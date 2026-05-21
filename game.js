@@ -349,7 +349,7 @@ const STATE = {
   pendingAI: false,
   animations: [],
   battle: null,      // active battle scene; see startBattle()
-  music: { wanted: true, started: false },
+  music: { wanted: true, started: false, trackIndex: 0 },
 };
 
 function startNewGame() {
@@ -1816,7 +1816,11 @@ function renderTopBar() {
   ctx.fillStyle = PAL.inkDim;
   ctx.font = "11px 'Courier New', monospace";
   ctx.textAlign = "right";
-  ctx.fillText("E end turn  |  M music " + (STATE.music.wanted ? "ON" : "OFF"), CANVAS_W - 16, 30);
+  const trackLabel = STATE.music.wanted
+    ? "♪ " + (TRACKS[STATE.music.trackIndex] || TRACKS[0]).name
+    : "music OFF";
+  ctx.fillText("E end turn  |  M mute  |  N next  |  " + trackLabel, CANVAS_W - 16, 30);
+  ctx.textAlign = "left";
 }
 
 function renderSidebar() {
@@ -1912,6 +1916,10 @@ function drawStatBar(x, y, w, h, val, max, color, label) {
   ctx.fillText(label, x + 4, y + h - 2);
   ctx.textAlign = "right";
   ctx.fillText(val + "/" + max, x + w - 4, y + h - 2);
+  // Reset textAlign so callers don't inherit "right" — previously this leak
+  // caused sidebar text (Spires held, BATTLE LOG) to render right-aligned
+  // at the panel's left edge, drifting off the left side of the sidebar.
+  ctx.textAlign = "left";
 }
 
 function wrapText(text, x, y, maxW, lh) {
@@ -2090,6 +2098,7 @@ function moveUnitTo(unit, q, r) { unit.q = q; unit.r = r; }
 function onKey(ev) {
   startMusicOnGesture();
   if (ev.key === "m" || ev.key === "M") { toggleMusic(); return; }
+  if (ev.key === "n" || ev.key === "N") { cycleTrack(); return; }
   if (STATE.screen === "title") {
     if (ev.key === "Enter" || ev.key === " ") startNewGame();
     return;
@@ -2443,54 +2452,152 @@ function toggleMusic() {
 
 function musicDuck(level) { audio.duck = level; }
 
-// A minor mode progression: i - VI - III - VII (Am - F - C - G) — extremely
-// common in 80s synth fantasy soundtracks.
-const CHORD_PROG = [
-  { root: 110.00, third: 130.81, fifth: 164.81 }, // Am
-  { root:  87.31, third: 110.00, fifth: 130.81 }, // F
-  { root:  65.41, third:  82.41, fifth:  98.00 }, // C (lower bass)
-  { root:  98.00, third: 123.47, fifth: 146.83 }, // G
-];
-// Arpeggio note pattern within a bar (16 sixteenths)
-const ARP_PATTERN = [0, 1, 2, 1, 0, 2, 1, 2, 0, 1, 2, 1, 0, 2, 1, 2];
-// Lead melody steps (pentatonic minor over A) by bar — sparse
-const LEAD_BARS = [
-  [{ s: 4, hz: 440 }, { s: 8, hz: 523.25 }, { s: 12, hz: 392 }],
-  [{ s: 0, hz: 349.23 }, { s: 8, hz: 440 }],
-  [{ s: 4, hz: 392 }, { s: 10, hz: 329.63 }, { s: 14, hz: 261.63 }],
-  [{ s: 2, hz: 293.66 }, { s: 8, hz: 392 }, { s: 12, hz: 440 }],
+// Six original 80s-dark-synth-fantasy loops. Each track is a 4-bar minor-key
+// progression with its own arp pattern and sparse lead melody. Pure chord
+// progressions and pentatonic phrases are not copyrightable expression —
+// these are written as generic genre-style patterns.
+const TRACKS = [
+  {
+    name: "WRAITHSPIRE FRONTIER",
+    // i-VI-III-VII in A minor — the classic "main theme" feel.
+    chords: [
+      { root: 110.00, third: 130.81, fifth: 164.81 }, // Am
+      { root:  87.31, third: 110.00, fifth: 130.81 }, // F
+      { root:  65.41, third:  82.41, fifth:  98.00 }, // C
+      { root:  98.00, third: 123.47, fifth: 146.83 }, // G
+    ],
+    arp: [0, 1, 2, 1, 0, 2, 1, 2, 0, 1, 2, 1, 0, 2, 1, 2],
+    lead: [
+      [{ s: 4, hz: 440 }, { s: 8, hz: 523.25 }, { s: 12, hz: 392 }],
+      [{ s: 0, hz: 349.23 }, { s: 8, hz: 440 }],
+      [{ s: 4, hz: 392 }, { s: 10, hz: 329.63 }, { s: 14, hz: 261.63 }],
+      [{ s: 2, hz: 293.66 }, { s: 8, hz: 392 }, { s: 12, hz: 440 }],
+    ],
+  },
+  {
+    name: "SHADOW VEIL",
+    // D minor, slower descending arp — more brooding/atmospheric.
+    chords: [
+      { root: 73.42, third:  87.31, fifth: 110.00 }, // Dm
+      { root: 58.27, third:  73.42, fifth:  87.31 }, // Bb
+      { root: 87.31, third: 110.00, fifth: 130.81 }, // F
+      { root: 65.41, third:  82.41, fifth:  98.00 }, // C
+    ],
+    arp: [2, 1, 0, 1, 2, 1, 0, 1, 2, 1, 0, 1, 2, 1, 0, 1],
+    lead: [
+      [{ s: 0, hz: 293.66 }, { s: 8, hz: 349.23 }, { s: 12, hz: 440 }],
+      [{ s: 4, hz: 466.16 }, { s: 10, hz: 392 }],
+      [{ s: 0, hz: 349.23 }, { s: 8, hz: 261.63 }],
+      [{ s: 4, hz: 261.63 }, { s: 8, hz: 311.13 }, { s: 14, hz: 233.08 }],
+    ],
+  },
+  {
+    name: "IRON CATACOMBS",
+    // E minor, bouncing arp, energetic exploration feel.
+    chords: [
+      { root: 82.41, third:  98.00, fifth: 123.47 }, // Em
+      { root: 65.41, third:  82.41, fifth:  98.00 }, // C
+      { root: 98.00, third: 123.47, fifth: 146.83 }, // G
+      { root: 73.42, third:  92.50, fifth: 110.00 }, // D
+    ],
+    arp: [0, 2, 1, 2, 0, 2, 1, 2, 0, 2, 1, 2, 0, 2, 1, 2],
+    lead: [
+      [{ s: 0, hz: 329.63 }, { s: 6, hz: 392 }, { s: 12, hz: 493.88 }],
+      [{ s: 4, hz: 523.25 }, { s: 10, hz: 392 }],
+      [{ s: 2, hz: 587.33 }, { s: 8, hz: 493.88 }, { s: 12, hz: 392 }],
+      [{ s: 0, hz: 440 }, { s: 8, hz: 369.99 }, { s: 14, hz: 293.66 }],
+    ],
+  },
+  {
+    name: "PYRE OF STARS",
+    // i-VII-VI-i descending bass — dramatic Andalusian cadence in A minor.
+    chords: [
+      { root: 110.00, third: 130.81, fifth: 164.81 }, // Am
+      { root:  98.00, third: 123.47, fifth: 146.83 }, // G
+      { root:  87.31, third: 110.00, fifth: 130.81 }, // F
+      { root:  82.41, third:  98.00, fifth: 123.47 }, // Em
+    ],
+    arp: [0, 1, 2, 1, 0, 1, 2, 1, 0, 1, 2, 1, 0, 1, 2, 1],
+    lead: [
+      [{ s: 0, hz: 440 }, { s: 6, hz: 523.25 }, { s: 12, hz: 659.25 }],
+      [{ s: 0, hz: 587.33 }, { s: 8, hz: 392 }],
+      [{ s: 0, hz: 523.25 }, { s: 6, hz: 440 }, { s: 12, hz: 349.23 }],
+      [{ s: 0, hz: 329.63 }, { s: 4, hz: 246.94 }, { s: 12, hz: 329.63 }],
+    ],
+  },
+  {
+    name: "TOWER WATCH",
+    // C minor, octave-jumping sparse arp — melancholic standing-vigil mood.
+    chords: [
+      { root: 65.41, third: 77.78, fifth:  98.00 }, // Cm
+      { root: 98.00, third: 116.54, fifth: 146.83 }, // Gm
+      { root: 51.91, third: 65.41, fifth:  77.78 }, // Ab
+      { root: 58.27, third: 73.42, fifth:  87.31 }, // Bb
+    ],
+    arp: [0, 2, 0, 2, 0, 2, 0, 2, 0, 2, 0, 2, 0, 2, 0, 2],
+    lead: [
+      [{ s: 4, hz: 261.63 }, { s: 12, hz: 311.13 }],
+      [{ s: 0, hz: 391.99 }, { s: 8, hz: 466.16 }],
+      [{ s: 4, hz: 415.31 }, { s: 12, hz: 311.13 }],
+      [{ s: 0, hz: 349.23 }, { s: 8, hz: 466.16 }, { s: 14, hz: 392 }],
+    ],
+  },
+  {
+    name: "HEX STORM",
+    // E minor with secondary minor, syncopated busy lead — combat tension.
+    chords: [
+      { root: 82.41, third:  98.00, fifth: 123.47 }, // Em
+      { root: 61.74, third:  73.42, fifth:  92.50 }, // Bm (low)
+      { root: 65.41, third:  82.41, fifth:  98.00 }, // C
+      { root: 98.00, third: 123.47, fifth: 146.83 }, // G
+    ],
+    arp: [0, 2, 1, 2, 1, 0, 1, 2, 0, 2, 1, 2, 1, 0, 1, 2],
+    lead: [
+      [{ s: 2, hz: 329.63 }, { s: 6, hz: 493.88 }, { s: 10, hz: 587.33 }, { s: 14, hz: 392 }],
+      [{ s: 0, hz: 493.88 }, { s: 6, hz: 587.33 }, { s: 12, hz: 369.99 }],
+      [{ s: 4, hz: 523.25 }, { s: 8, hz: 659.25 }, { s: 14, hz: 392 }],
+      [{ s: 0, hz: 587.33 }, { s: 8, hz: 392 }, { s: 12, hz: 493.88 }],
+    ],
+  },
 ];
 
 function musicTick() {
   if (!audio.enabled) return;
+  const track = TRACKS[STATE.music.trackIndex] || TRACKS[0];
   const stepGlobal = audio.step++;
   const stepsPerBar = 16;
-  const barIdx = Math.floor(stepGlobal / stepsPerBar) % CHORD_PROG.length;
+  const barIdx = Math.floor(stepGlobal / stepsPerBar) % track.chords.length;
   const beat = stepGlobal % stepsPerBar;
-  const chord = CHORD_PROG[barIdx];
+  const chord = track.chords[barIdx];
   const notes = [chord.root, chord.third, chord.fifth];
 
-  // Bass: square pluck on beats 1, 7, 9
+  // Bass: square pluck on beats 1, 9 (downbeats), with a softer offbeat
   if (beat === 0 || beat === 8) playSynth(chord.root, "square", 0.35, 0.16, 800);
   if (beat === 4 || beat === 12) playSynth(chord.root * 1.5, "square", 0.18, 0.10, 600);
 
-  // Arp: triangle every 16th
-  const arpNote = notes[ARP_PATTERN[beat] % notes.length] * 2;
+  // Arp: triangle every 16th, cycling the track's chord-tone pattern
+  const arpNote = notes[track.arp[beat] % notes.length] * 2;
   playSynth(arpNote, "triangle", 0.13, 0.045, 4000);
 
-  // Pad: sawtooth chord on beat 1, sustains
+  // Pad: sawtooth chord on bar 1, sustains; sine doubles octave up
   if (beat === 0) {
     for (const n of notes) playSynth(n * 2, "sawtooth", 1.7, 0.025, 1200);
     for (const n of notes) playSynth(n * 4, "sine", 1.7, 0.012, 4000);
   }
 
-  // Lead: occasional notes per pattern
-  for (const lead of LEAD_BARS[barIdx]) {
+  // Lead: occasional notes per the track's lead pattern for this bar
+  for (const lead of track.lead[barIdx]) {
     if (lead.s === beat) playSynth(lead.hz, "sawtooth", 0.45, 0.06, 1800, 0.06);
   }
 
-  // Soft kick on beat 1 and 9
+  // Soft kick on beats 1 and 9
   if (beat === 0 || beat === 8) noiseHit(0.05, 0.08);
+}
+
+function cycleTrack() {
+  STATE.music.trackIndex = (STATE.music.trackIndex + 1) % TRACKS.length;
+  audio.step = 0; // restart the new track at bar 1
+  STATE.banner = { text: "♪ " + TRACKS[STATE.music.trackIndex].name, ttl: 60 };
 }
 
 function playSynth(freq, type, dur, gain, filterHz, attack) {
