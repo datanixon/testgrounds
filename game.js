@@ -1926,11 +1926,8 @@ function wrapText(text, x, y, maxW, lh) {
 function renderMenu() {
   if (!STATE.menu) return;
   const m = STATE.menu;
-  const padX = 12, padY = 10, lineH = 20;
-  const w = m.kind === "summonMenu" ? 200 : 150;
-  const h = padY * 2 + m.items.length * lineH;
-  const x = Math.min(CANVAS_W - SIDEBAR_W - w - 8, Math.max(8, m.anchor.x + 18));
-  const y = Math.min(CANVAS_H - h - 8, Math.max(TOPBAR_H + 8, m.anchor.y - h / 2));
+  const r = menuRect(m);
+  const { x, y, w, h, padX, padY, lineH } = r;
 
   ctx.fillStyle = "rgba(8, 6, 14, 0.95)";
   ctx.fillRect(x, y, w, h);
@@ -1980,8 +1977,30 @@ function clientToCanvas(ev) {
 
 function onMouseMove(ev) {
   const p = clientToCanvas(ev);
+  // Menu hover takes precedence — move the selection cursor to whichever
+  // item the mouse is over.
+  if (STATE.menu) {
+    const rect = menuRect(STATE.menu);
+    if (p.x >= rect.x && p.x <= rect.x + rect.w && p.y >= rect.y && p.y <= rect.y + rect.h) {
+      const idx = Math.floor((p.y - rect.y - rect.padY) / rect.lineH);
+      if (idx >= 0 && idx < STATE.menu.items.length && !STATE.menu.items[idx].disabled) {
+        STATE.menu.index = idx;
+      }
+    }
+  }
   if (p.x > MAP_W || p.y < TOPBAR_H) { STATE.hover = null; return; }
   STATE.hover = pixelToAxial(p.x - STATE.cam.x, p.y - STATE.cam.y - TOPBAR_H);
+}
+
+// Single source of truth for where the menu is drawn on screen so the
+// click hit-test and the renderer don't drift.
+function menuRect(m) {
+  const padX = 12, padY = 10, lineH = 20;
+  const w = m.kind === "summonMenu" ? 200 : 150;
+  const h = padY * 2 + m.items.length * lineH;
+  const x = Math.min(CANVAS_W - SIDEBAR_W - w - 8, Math.max(8, m.anchor.x + 18));
+  const y = Math.min(CANVAS_H - h - 8, Math.max(TOPBAR_H + 8, m.anchor.y - h / 2));
+  return { x, y, w, h, padX, padY, lineH };
 }
 
 function onClick(ev) {
@@ -1993,10 +2012,26 @@ function onClick(ev) {
   if (PLAYERS[STATE.currentPlayer].isAI) return;
 
   const p = clientToCanvas(ev);
+
+  // If a menu is open, route the click to its hit-test before touching the map.
+  if (STATE.menu) {
+    const rect = menuRect(STATE.menu);
+    if (p.x >= rect.x && p.x <= rect.x + rect.w && p.y >= rect.y && p.y <= rect.y + rect.h) {
+      const idx = Math.floor((p.y - rect.y - rect.padY) / rect.lineH);
+      if (idx >= 0 && idx < STATE.menu.items.length && !STATE.menu.items[idx].disabled) {
+        STATE.menu.index = idx;
+        selectMenuItem(STATE.menu.items[idx]);
+      }
+      return;
+    }
+    // Clicking outside the menu closes it (Wait-equivalent escape).
+    cancelMenu();
+    return;
+  }
+
   if (p.x > MAP_W || p.y < TOPBAR_H) return;
   const local = pixelToAxial(p.x - STATE.cam.x, p.y - STATE.cam.y - TOPBAR_H);
   if (!inBounds(local.q, local.r)) return;
-  if (STATE.menu) return;
 
   const onUnit = unitAt(local.q, local.r);
 
@@ -2511,16 +2546,18 @@ function boot() {
 }
 
 function resizeCanvasCSS() {
-  // Fit the canvas to the viewport while preserving 16:10 aspect ratio.
-  // Allow scaling up generously on big monitors (the user asked for "easily
-  // play on larger monitors") — we cap at 2x to keep the pixel grid crisp.
-  const aspect = CANVAS_W / CANVAS_H;
+  // Fit the canvas to the viewport while preserving 16:10 aspect ratio EXACTLY.
+  // We compute a single uniform scale factor, then derive height from the
+  // floored width so the displayed ratio is identical to the internal ratio.
+  // Without this, flooring width and height independently produces slightly
+  // different x/y scales — pixelated rendering skews text and sprites.
   const vw = Math.max(320, window.innerWidth);
   const vh = Math.max(200, window.innerHeight) - 24;
-  let w = vw, h = vw / aspect;
-  if (h > vh) { h = vh; w = vh * aspect; }
-  canvas.style.width = Math.floor(w) + "px";
-  canvas.style.height = Math.floor(h) + "px";
+  const scale = Math.min(vw / CANVAS_W, vh / CANVAS_H);
+  const dispW = Math.floor(CANVAS_W * scale);
+  const dispH = Math.round(dispW * CANVAS_H / CANVAS_W);
+  canvas.style.width = dispW + "px";
+  canvas.style.height = dispH + "px";
 }
 
 function loop() {
