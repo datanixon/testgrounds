@@ -2422,8 +2422,37 @@ function ensureAudio() {
     audio.master.gain.value = 0.6;
     audio.master.connect(audio.ctx.destination);
     audio.musicGain = audio.ctx.createGain();
-    audio.musicGain.gain.value = 0.5;
+    audio.musicGain.gain.value = 0.45;
     audio.musicGain.connect(audio.master);
+
+    // Delay-based fake reverb send bus. Synths can route some signal here
+    // via the `reverbSend` arg on playSynth; the feedback loop with a
+    // lowpass filter approximates a dark plate reverb tail. Cheap, no IR
+    // sample needed, and gives the loops the spacious 80s feel.
+    audio.reverbIn = audio.ctx.createGain();
+    audio.reverbIn.gain.value = 1.0;
+    const delay = audio.ctx.createDelay(1.0);
+    delay.delayTime.value = 0.21;
+    const feedback = audio.ctx.createGain();
+    feedback.gain.value = 0.48;
+    const reverbFilter = audio.ctx.createBiquadFilter();
+    reverbFilter.type = "lowpass";
+    reverbFilter.frequency.value = 3500;
+    const reverbOut = audio.ctx.createGain();
+    reverbOut.gain.value = 0.6;
+    audio.reverbIn.connect(delay);
+    delay.connect(reverbFilter);
+    reverbFilter.connect(feedback);
+    feedback.connect(delay);
+    reverbFilter.connect(reverbOut);
+    reverbOut.connect(audio.musicGain);
+
+    // Reusable noise buffer for hi-hat / snare layers (avoid allocating
+    // a fresh AudioBuffer every 16th note).
+    const bufLen = audio.ctx.sampleRate;
+    audio.noiseBuf = audio.ctx.createBuffer(1, bufLen, audio.ctx.sampleRate);
+    const data = audio.noiseBuf.getChannelData(0);
+    for (let i = 0; i < bufLen; i++) data[i] = Math.random() * 2 - 1;
   } catch (e) { /* audio unavailable */ }
 }
 
@@ -2571,27 +2600,39 @@ function musicTick() {
   const chord = track.chords[barIdx];
   const notes = [chord.root, chord.third, chord.fifth];
 
-  // Bass: square pluck on beats 1, 9 (downbeats), with a softer offbeat
-  if (beat === 0 || beat === 8) playSynth(chord.root, "square", 0.35, 0.16, 800);
-  if (beat === 4 || beat === 12) playSynth(chord.root * 1.5, "square", 0.18, 0.10, 600);
+  // -------- DRUMS --------
+  // Kick on the 1 and the 3 (beats 1 and 9 of 16 sixteenths).
+  if (beat === 0 || beat === 8) playKick(0.5);
+  // Snare backbeat on the 2 and 4 (beats 5 and 13).
+  if (beat === 4 || beat === 12) playSnare(0.22);
+  // Hi-hat on every 8th note, accent on the 16th-note pickups.
+  if (beat % 2 === 0) playHihat(beat % 4 === 2 ? 0.10 : 0.06);
 
-  // Arp: triangle every 16th, cycling the track's chord-tone pattern
+  // -------- BASS --------
+  // Filter-swept sawtooth bass on downbeats (the "wow" envelope) plus
+  // walking notes on the offbeats to keep it moving.
+  if (beat === 0 || beat === 8) playBass(chord.root, 0.42, 0.22, 2400);
+  if (beat === 4)  playBass(chord.fifth * 0.5, 0.28, 0.13, 1600);
+  if (beat === 12) playBass(chord.third * 0.5, 0.28, 0.13, 1600);
+
+  // -------- ARP --------
+  // Triangle arp every 16th, light reverb so it sparkles without smearing.
   const arpNote = notes[track.arp[beat] % notes.length] * 2;
-  playSynth(arpNote, "triangle", 0.13, 0.045, 4000);
+  playSynth(arpNote, "triangle", 0.14, 0.05, 4000, undefined, 0.18);
 
-  // Pad: sawtooth chord on bar 1, sustains; sine doubles octave up
+  // -------- PAD --------
+  // Sawtooth chord layered with a soft sine octave on bar downbeat. The
+  // pad is the main carrier of reverb — high send keeps the loop spacious.
   if (beat === 0) {
-    for (const n of notes) playSynth(n * 2, "sawtooth", 1.7, 0.025, 1200);
-    for (const n of notes) playSynth(n * 4, "sine", 1.7, 0.012, 4000);
+    for (const n of notes) playSynth(n * 2, "sawtooth", 1.8, 0.028, 1100, 0.04, 0.45);
+    for (const n of notes) playSynth(n * 4, "sine",     1.8, 0.014, 4000, 0.04, 0.35);
   }
 
-  // Lead: occasional notes per the track's lead pattern for this bar
+  // -------- LEAD --------
+  // Lead notes get the most reverb so they sit on top of the mix.
   for (const lead of track.lead[barIdx]) {
-    if (lead.s === beat) playSynth(lead.hz, "sawtooth", 0.45, 0.06, 1800, 0.06);
+    if (lead.s === beat) playSynth(lead.hz, "sawtooth", 0.50, 0.07, 1900, 0.06, 0.55);
   }
-
-  // Soft kick on beats 1 and 9
-  if (beat === 0 || beat === 8) noiseHit(0.05, 0.08);
 }
 
 function cycleTrack() {
@@ -2600,7 +2641,7 @@ function cycleTrack() {
   STATE.banner = { text: "♪ " + TRACKS[STATE.music.trackIndex].name, ttl: 60 };
 }
 
-function playSynth(freq, type, dur, gain, filterHz, attack) {
+function playSynth(freq, type, dur, gain, filterHz, attack, reverbSend) {
   if (!audio.ctx) return;
   const t = audio.ctx.currentTime;
   const osc = audio.ctx.createOscillator();
@@ -2617,28 +2658,124 @@ function playSynth(freq, type, dur, gain, filterHz, attack) {
   g.gain.linearRampToValueAtTime(peak, t + a);
   g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
   osc.connect(lp); lp.connect(g); g.connect(audio.musicGain);
+  if (reverbSend && audio.reverbIn) {
+    const send = audio.ctx.createGain();
+    send.gain.value = reverbSend;
+    g.connect(send); send.connect(audio.reverbIn);
+  }
   osc.start(t);
   osc.stop(t + dur + 0.05);
 }
 
-function noiseHit(dur, gain) {
+// Sawtooth bass with a fast filter-envelope sweep — the synthwave "wow"
+// signature. Filter opens from 200 Hz up to `sweepTo` Hz over 60 ms, then
+// drifts back closed across the note's tail.
+function playBass(freq, dur, gain, sweepTo) {
   if (!audio.ctx) return;
   const t = audio.ctx.currentTime;
-  const bufferSize = Math.floor(audio.ctx.sampleRate * dur);
-  const buffer = audio.ctx.createBuffer(1, bufferSize, audio.ctx.sampleRate);
-  const data = buffer.getChannelData(0);
-  for (let i = 0; i < bufferSize; i++) {
-    data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / bufferSize, 2);
-  }
-  const src = audio.ctx.createBufferSource();
-  src.buffer = buffer;
-  const hp = audio.ctx.createBiquadFilter();
-  hp.type = "lowpass";
-  hp.frequency.value = 220;
+  const osc = audio.ctx.createOscillator();
   const g = audio.ctx.createGain();
-  g.gain.value = gain * audio.duck;
+  const lp = audio.ctx.createBiquadFilter();
+  lp.type = "lowpass";
+  lp.Q.value = 6;
+  lp.frequency.setValueAtTime(200, t);
+  lp.frequency.linearRampToValueAtTime(sweepTo || 1500, t + 0.06);
+  lp.frequency.exponentialRampToValueAtTime(180, t + dur);
+  osc.type = "sawtooth";
+  osc.frequency.value = freq;
+  const peak = gain * audio.duck;
+  g.gain.setValueAtTime(0, t);
+  g.gain.linearRampToValueAtTime(peak, t + 0.005);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  osc.connect(lp); lp.connect(g); g.connect(audio.musicGain);
+  osc.start(t);
+  osc.stop(t + dur + 0.05);
+}
+
+// 808-style kick: sine wave pitch-bent from ~110 Hz down to ~40 Hz with
+// a quick lowpassed noise click on top for transient body.
+function playKick(gain) {
+  if (!audio.ctx) return;
+  const t = audio.ctx.currentTime;
+  const osc = audio.ctx.createOscillator();
+  const g = audio.ctx.createGain();
+  osc.type = "sine";
+  osc.frequency.setValueAtTime(110, t);
+  osc.frequency.exponentialRampToValueAtTime(40, t + 0.08);
+  g.gain.setValueAtTime(0, t);
+  g.gain.linearRampToValueAtTime(gain * audio.duck, t + 0.002);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.22);
+  osc.connect(g); g.connect(audio.musicGain);
+  osc.start(t);
+  osc.stop(t + 0.3);
+
+  // Click transient
+  const src = audio.ctx.createBufferSource();
+  src.buffer = audio.noiseBuf;
+  src.loop = false;
+  const clickFilt = audio.ctx.createBiquadFilter();
+  clickFilt.type = "lowpass";
+  clickFilt.frequency.value = 3500;
+  const clickG = audio.ctx.createGain();
+  clickG.gain.setValueAtTime(gain * 0.5 * audio.duck, t);
+  clickG.gain.exponentialRampToValueAtTime(0.0001, t + 0.015);
+  src.connect(clickFilt); clickFilt.connect(clickG); clickG.connect(audio.musicGain);
+  src.start(t, 0, 0.02);
+}
+
+// Snare: noise band-passed at 1.5 kHz with a short tonal "thwack" body
+// triangle at 200→100 Hz layered underneath.
+function playSnare(gain) {
+  if (!audio.ctx) return;
+  const t = audio.ctx.currentTime;
+  // Noise body
+  const src = audio.ctx.createBufferSource();
+  src.buffer = audio.noiseBuf;
+  const bp = audio.ctx.createBiquadFilter();
+  bp.type = "bandpass";
+  bp.frequency.value = 1700;
+  bp.Q.value = 0.7;
+  const ng = audio.ctx.createGain();
+  ng.gain.setValueAtTime(0, t);
+  ng.gain.linearRampToValueAtTime(gain * audio.duck, t + 0.002);
+  ng.gain.exponentialRampToValueAtTime(0.0001, t + 0.13);
+  src.connect(bp); bp.connect(ng); ng.connect(audio.musicGain);
+  src.start(t, 0, 0.18);
+  // Tonal body
+  const osc = audio.ctx.createOscillator();
+  osc.type = "triangle";
+  osc.frequency.setValueAtTime(220, t);
+  osc.frequency.exponentialRampToValueAtTime(110, t + 0.06);
+  const og = audio.ctx.createGain();
+  og.gain.setValueAtTime(0, t);
+  og.gain.linearRampToValueAtTime(gain * 0.45 * audio.duck, t + 0.002);
+  og.gain.exponentialRampToValueAtTime(0.0001, t + 0.09);
+  osc.connect(og); og.connect(audio.musicGain);
+  osc.start(t);
+  osc.stop(t + 0.15);
+  // Small reverb tail on snare for "in the room" feel
+  if (audio.reverbIn) {
+    const send = audio.ctx.createGain();
+    send.gain.value = 0.2;
+    ng.connect(send); send.connect(audio.reverbIn);
+  }
+}
+
+// Closed hi-hat: high-passed noise with a very short envelope.
+function playHihat(gain) {
+  if (!audio.ctx) return;
+  const t = audio.ctx.currentTime;
+  const src = audio.ctx.createBufferSource();
+  src.buffer = audio.noiseBuf;
+  const hp = audio.ctx.createBiquadFilter();
+  hp.type = "highpass";
+  hp.frequency.value = 7000;
+  const g = audio.ctx.createGain();
+  g.gain.setValueAtTime(0, t);
+  g.gain.linearRampToValueAtTime(gain * audio.duck, t + 0.001);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.04);
   src.connect(hp); hp.connect(g); g.connect(audio.musicGain);
-  src.start(t);
+  src.start(t, 0, 0.06);
 }
 
 function beep(freq, dur, type, gain) {
