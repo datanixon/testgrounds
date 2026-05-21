@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Wraithspire — Summoner's War</title>
+<style>
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: #05030c;
+    color: #e8e6d8;
+    font-family: "Courier New", monospace;
+    overflow: hidden;
+    width: 100%;
+    height: 100%;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  #stage {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+  }
+  canvas {
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+    background: #050409;
+    box-shadow: 0 0 36px rgba(120, 90, 200, 0.3), 0 0 4px rgba(0,0,0,0.6);
+    cursor: crosshair;
+    /* JS sets concrete CSS width/height to keep aspect ratio and fit window */
+  }
+  #hint {
+    position: absolute;
+    bottom: 6px;
+    left: 50%;
+    transform: translateX(-50%);
+    color: #5a567a;
+    font-size: 11px;
+    letter-spacing: 1px;
+    pointer-events: none;
+    text-align: center;
+    white-space: nowrap;
+  }
+</style>
+</head>
+<body>
+  <div id="stage">
+    <canvas id="game" width="1280" height="800"></canvas>
+  </div>
+  <div id="hint">Click hexes &middot; arrow keys to pan &middot; ENTER to confirm &middot; ESC to cancel &middot; M to mute music</div>
+  <script src="game.js"></script>
+</body>
+</html>
