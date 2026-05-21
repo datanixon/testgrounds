@@ -616,7 +616,7 @@ function aiActUnit(u, enemyMaster, done) {
   if (best) {
     moveUnitTo(u, best.moveTo.q, best.moveTo.r);
     u.acted = true;
-    beginBattle(u, best.target, () => setTimeout(done, 120));
+    beginBattle(u, best.target, () => setTimeout(done, 400));
     return;
   }
 
@@ -1133,15 +1133,19 @@ function drawTerrainDetail(ctx, cell, cx, cy) {
 // 10. Battle scene state machine & renderer
 // =========================================================================
 
-// Phase durations (frames)
+// Phase durations (frames @ 60 fps). Tuned to feel cinematic rather than
+// snappy — the player needs time to read the damage number, see who hit
+// who, and process the counter. Total no-counter ≈ 2.8 s, with counter
+// ≈ 4 s. Bump these if you want even slower drama; trim to make turns
+// move faster.
 const B = {
-  intro: 22,
-  standoff: 16,
-  charge: 14,
-  impact: 18,
-  recover: 10,
-  pause: 12,
-  outro: 22,
+  intro: 36,     // 600 ms — letterbox wipes in, "BATTLE" banner appears
+  standoff: 26,  // 433 ms — both combatants in idle, banner finishes fading
+  charge: 22,    // 367 ms — attacker dashes forward (or projectile flies)
+  impact: 34,    // 567 ms — hit flash + damage popup, screen shake
+  recover: 18,   // 300 ms — attacker returns to start position
+  pause: 22,     // 367 ms — dramatic beat before counterattack
+  outro: 32,     // 533 ms — letterbox closes, return to map
 };
 
 function updateBattle() {
