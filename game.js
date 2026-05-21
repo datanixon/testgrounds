@@ -685,6 +685,11 @@ function drawMapSprite(ctx, unit, cx, cy, t) {
 
   const px = (x, y, w, h, fill) => { ctx.fillStyle = fill; ctx.fillRect(x, y, w, h); };
 
+  // NOTE: every branch in this function MUST round-trip through the
+  // ctx.restore() at the bottom. A missing restore here leaves the canvas
+  // transformed for whatever draws next (HP bars, the next unit, eventually
+  // the topbar) — that bug previously offset master HP bars by one hex and
+  // pushed the CRIMSON archon off the grid.
   if (unit.isMaster) {
     // Player-specific archon silhouette
     if (unit.owner === 0) {
@@ -721,6 +726,7 @@ function drawMapSprite(ctx, unit, cx, cy, t) {
       px(10, -12, 2, 2, "#ffe0a0");
       px(10, -13, 1, 1, trim);
     }
+    ctx.restore();
     return;
   }
 
@@ -2193,7 +2199,32 @@ function closeMenu() {
   STATE.attackTargets = null;
 }
 
-function cancelMenu() { closeMenu(); }
+function cancelMenu() {
+  if (!STATE.menu) return;
+  // Submenu (Summon picker) — back out to the parent post-move menu so
+  // the player can still pick a different action for this unit.
+  if (STATE.menu.kind === "summonMenu") {
+    const unit = STATE.menu.unit;
+    const items = [];
+    const targets = computeAttackTargets(unit, unit.q, unit.r);
+    const cellHere = cellAt({ q: unit.q, r: unit.r });
+    if (targets.size > 0) items.push({ label: "Attack", kind: "attackMode" });
+    if (canCapture(unit, cellHere)) items.push({ label: "Capture", kind: "capture" });
+    if (unit.isMaster && unit.mp >= 6) items.push({ label: "Summon", kind: "summon" });
+    items.push({ label: "Wait", kind: "wait" });
+    const px = axialToPixel(unit.q, unit.r);
+    STATE.menu = {
+      kind: "postMove", unit, items, index: 0,
+      anchor: { x: px.x + STATE.cam.x, y: px.y + STATE.cam.y + TOPBAR_H },
+    };
+    return;
+  }
+  // Post-move menu cancel commits the move (move is already applied; this
+  // is equivalent to Wait). Without this, the unit becomes reselectable
+  // and the player can repeatedly move it.
+  if (STATE.menu.unit && !STATE.menu.unit.acted) STATE.menu.unit.acted = true;
+  closeMenu();
+}
 
 // =========================================================================
 // 13. Turn / phase machinery
