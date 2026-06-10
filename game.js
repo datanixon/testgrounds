@@ -20,6 +20,8 @@
 //  14. UI screens (title, win/lose, banners)
 //  15. Audio engine (SFX + 80s synth music loop)
 //  16. Boot, resize, main loop
+//  17. Status effects (v2 1.1)
+//  18. Abilities (v2 1.2-1.4)
 
 // =========================================================================
 // 1. Constants & palette
@@ -388,11 +390,11 @@ function elementsEmpoweredBy(terrain) {
 const UNIT_TYPES = {
   cinderling:  { name: "Cinderling",  element: "pyro",   maxHp: 12, move: 4, range: 1, power: 5, def: 1, cost: 6,  flying: false, sprite: "imp",      attack: "melee",  evolvesTo: "infernite" },
   pyrowyrm:    { name: "Pyrowyrm",    element: "pyro",   maxHp: 18, move: 3, range: 2, power: 7, def: 2, cost: 12, flying: false, sprite: "wyrm",     attack: "breath", evolvesTo: "emberdrake" },
-  tidekin:     { name: "Tidekin",     element: "hydro",  maxHp: 14, move: 4, range: 1, power: 5, def: 2, cost: 7,  flying: false, sprite: "merfolk",  attack: "melee",  evolvesTo: "tidelord" },
+  tidekin:     { name: "Tidekin",     element: "hydro",  maxHp: 14, move: 4, range: 1, power: 5, def: 2, cost: 7,  flying: false, sprite: "merfolk",  attack: "melee",  evolvesTo: "tidelord", ability: "healPulse" },
   mistleviath: { name: "Mistlevy",    element: "hydro",  maxHp: 20, move: 3, range: 2, power: 6, def: 3, cost: 14, flying: false, sprite: "serpent",  attack: "spray",  evolvesTo: "leviathan" },
   stoneward:   { name: "Stoneward",   element: "terra",  maxHp: 22, move: 2, range: 1, power: 5, def: 4, cost: 8,  flying: false, sprite: "golem",    attack: "melee",  evolvesTo: "colossus" },
-  geomaul:     { name: "Geomaul",     element: "terra",  maxHp: 26, move: 2, range: 1, power: 9, def: 4, cost: 16, flying: false, sprite: "ogre",     attack: "melee",  evolvesTo: "earthbreaker" },
-  galewisp:    { name: "Galewisp",    element: "zephyr", maxHp: 10, move: 5, range: 2, power: 4, def: 1, cost: 7,  flying: true,  sprite: "wisp",     attack: "spark",  evolvesTo: "stormwisp" },
+  geomaul:     { name: "Geomaul",     element: "terra",  maxHp: 26, move: 2, range: 1, power: 9, def: 4, cost: 16, flying: false, sprite: "ogre",     attack: "melee",  evolvesTo: "earthbreaker", ability: "quake" },
+  galewisp:    { name: "Galewisp",    element: "zephyr", maxHp: 10, move: 5, range: 2, power: 4, def: 1, cost: 7,  flying: true,  sprite: "wisp",     attack: "spark",  evolvesTo: "stormwisp", ability: "galeRush" },
   skyharrow:   { name: "Skyharrow",   element: "zephyr", maxHp: 16, move: 4, range: 2, power: 7, def: 2, cost: 13, flying: true,  sprite: "raptor",   attack: "dive",   evolvesTo: "skytyrant" },
 
   // Evolved forms (terminal tier; not directly summonable). Reached when a
@@ -400,18 +402,18 @@ const UNIT_TYPES = {
   // in milestone 5.1 — each evolved form now has its own unique sprite id.
   infernite:    { name: "Infernite",    element: "pyro",   maxHp: 22, move: 4, range: 1, power: 9,  def: 3, cost: 18, flying: false, sprite: "infernite",    attack: "melee",  evolved: true },
   emberdrake:   { name: "Emberdrake",   element: "pyro",   maxHp: 30, move: 3, range: 2, power: 11, def: 4, cost: 26, flying: false, sprite: "emberdrake",   attack: "breath", evolved: true },
-  tidelord:     { name: "Tidelord",     element: "hydro",  maxHp: 24, move: 4, range: 1, power: 9,  def: 4, cost: 18, flying: false, sprite: "tidelord",     attack: "melee",  evolved: true },
+  tidelord:     { name: "Tidelord",     element: "hydro",  maxHp: 24, move: 4, range: 1, power: 9,  def: 4, cost: 18, flying: false, sprite: "tidelord",     attack: "melee",  evolved: true, ability: "healPulse" },
   leviathan:    { name: "Leviathan",    element: "hydro",  maxHp: 32, move: 3, range: 2, power: 10, def: 5, cost: 28, flying: false, sprite: "leviathan",    attack: "spray",  evolved: true },
   colossus:     { name: "Colossus",     element: "terra",  maxHp: 36, move: 2, range: 1, power: 9,  def: 6, cost: 20, flying: false, sprite: "colossus",     attack: "melee",  evolved: true },
-  earthbreaker: { name: "Earthbreaker", element: "terra",  maxHp: 42, move: 2, range: 1, power: 14, def: 6, cost: 30, flying: false, sprite: "earthbreaker", attack: "melee",  evolved: true },
-  stormwisp:    { name: "Stormwisp",    element: "zephyr", maxHp: 18, move: 5, range: 2, power: 8,  def: 2, cost: 18, flying: true,  sprite: "stormwisp",    attack: "spark",  evolved: true },
+  earthbreaker: { name: "Earthbreaker", element: "terra",  maxHp: 42, move: 2, range: 1, power: 14, def: 6, cost: 30, flying: false, sprite: "earthbreaker", attack: "melee",  evolved: true, ability: "quake" },
+  stormwisp:    { name: "Stormwisp",    element: "zephyr", maxHp: 18, move: 5, range: 2, power: 8,  def: 2, cost: 18, flying: true,  sprite: "stormwisp",    attack: "spark",  evolved: true, ability: "galeRush" },
   skytyrant:    { name: "Skytyrant",    element: "zephyr", maxHp: 26, move: 4, range: 2, power: 11, def: 3, cost: 24, flying: true,  sprite: "skytyrant",    attack: "dive",   evolved: true },
 
   // New base monsters (milestone 5.1 — arcane element coverage + roster depth)
   hexwisp:   { name: "Hexwisp",   element: "arcane", maxHp: 11, move: 5, range: 2, power: 5,  def: 1, cost: 8,  flying: true,  sprite: "hexwisp",   attack: "bolt" },
   runeward:  { name: "Runeward",  element: "arcane", maxHp: 24, move: 2, range: 1, power: 7,  def: 5, cost: 15, flying: false, sprite: "runeward",  attack: "melee" },
   frostmaw:  { name: "Frostmaw",  element: "hydro",  maxHp: 28, move: 3, range: 1, power: 10, def: 3, cost: 18, flying: false, sprite: "frostmaw",  attack: "melee" },
-  duneskink: { name: "Duneskink", element: "terra",  maxHp: 13, move: 5, range: 1, power: 6,  def: 1, cost: 6,  flying: false, sprite: "duneskink", attack: "melee" },
+  duneskink: { name: "Duneskink", element: "terra",  maxHp: 13, move: 5, range: 1, power: 6,  def: 1, cost: 6,  flying: false, sprite: "duneskink", attack: "melee", ability: "skitter" },
 };
 
 const SUMMON_LIST = ["cinderling", "tidekin", "stoneward", "galewisp", "duneskink", "pyrowyrm", "hexwisp", "mistleviath", "runeward", "geomaul", "frostmaw", "skyharrow"];
@@ -434,6 +436,7 @@ function makeUnit(typeKey, owner, q, r) {
     flying: t.flying, sprite: t.sprite, attack: t.attack,
     level: 1, xp: 0,
     acted: false, isMaster: false,
+    cd: 0, secondMove: false,
   };
 }
 
@@ -451,6 +454,7 @@ function makeMaster(owner, q, r) {
     flying: false, sprite: "archon", attack: "bolt",
     level: 1, xp: 0,
     acted: false, isMaster: true,
+    cd: 0, secondMove: false,
   };
 }
 
@@ -3321,7 +3325,8 @@ function drawUnitCard(u, y) {
   const showForecast = sel && sel !== u && sel.hp > 0 && sel.owner !== u.owner;
   const statusKeys = u.status ? Object.keys(u.status).filter(k => u.status[k] > 0) : [];
   const showStatus = statusKeys.length > 0;
-  const h = 112 + (showStatus ? 12 : 0) + (showForecast ? 44 : 0);
+  const showAbility = !!abilityFor(u);
+  const h = 112 + (showAbility ? 12 : 0) + (showStatus ? 12 : 0) + (showForecast ? 44 : 0);
   // never collide with the battle log strip at the sidebar bottom
   if (y + h > CANVAS_H - 178) y = CANVAS_H - 178 - h;
 
@@ -3388,17 +3393,29 @@ function drawUnitCard(u, y) {
     }
   }
 
+  // ability line: 9px, gold when ready, dimmed on cooldown (card height +12 when present)
+  if (showAbility) {
+    const ab = abilityFor(u);
+    ctx.font = "9px 'Courier New', monospace";
+    ctx.fillStyle = u.cd > 0 ? PAL.inkDim : PAL.gold;
+    ctx.textAlign = "left";
+    ctx.fillText(
+      "◆ " + ab.name + (u.cd > 0 ? " — ready in " + u.cd : " — ready"),
+      x + 8, y + 114
+    );
+  }
+
   // status labels: one 9px line listing active effect names (option a: card height +12)
   if (showStatus) {
     ctx.font = "9px 'Courier New', monospace";
     ctx.fillStyle = PAL.inkDim;
     ctx.textAlign = "left";
-    ctx.fillText(statusKeys.map(k => STATUS_META[k] ? STATUS_META[k].label : k).join(" · "), x + 8, y + 114);
+    ctx.fillText(statusKeys.map(k => STATUS_META[k] ? STATUS_META[k].label : k).join(" · "), x + 8, y + 114 + (showAbility ? 12 : 0));
   }
 
   if (showForecast) {
     const f = forecastBattle(sel, u);
-    const fy = y + 112 + (showStatus ? 12 : 0);
+    const fy = y + 112 + (showAbility ? 12 : 0) + (showStatus ? 12 : 0);
     ctx.fillStyle = "#0e0c1a";
     ctx.fillRect(x + 4, fy, w - 8, 36);
     ctx.font = "bold 10px 'Courier New', monospace";
@@ -4207,6 +4224,9 @@ function interactAt(q, r) {
     STATE.selected = onUnit;
     STATE.reachable = computeReachable(onUnit);
     STATE.attackTargets = computeAttackTargets(onUnit, onUnit.q, onUnit.r);
+    // secondMove leg (skitter/galeRush): move-only — suppress attack rings entirely
+    // so the player cannot attack from this re-select (ability + attack in one turn).
+    if (onUnit.secondMove) STATE.attackTargets = null;
   } else {
     STATE.selected = null; STATE.reachable = null; STATE.attackTargets = null;
   }
@@ -4409,13 +4429,26 @@ function mapPixelHeight() { return HEX_STEP_Y * ROWS + HEX_SIZE + 12; }
 // the move handler, the summon-picker "Back", and the cancel-out path.
 function openPostMoveMenu(unit) {
   const items = [];
-  const targets = computeAttackTargets(unit, unit.q, unit.r);
   const cellHere = cellAt({ q: unit.q, r: unit.r });
-  if (targets.size > 0) items.push({ label: "Attack", kind: "attackMode" });
-  if (canCapture(unit, cellHere)) items.push({ label: "Capture", kind: "capture" });
-  if (unit.isMaster && unit.mp >= 6) items.push({ label: "Summon", kind: "summon" });
-  if (STATE.undo && STATE.undo.unit === unit) items.push({ label: "Undo", kind: "undo" }); // 6.2
-  items.push({ label: "Wait", kind: "wait" });
+  // Second-move leg (skitter/galeRush): only Capture and Wait are available —
+  // no Attack, Summon, Ability, or Undo.
+  if (unit.secondMove) {
+    unit.secondMove = false;
+    if (canCapture(unit, cellHere)) items.push({ label: "Capture", kind: "capture" });
+    items.push({ label: "Wait", kind: "wait" });
+  } else {
+    const targets = computeAttackTargets(unit, unit.q, unit.r);
+    if (targets.size > 0) items.push({ label: "Attack", kind: "attackMode" });
+    if (canCapture(unit, cellHere)) items.push({ label: "Capture", kind: "capture" });
+    if (unit.isMaster && unit.mp >= 6) items.push({ label: "Summon", kind: "summon" });
+    const ab = abilityFor(unit);
+    if (ab) items.push({
+      label: unit.cd > 0 ? ab.name + " (" + unit.cd + ")" : ab.name,
+      kind: "ability", disabled: unit.cd > 0,
+    });
+    if (STATE.undo && STATE.undo.unit === unit) items.push({ label: "Undo", kind: "undo" }); // 6.2
+    items.push({ label: "Wait", kind: "wait" });
+  }
   const px = axialToPixel(unit.q, unit.r);
   STATE.menu = {
     kind: "postMove", unit, items, index: 0,
@@ -4477,6 +4510,27 @@ function selectMenuItem(item) {
     pushAnim("summon", slot.q, slot.r, "", PAL.gold, "190, 150, 230");
     beep(660, 0.08, "triangle", 0.18);
     STATE.undo = null; unit.acted = true; closeMenu();
+  } else if (item.kind === "ability") {
+    const ab = abilityFor(unit);
+    if (!ab) { closeMenu(); return; }
+    if (ab.target === "none") {
+      if (resolveInstantAbility(unit, ab)) {
+        unit.cd = ab.cd;
+        STATE.undo = null;
+        if (unit.secondMove) {
+          closeMenu();
+          interactAt(unit.q, unit.r); // reselect: fresh reachable for the move-only leg
+        } else {
+          unit.acted = true;
+          closeMenu();
+        }
+      }
+      return;
+    }
+    // "enemy"/"tile" targeting modes are milestone 1.3 — none of THIS
+    // milestone's wired units have them, so just close defensively.
+    closeMenu();
+    return;
   } else if (item.kind === "back") {
     openPostMoveMenu(unit);
   }
@@ -4526,6 +4580,8 @@ function endTurn() {
   if (STATE.screen !== "play") return; // burn-kill may have ended the match
   for (const u of aliveUnits(STATE.currentPlayer)) {
     u.acted = false;
+    u.secondMove = false;
+    if (u.cd > 0) u.cd--;
     const c = cellAt({ q: u.q, r: u.r });
     const hpBefore = u.hp;
     if (c && c.terrain === "tower" && c.owner === u.owner) u.hp = Math.min(u.maxHp, u.hp + 2);
@@ -5371,12 +5427,13 @@ window.addEventListener("DOMContentLoaded", boot);
 // =========================================================================
 
 const STATUS_META = {
-  burn:    { color: "#e07050", label: "burning" },
-  slow:    { color: "#5aa8d8", label: "slowed" },
-  regen:   { color: "#7ac075", label: "regenerating" },
-  bulwark: { color: "#f0c674", label: "bulwark +2 DEF" },
-  ward:    { color: "#b078c8", label: "warded" },
-  mark:    { color: "#ff8888", label: "marked +20% dmg taken" },
+  burn:         { color: "#e07050", label: "burning" },
+  slow:         { color: "#5aa8d8", label: "slowed" },
+  regen:        { color: "#7ac075", label: "regenerating" },
+  bulwark:      { color: "#f0c674", label: "bulwark +2 DEF" },
+  ward:         { color: "#b078c8", label: "warded" },
+  mark:         { color: "#ff8888", label: "marked +20% dmg taken" },
+  skitterBoost: { color: "#c8c8d8", label: "skittering" },
 };
 
 function addStatus(unit, key, turns) {
@@ -5392,6 +5449,7 @@ function hasStatus(unit, key) {
 function effectiveMove(unit) {
   let m = unit.move;
   if (hasStatus(unit, "slow")) m = Math.max(1, m - 2);
+  if (hasStatus(unit, "skitterBoost")) m += 2;
   return m;
 }
 
@@ -5503,4 +5561,84 @@ function runSmokeTest() {
     setTimeout(poll, 300);
   }
   setTimeout(poll, 500);
+}
+
+// =========================================================================
+// 18. Abilities (v2 1.2-1.4)
+// =========================================================================
+
+// One active ability per monster line — an ALTERNATIVE to attacking
+// (a turn = move + one of attack/ability/capture/wait). Cooldown lives on
+// the instance as u.cd (turns until ready), ticked in endTurn.
+// target kinds: "none" (resolves instantly), "enemy" (attack-flavored,
+// runs through beginBattle with a status payload — 1.3), "tile" (Blink, 1.3).
+const ABILITIES = {
+  healPulse:    { name: "Heal Pulse",    cd: 3, target: "none",  desc: "+5 HP to adjacent allies" },
+  quake:        { name: "Quake",         cd: 4, target: "none",  desc: "4 dmg to all adjacent enemies, no counter" },
+  skitter:      { name: "Skitter",       cd: 2, target: "none",  desc: "take a second move-only action (+2 MOV)" },
+  frostBite:    { name: "Frost Bite",    cd: 3, target: "enemy", desc: "attack; slows the target", status: "slow", statusTurns: 2 },
+  ignite:       { name: "Ignite",        cd: 3, target: "enemy", desc: "attack; burns the target", status: "burn", statusTurns: 2 },
+  cinderBreath: { name: "Cinder Breath", cd: 4, target: "enemy", desc: "attack; burns the target", status: "burn", statusTurns: 2 },
+  undertow:     { name: "Undertow",      cd: 3, target: "enemy", desc: "attack; slows the target", status: "slow", statusTurns: 2 },
+  diveMark:     { name: "Dive Mark",     cd: 4, target: "enemy", desc: "attack; marks the target", status: "mark", statusTurns: 2 },
+  bulwark:      { name: "Bulwark",       cd: 3, target: "none",  desc: "+2 DEF to self & adjacent allies for a turn" },
+  ward:         { name: "Ward",          cd: 4, target: "none",  desc: "shield self & adjacent allies from the next hit" },
+  blink:        { name: "Blink",         cd: 3, target: "tile",  desc: "teleport up to 4 hexes" },
+  galeRush:     { name: "Gale Rush",     cd: 4, target: "none",  desc: "take a second move-only action" },
+};
+
+// Evolved forms keep the line's ability one turn snappier.
+function abilityFor(unit) {
+  const t = UNIT_TYPES[unit.typeKey];
+  if (!t || !t.ability) return null;
+  const base = ABILITIES[t.ability];
+  if (!base) return null;
+  return Object.assign({ key: t.ability }, base, { cd: Math.max(1, base.cd - (t.evolved ? 1 : 0)) });
+}
+
+// Resolve an instant (target:"none") ability at the unit's current hex.
+// Returns true if it fired. Sets nothing on the unit — caller owns
+// cooldown/acted/menu state.
+function resolveInstantAbility(unit, ab) {
+  if (ab.key === "healPulse") {
+    for (const n of hexNeighbors(unit.q, unit.r)) {
+      const a = unitAt(n.q, n.r);
+      if (a && a.owner === unit.owner && a.hp < a.maxHp) {
+        const h = Math.min(5, a.maxHp - a.hp);
+        a.hp += h;
+        pushAnim("float", a.q, a.r, "+" + h, "#5fd06a");
+      }
+    }
+    pushLog(unit.name + " pulses healing light.", PAL.green);
+    beep(740, 0.1, "triangle", 0.2);
+    return true;
+  }
+  if (ab.key === "quake") {
+    let total = 0;
+    for (const n of hexNeighbors(unit.q, unit.r)) {
+      const e = unitAt(n.q, n.r);
+      if (e && e.owner !== unit.owner) {
+        e.hp -= 4; total += 4;
+        pushAnim("float", e.q, e.r, "-4", PAL.red);
+        if (e.hp <= 0) {
+          pushLog(e.name + " is crushed.", "#ff8888");
+          if (STATE.stats) STATE.stats.lost[e.owner]++;
+          total += KILL_XP_BONUS;
+        }
+      }
+    }
+    if (total > 0 && gainXp(unit, total) > 0) pushAnim("float", unit.q, unit.r, "LEVEL UP!", PAL.gold, null, -22);
+    pushLog(unit.name + " shakes the earth.", PAL.gold);
+    beep(120, 0.18, "square", 0.25);
+    checkWinCondition();
+    return true;
+  }
+  if (ab.key === "skitter" || ab.key === "galeRush") {
+    if (ab.key === "skitter") addStatus(unit, "skitterBoost", 1);
+    unit.secondMove = true; // move-only leg; cleared when its menu opens or at endTurn
+    pushLog(unit.name + " surges with speed.", PAL.green);
+    beep(880, 0.08, "triangle", 0.18);
+    return true;
+  }
+  return false; // bulwark/ward land in 1.3
 }

@@ -23,10 +23,16 @@ Tag legend: `[model | effort]` routing hints, same rubric as v1.
   budget read swapped to effectiveMove; map status dots + card status line
   (card h +12). Spec-reviewed ✅, quality-reviewed (2 nits, accepted).
   [claude-opus-4-8 | high]
-- [ ] 1.2 Ability framework + first 4: ABILITIES table, per-type `ability`
-  key (evolved −1 cd), u.cd ticking, "Ability" post-move menu entry, resolve
-  + floats/sfx. Ships Heal Pulse, Quake, Skitter, Frost Bite.
-  [claude-opus-4-8 | high]
+- [x] 1.2 Ability framework + first 4 (S1): section 18 — ABILITIES (all 12
+  defined), abilityFor (evolved −1 cd, floor 1), resolveInstantAbility;
+  wired healPulse (tidekin line), quake (geomaul line), skitter (duneskink),
+  galeRush (galewisp line) — NOTE: shipped galeRush instead of frostBite
+  (frostBite is enemy-target, lands with 1.3's targeting). Post-move menu
+  Ability item w/ cooldown label; second-move-only leg (secondMove flag,
+  attack rings suppressed in interactAt, leg menu = Capture/Wait); cd tick +
+  flag clear in endTurn; card ability line (+12 h). Spec-reviewed ✅ twice
+  (leak fixed: attack-during-leg), quality-reviewed (5 fragility notes,
+  none reachable — accepted). [claude-opus-4-8 | high]
 - [ ] 1.3 Remaining 8 abilities: Ignite, Cinder Breath, Undertow, Dive Mark
   (attack-flavored via battle applyStatus), Bulwark, Ward (flag auras),
   Blink (teleport targeting), Gale Rush (move-again). [claude-opus-4-8 | high]
@@ -106,5 +112,11 @@ Tag legend: `[model | effort]` routing hints, same rubric as v1.
 
 - S1 (2026-06-10): systems-first ordering (approach A) approved; spec
   committed at 5a7f27a. Two-file zero-dep architecture retained.
+- S1 (2026-06-10): ENGINE DECISION — finish Phase 1 in JS as the cheap design
+  lab, then port the proven game to Godot 4 ("path B"). JS work STOPS after
+  milestone 1.5; Phases 2-8 of this roadmap will be re-planned as Godot work
+  (spec + ROADMAP2 + ability/relic tables carry over as the build plan; code
+  does not). Cleanest-cut rationale: every JS milestone past Phase 1 would be
+  redone in Godot.
 
 ## Handoff log
