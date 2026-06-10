@@ -14,7 +14,8 @@ its AI hook in the same milestone; new code in banner sections 17+.
 
 Tag legend: `[model | effort]` routing hints, same rubric as v1.
 
-## Phase 1 — Combat core: abilities, statuses, weather
+## Phase 1 — Combat core: abilities, statuses, weather  ✅ COMPLETE (S1)
+## ⛔ JS WORK ENDS HERE — Phases 2-8 move to the Godot 4 port (decision log)
 
 - [x] 1.1 Status engine (S1): section 17 — STATUS_META, addStatus (max-merge),
   hasStatus, effectiveMove (slow → max(1, move−2)), tickStatuses (burn −3 w/
@@ -53,9 +54,19 @@ Tag legend: `[model | effort]` routing hints, same rubric as v1.
   ability → capture → attack → move. Live-verified: AI casts Heal Pulse when
   no kill on offer; prefers kills when available; zero errors over full AI
   turns. [claude-fable-5 | high]
-- [ ] 1.5 Weather: STATE.weather, per-map tables, reroll ~5 turns,
-  computeDamage/computeReachable hooks (AI + forecast free), topbar icon +
-  change banner. [claude-sonnet-4-6 | medium]
+- [x] 1.5 Weather (S1): section 19 — WEATHERS (rain hydro+15/pyro−15, heat
+  inverse, gale ranged −20% + flyers +1 MOV), per-map weatherTables (tides
+  rain-heavy, crags heat-heavy), reroll 4-6 turns at round wrap; wMul inside
+  computeDamage + flyBonus in effectiveMove → forecast/AI inherit free;
+  topbar label; STATE.mapDef so campaign defs get the right table; weather
+  in save blob (v1 saves default clear, blob.v unchanged). Live-verified all
+  four effects. Final Phase-1 review fixes folded in: weather banner no
+  longer clobbered by turn banner; arm-cancel re-move exploit closed
+  (mis-click/Esc on an armed attack/ability/blink reopens the post-move menu
+  instead of freeing the moved unit); v1-save cd normalization in loadGame
+  (AI ability lockout); bulwark/ward 2→1 tick (one enemy round, as labeled).
+  Known accepted gaps: forecast/AI blind to ward negation (symmetric),
+  regen status has no writer until Phase-2 relics. [claude-sonnet-4-6 | medium]
 
 ## Phase 2 — Relics
 
@@ -135,3 +146,20 @@ Tag legend: `[model | effort]` routing hints, same rubric as v1.
   redone in Godot.
 
 ## Handoff log
+
+## Session 1 — 2026-06-10
+Done: Phase 1 COMPLETE via subagent-driven execution (implementer + spec
+review + quality review per milestone) — 1.1 status engine, 1.2 ability
+framework, 1.3 all 12 abilities (+ fixed v1's dead post-move Attack button),
+1.4 ability AI, 1.5 weather (+ final-review fixes: banner clobber, arm-cancel
+re-move exploit, v1-save cd normalization, bulwark/ward duration).
+State: GREEN — smoke pass at every commit; abilities/weather live-verified
+via Playwright (player paths, AI casting, forecast deltas).
+Next: NO further JS milestones. Per the engine decision, next session starts
+Godot 4 port planning — carry over the v2 spec, this roadmap (Phases 2-8),
+data tables (UNIT_TYPES/ELEM_MATRIX/ABILITIES/WEATHERS/MAPS/CAMPAIGN), AI
+architecture, and Phase-1's validated combat design. The JS build remains
+the playable reference implementation.
+Risks/notes: forecast/AI treat warded targets as killable (symmetric,
+accepted); regen status awaits Phase-2 relics; resumed campaign saves fall
+back to the skirmish weather table (STATE.mapDef not serialized).

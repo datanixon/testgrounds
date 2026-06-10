@@ -170,11 +170,13 @@ const MAPS = [
     mountains: 4, lakes: 3, forests: 22, hills: 14, towers: 5 },
   { key: "tides", name: "Shattered Tides", desc: "Drowned field — flyers rule.",
     cols: 14, rows: 12, seed: null,
-    mountains: 1, lakes: 8, forests: 12, hills: 6, towers: 5 },
+    mountains: 1, lakes: 8, forests: 12, hills: 6, towers: 5,
+    weatherTable: ["rain", "rain", "clear", "gale"] },
   { key: "crags", name: "Emberfall Crags", desc: "Walls of stone, tight passes.",
     cols: 15, rows: 11, seed: null,
     mountains: 9, lakes: 1, forests: 8, hills: 22, towers: 4,
-    castles: [{ q: 0, r: 5 }, { q: 9, r: 5 }] },   // handcrafted: east-west standoff
+    castles: [{ q: 0, r: 5 }, { q: 9, r: 5 }],   // handcrafted: east-west standoff
+    weatherTable: ["heat", "heat", "clear", "gale"] },
   { key: "verdant", name: "Verdant Expanse", desc: "Wide greens, six spires.",
     cols: 16, rows: 13, seed: null,
     mountains: 2, lakes: 2, forests: 30, hills: 10, towers: 6 },
@@ -577,6 +579,8 @@ const STATE = {
   logScroll: 0,         // 6.2 entries scrolled back from newest (0 = live tail)
   abilityArm: null,     // 1.3 armed enemy-target ability waiting for click
   blinkArm: null,       // 1.3 armed blink (tile-target) waiting for click
+  weather: { key: "clear", turnsLeft: 5 }, // 1.5 current weather
+  mapDef: null,         // 1.5 active map definition (campaign-safe rollWeather)
 };
 
 // ---- Settings persistence (3.3) ----
@@ -644,6 +648,7 @@ function saveGame() {
       campaign: STATE.campaign,
       matchDifficulty: STATE.matchDifficulty,
       log: STATE.log.slice(0, 12),
+      weather: STATE.weather, // 1.5
     };
     localStorage.setItem(SAVE_KEY, JSON.stringify(blob));
     STATE.hasSave = true;
@@ -677,12 +682,17 @@ function loadGame() {
 
   nextUnitId = blob.nextUnitId || 1000;
   STATE.units = blob.units;
+  // v1-blob units predate abilities — normalize so cd gates (u.cd <= 0)
+  // behave; undefined would lock the AI out of its abilities forever.
+  for (const u of STATE.units) { if (typeof u.cd !== "number") u.cd = 0; }
   STATE.turn = blob.turn;
   STATE.currentPlayer = blob.currentPlayer;
   STATE.stats = blob.stats || { summoned: [0, 0], lost: [0, 0], battles: 0 };
   STATE.campaign = blob.campaign || null;
   STATE.matchDifficulty = blob.matchDifficulty || STATE.difficulty;
   STATE.log = Array.isArray(blob.log) ? blob.log : [];
+  STATE.weather = blob.weather || { key: "clear", turnsLeft: 5 }; // 1.5 (defaults old saves)
+  STATE.mapDef = null; // 1.5 campaign def not serialised; rollWeather falls back to skirmish def
 
   invalidateTerrainCache(); // 7.1 — rebuilt cells need a fresh terrain layer
 
@@ -712,6 +722,7 @@ function loadGame() {
 function startNewGame(scenario) {
   nextUnitId = 1;
   const def = scenario ? scenario.map : (MAPS[STATE.mapIndex] || MAPS[0]);
+  STATE.mapDef = def; // 1.5 store active def so rollWeather works for campaign maps
   generateMap(def.seed != null ? def.seed : Math.floor(Math.random() * 1e9), def);
   STATE.campaign = scenario ? { index: CAMPAIGN.indexOf(scenario) } : null;
   STATE.units = [];
@@ -753,6 +764,7 @@ function startNewGame(scenario) {
   } else {
     pushLog("Battle begins on the Wraithspire frontier.");
   }
+  rollWeather(true); // 1.5 initialise weather silently at match start
   centerCameraOn(masterOf(0), true);
 }
 
@@ -961,9 +973,13 @@ function computeDamage(attacker, defender) {
   // v2 combat flags (1.3)
   const markMul = hasStatus(defender, "mark") ? 1.2 : 1.0;
   const bulwarkDef = hasStatus(defender, "bulwark") ? 2 : 0;
+  // v2 weather modifier (1.5)
+  const w = weatherNow();
+  const wMul = (w.atkMul && w.atkMul[attacker.element] ? w.atkMul[attacker.element] : 1.0)
+             * (w.rangedMul && attacker.range >= 2 ? w.rangedMul : 1.0);
   const raw = attacker.power * (attacker.hp / attacker.maxHp * 0.5 + 0.5);
   const mit = defender.def + bulwarkDef + dTDef * 0.5;
-  const base = Math.max(1, Math.round(raw * elemMul * affMul * markMul - mit * 0.6));
+  const base = Math.max(1, Math.round(raw * elemMul * affMul * markMul * wMul - mit * 0.6));
   const dmg = Math.max(1, base + Math.floor(Math.random() * 3) - 1);
   return { dmg, base, elemMul, affMul, hasAffinity: !!aff, aTDef, dTDef };
 }
@@ -3242,7 +3258,7 @@ function renderTopBar() {
   const trackLabel = STATE.music.wanted
     ? "♪ " + (TRACKS[STATE.music.trackIndex] || TRACKS[0]).name
     : "music OFF";
-  ctx.fillText("E end turn  |  M mute  |  N next  |  " + trackLabel, textRight, 30);
+  ctx.fillText(weatherNow().name + "  |  E end turn  |  M mute  |  N next  |  " + trackLabel, textRight, 30);
   ctx.textAlign = "left";
 
   // Gear button (⚙) and help button (?)
@@ -4258,9 +4274,13 @@ function interactAt(q, r) {
       beep(700, 0.1, "triangle", 0.2);
       unit.acted = true; unit.cd = ab.cd; STATE.undo = null;
     } else {
-      // mis-click: cancel arm, deselect — unit is un-acted and cd unspent
+      // mis-click: back out to the unit's post-move menu. The unit already
+      // moved, so freeing it here would grant a repeatable extra move
+      // (Phase-1 review exploit fix) — the menu keeps its options open
+      // without re-opening movement.
       STATE.blinkArm = null;
       STATE.selected = null; STATE.reachable = null; STATE.attackTargets = null;
+      openPostMoveMenu(unit);
     }
     return;
   }
@@ -4286,9 +4306,13 @@ function interactAt(q, r) {
     return;
   }
   if (STATE.abilityArm) {
-    // mis-click outside targets: cancel arm, deselect — unit is un-acted and cd unspent
+    // mis-click outside targets: back out to the unit's post-move menu —
+    // the move already happened, so the unit must not become re-selectable
+    // (Phase-1 review exploit fix).
+    const unit = STATE.abilityArm.unit;
     STATE.abilityArm = null;
     STATE.selected = null; STATE.reachable = null; STATE.attackTargets = null;
+    openPostMoveMenu(unit);
     return;
   }
 
@@ -4413,8 +4437,13 @@ function onKey(ev) {
     return;
   }
   if (ev.key === "Escape") {
+    // Esc on a live arm backs out to the unit's post-move menu — the move
+    // already happened, so the unit must not become re-selectable
+    // (Phase-1 review exploit fix).
+    const arm = STATE.abilityArm || STATE.blinkArm;
     STATE.selected = null; STATE.reachable = null; STATE.attackTargets = null;
     STATE.abilityArm = null; STATE.blinkArm = null; // 1.3
+    if (arm) { openPostMoveMenu(arm.unit); return; }
     // If cursor was active but nothing was selected, clear it too.
     if (!STATE.selected) STATE.cursor = null;
     return;
@@ -4718,6 +4747,9 @@ function endTurn() {
   STATE.attackTargets = null;
   STATE.abilityArm = null; STATE.blinkArm = null; // 1.3 stale arms cleared on turn change
   STATE.banner = { text: PLAYERS[STATE.currentPlayer].name + " — TURN " + STATE.turn, ttl: 80, color: PLAYERS[STATE.currentPlayer].color };
+  // Weather ticks once per full round, AFTER the turn banner is set so a
+  // shift's banner isn't clobbered by it (1.5 review fix).
+  if (STATE.currentPlayer === 0 && STATE.weather && --STATE.weather.turnsLeft <= 0) rollWeather();
   checkWinCondition();
   if (STATE.screen !== "play") return;
   saveGame(); // autosave each turn (6.1)
@@ -5570,11 +5602,12 @@ function hasStatus(unit, key) {
   return !!(unit.status && unit.status[key] > 0);
 }
 
-// Movement allowance after statuses (weather hook lands in 1.5).
+// Movement allowance after statuses and weather (1.5).
 function effectiveMove(unit) {
   let m = unit.move;
   if (hasStatus(unit, "slow")) m = Math.max(1, m - 2);
   if (hasStatus(unit, "skitterBoost")) m += 2;
+  if (weatherNow().flyBonus && unit.flying) m += weatherNow().flyBonus;
   return m;
 }
 
@@ -5766,10 +5799,13 @@ function resolveInstantAbility(unit, ab) {
     return true;
   }
   if (ab.key === "bulwark" || ab.key === "ward") {
-    addStatus(unit, ab.key, 2); // expires at the owner's next turn tick
+    // 1 tick: covers exactly the enemy round, expiring at the owner's next
+    // turn start (decrement-then-delete in tickStatuses). 2 would shield
+    // through two enemy rounds — Phase-1 review tuning fix.
+    addStatus(unit, ab.key, 1);
     for (const n of hexNeighbors(unit.q, unit.r)) {
       const a = unitAt(n.q, n.r);
-      if (a && a.owner === unit.owner) addStatus(a, ab.key, 2);
+      if (a && a.owner === unit.owner) addStatus(a, ab.key, 1);
     }
     pushLog(unit.name + " raises a " + ab.name.toLowerCase() + ".", PAL.purple);
     beep(560, 0.1, "triangle", 0.2);
@@ -5811,3 +5847,33 @@ function aiScoreInstantAbility(u) {
   // skitter/galeRush: movement value — out of scope for AI v1 (documented)
   return s > 0 ? { score: s } : null;
 }
+
+// =========================================================================
+// 19. Weather (v2 1.5)
+// =========================================================================
+// One global modifier, re-rolled every ~5 turns from the map's table.
+// Implemented as reads inside computeDamage/effectiveMove, so the AI and
+// the damage forecast understand weather with zero extra code.
+
+const WEATHERS = {
+  clear: { name: "Clear",    color: "#8a85a2" },
+  rain:  { name: "Rain",     color: "#5aa8d8", atkMul: { hydro: 1.15, pyro: 0.85 } },
+  heat:  { name: "Heatwave", color: "#e07050", atkMul: { pyro: 1.15, hydro: 0.85 } },
+  gale:  { name: "Gale",     color: "#c8c8d8", rangedMul: 0.8, flyBonus: 1 },
+};
+const DEFAULT_WEATHER_TABLE = ["clear", "clear", "rain", "heat", "gale"];
+
+function rollWeather(initial) {
+  const def = STATE.mapDef || MAPS[STATE.mapIndex] || MAPS[0];
+  const table = def.weatherTable || DEFAULT_WEATHER_TABLE;
+  const key = initial ? "clear" : table[Math.floor(Math.random() * table.length)];
+  const changed = !STATE.weather || STATE.weather.key !== key;
+  STATE.weather = { key, turnsLeft: 4 + Math.floor(Math.random() * 3) };
+  if (changed && !initial) {
+    const w = WEATHERS[key];
+    STATE.banner = { text: "WEATHER — " + w.name.toUpperCase(), ttl: 70, color: w.color };
+    pushLog("The skies shift: " + w.name + ".", w.color);
+  }
+}
+
+function weatherNow() { return WEATHERS[(STATE.weather || {}).key] || WEATHERS.clear; }
