@@ -154,7 +154,7 @@ Check off with a one-line note when done. Mark `BLOCKED:`/`PARKED:` per rules.
   ←/→ keys cycle, choice persisted in the settings blob.
   [claude-sonnet-4-6 | medium]
 
-### Phase 5 — Content
+### Phase 5 — Content  ✅ COMPLETE (S4)
 
 - [x] 5.1 Roster wave (S4): 8 evolved forms get own sprite ids + map & battle
   cases (base look, ascended — bigger silhouette, hotter palette, extra
@@ -170,9 +170,15 @@ Check off with a one-line note when done. Mark `BLOCKED:`/`PARKED:` per rules.
   spires). Title map row (titleMapRects, ↑/↓ cycles, blurb w/ size+spires),
   choice persisted. Camera clamps auto-adapt via mapPixelWidth/Height.
   [claude-opus-4-8 | high]
-- [ ] 5.3 Campaign arc: 4-scenario escalation (tutorial-ish skirmish → final
-  showdown) with brief narrative interstitials (text panels in existing art
-  style), campaign progress kept in memory (persisted in 6.1).
+- [x] 5.3 Campaign arc (S4): CAMPAIGN[] — 4 missions w/ fixed-seed map defs
+  (11×9 skirmish → drowned marches → crags passes → 16×13 finale), per-mission
+  difficulty + AI mp bonus + pre-summons + 4-line lore. New screens: campaign
+  list (locked/READY/CLEARED rows) + story interstitial (staggered fade-in,
+  click to begin). Title CAMPAIGN button ("next: <mission>"); win unlocks next
+  (campaignProgress persisted in settings blob; full saves in 6.1); gameover
+  shows MISSION COMPLETE/FAILED/CAMPAIGN COMPLETE. STATE.matchDifficulty keeps
+  scenario difficulty match-local so skirmish prefs survive (caught via
+  Playwright test — saveSettings mid-campaign had clobbered the pref).
   [claude-opus-4-8 | high]
 
 ### Phase 6 — Systems

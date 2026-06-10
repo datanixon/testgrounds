@@ -178,6 +178,62 @@ const MAPS = [
     mountains: 2, lakes: 2, forests: 30, hills: 10, towers: 6 },
 ];
 
+// Campaign scenarios (5.3): an escalating 4-mission arc. Each carries its own
+// map definition (fixed seed → handcrafted-feeling, repeatable layouts), an AI
+// difficulty, opening-strength modifiers, and interstitial lore. Progress
+// (highest unlocked index) is kept in the settings blob; full save/load is 6.1.
+const CAMPAIGN = [
+  {
+    name: "The Border Skirmish", difficulty: "easy",
+    map: { key: "c1", name: "Border Skirmish", desc: "", cols: 11, rows: 9, seed: 7041,
+           mountains: 2, lakes: 1, forests: 12, hills: 8, towers: 3 },
+    aiMpBonus: -6, aiSummons: [],
+    intro: [
+      "The old truce is ash. CRIMSON riders burn the",
+      "border farms, and the Azure throne calls you —",
+      "its youngest archon — to answer.",
+      "Drive them from the frontier.",
+    ],
+  },
+  {
+    name: "The Drowned Marches", difficulty: "normal",
+    map: { key: "c2", name: "Drowned Marches", desc: "", cols: 14, rows: 12, seed: 11317,
+           mountains: 1, lakes: 8, forests: 12, hills: 6, towers: 5 },
+    aiMpBonus: 0, aiSummons: ["tidekin"],
+    intro: [
+      "You chased them into the marches, where the",
+      "tide swallows roads whole. CRIMSON's leviathans",
+      "glide where your soldiers drown.",
+      "Take wing, or take the long way around.",
+    ],
+  },
+  {
+    name: "The Emberfall Passes", difficulty: "normal",
+    map: { key: "c3", name: "Emberfall Passes", desc: "", cols: 15, rows: 11, seed: 40923,
+           mountains: 9, lakes: 1, forests: 8, hills: 22, towers: 4,
+           castles: [{ q: 0, r: 5 }, { q: 9, r: 5 }] },
+    aiMpBonus: 6, aiSummons: ["stoneward", "cinderling"],
+    intro: [
+      "Only the high passes lead to the enemy's seat,",
+      "and CRIMSON knows it. Stoneward garrisons hold",
+      "every defile, fed by the spires you must take.",
+      "The mountains do not forgive haste.",
+    ],
+  },
+  {
+    name: "The Wraithspire", difficulty: "hard",
+    map: { key: "c4", name: "The Wraithspire", desc: "", cols: 16, rows: 13, seed: 86011,
+           mountains: 4, lakes: 3, forests: 24, hills: 12, towers: 6 },
+    aiMpBonus: 10, aiSummons: ["geomaul", "skyharrow"],
+    intro: [
+      "The Wraithspire itself — the first spire, the",
+      "one all others echo. The CRIMSON archon waits",
+      "beneath it with everything he has left.",
+      "Cast him down. Inherit the realm.",
+    ],
+  },
+];
+
 function generateMap(seed, def = MAPS[0]) {
   let rng = mulberry32(seed);
   COLS = def.cols;
@@ -509,6 +565,9 @@ const STATE = {
   helpOpen: false,      // 3.3 ? overlay
   difficulty: "normal", // 4.3 AI profile key; chosen on the title screen
   mapIndex: 0,          // 5.2 index into MAPS; chosen on the title screen
+  campaign: null,       // 5.3 {index} while a campaign mission is live
+  campaignProgress: 0,  // 5.3 highest unlocked mission index
+  story: null,          // 5.3 {index} for the interstitial screen
 };
 
 // ---- Settings persistence (3.3) ----
@@ -533,6 +592,10 @@ function loadSettings() {
     if (typeof saved.mapIndex === "number" && saved.mapIndex >= 0 && saved.mapIndex < MAPS.length) {
       STATE.mapIndex = saved.mapIndex;
     }
+    if (typeof saved.campaignProgress === "number" &&
+        saved.campaignProgress >= 0 && saved.campaignProgress < CAMPAIGN.length) {
+      STATE.campaignProgress = saved.campaignProgress;
+    }
   } catch (_) { /* localStorage can throw on file:// in some browsers */ }
 }
 
@@ -545,15 +608,21 @@ function saveSettings() {
       trackIndex:  STATE.music.trackIndex,
       difficulty:  STATE.difficulty,
       mapIndex:    STATE.mapIndex,
+      campaignProgress: STATE.campaignProgress,
     };
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(blob));
   } catch (_) { /* ignore write failures */ }
 }
 
-function startNewGame() {
+// Starts a match. With no argument it's a free skirmish on the title-screen
+// map/difficulty; with a CAMPAIGN scenario it uses the scenario's map, sets
+// its difficulty for the match (without persisting over skirmish prefs), and
+// applies its AI opening-strength modifiers.
+function startNewGame(scenario) {
   nextUnitId = 1;
-  const def = MAPS[STATE.mapIndex] || MAPS[0];
+  const def = scenario ? scenario.map : (MAPS[STATE.mapIndex] || MAPS[0]);
   generateMap(def.seed != null ? def.seed : Math.floor(Math.random() * 1e9), def);
+  STATE.campaign = scenario ? { index: CAMPAIGN.indexOf(scenario) } : null;
   STATE.units = [];
   const cA = MAP.castles[0];
   const cB = MAP.castles[1];
@@ -575,7 +644,21 @@ function startNewGame() {
   STATE.battle = null;
   STATE.stats = { summoned: [0, 0], lost: [0, 0], battles: 0 };
   for (const u of STATE.units) u.acted = false;
-  pushLog("Battle begins on the Wraithspire frontier.");
+  STATE.matchDifficulty = scenario ? scenario.difficulty : STATE.difficulty;
+  if (scenario) {
+    const m1 = masterOf(1);
+    if (m1) {
+      m1.mp = Math.max(4, Math.min(m1.maxMp, m1.mp + (scenario.aiMpBonus || 0)));
+      for (const k of scenario.aiSummons || []) {
+        const slot = findSummonSlot(m1);
+        if (!slot) break;
+        STATE.units.push(makeUnit(k, 1, slot.q, slot.r));
+      }
+    }
+    pushLog("Mission " + (STATE.campaign.index + 1) + ": " + scenario.name);
+  } else {
+    pushLog("Battle begins on the Wraithspire frontier.");
+  }
   centerCameraOn(masterOf(0), true);
 }
 
@@ -869,6 +952,12 @@ function checkWinCondition() {
       STATE.screen = "gameover";
       startTransition("fade", 45);   // dissolve into the victory screen
       pushLog(PLAYERS[STATE.winner].name + " is victorious!");
+      // Campaign (5.3): a mission win unlocks the next scenario.
+      if (STATE.campaign && STATE.winner === 0) {
+        STATE.campaignProgress = Math.min(CAMPAIGN.length - 1,
+          Math.max(STATE.campaignProgress, STATE.campaign.index + 1));
+        saveSettings();
+      }
       beep(440, 0.2, "triangle", 0.25);
       setTimeout(() => beep(660, 0.3, "triangle", 0.25), 200);
       return;
@@ -921,7 +1010,11 @@ const AI_PROFILES = {
 };
 const DIFFICULTIES = ["easy", "normal", "hard"];
 
-function aiW() { return AI_PROFILES[STATE.difficulty] || AI_PROFILES.normal; }
+// The live match's profile: campaign missions set matchDifficulty without
+// touching the player's persisted skirmish preference (STATE.difficulty).
+function aiW() {
+  return AI_PROFILES[STATE.matchDifficulty || STATE.difficulty] || AI_PROFILES.normal;
+}
 
 // Sum of potential enemy damage onto every tile: each enemy's reachable
 // nodes are expanded by its attack range. One enemy contributes at most once
@@ -2664,6 +2757,10 @@ function render() {
 
   if (STATE.screen === "title") {
     renderTitle();
+  } else if (STATE.screen === "campaign") {
+    renderCampaignScreen();
+  } else if (STATE.screen === "story") {
+    renderStoryScreen();
   } else if (STATE.screen === "gameover") {
     renderGameOver();
   } else if (STATE.screen === "battle") {
@@ -3804,10 +3901,34 @@ function menuRect(m) {
 
 function onClick(ev) {
   startMusicOnGesture();
+  if (STATE.screen === "campaign") {
+    const p = clientToCanvas(ev);
+    for (const r of campaignRowRects()) {
+      if (r.index <= STATE.campaignProgress &&
+          p.x >= r.x && p.x <= r.x + r.w && p.y >= r.y && p.y <= r.y + r.h) {
+        STATE.story = { index: r.index, shownAt: frame };
+        STATE.screen = "story";
+        beep(620, 0.08, "triangle", 0.18);
+        return;
+      }
+    }
+    return;
+  }
+  if (STATE.screen === "story") {
+    startNewGame(CAMPAIGN[STATE.story.index]);
+    STATE.story = null;
+    return;
+  }
   if (STATE.screen === "title") {
-    // Clicking a map/difficulty box selects it; clicking anywhere else starts.
+    // Clicking the campaign button, a map box, or a difficulty box selects;
+    // clicking anywhere else starts a skirmish.
     const p = clientToCanvas(ev);
     const hit = (r) => p.x >= r.x && p.x <= r.x + r.w && p.y >= r.y && p.y <= r.y + r.h;
+    if (hit(titleCampaignRect())) {
+      STATE.screen = "campaign";
+      beep(620, 0.08, "triangle", 0.18);
+      return;
+    }
     for (const r of titleMapRects()) {
       if (hit(r)) {
         STATE.mapIndex = r.index;
@@ -3827,7 +3948,7 @@ function onClick(ev) {
     startNewGame();
     return;
   }
-  if (STATE.screen === "gameover") { STATE.screen = "title"; return; }
+  if (STATE.screen === "gameover") { returnToTitle(); return; }
   if (STATE.screen === "battle") return;
   if (STATE.moveAnim) return;
   if (STATE.pendingAI) return;
@@ -3934,10 +4055,23 @@ function onKey(ev) {
       saveSettings();
       beep(620, 0.06, "triangle", 0.15);
     }
+    if (ev.key === "c" || ev.key === "C") STATE.screen = "campaign";
+    return;
+  }
+  if (STATE.screen === "campaign") {
+    if (ev.key === "Escape") STATE.screen = "title";
+    return;
+  }
+  if (STATE.screen === "story") {
+    if (ev.key === "Enter" || ev.key === " ") {
+      startNewGame(CAMPAIGN[STATE.story.index]);
+      STATE.story = null;
+    }
+    if (ev.key === "Escape") { STATE.screen = "campaign"; STATE.story = null; }
     return;
   }
   if (STATE.screen === "gameover") {
-    if (ev.key === "Enter" || ev.key === " ") STATE.screen = "title";
+    if (ev.key === "Enter" || ev.key === " ") returnToTitle();
     return;
   }
   if (STATE.screen === "battle") return;
@@ -4297,6 +4431,21 @@ function renderTitle() {
   ctx.fillStyle = PAL.p1;
   ctx.fillText("CRIMSON", CANVAS_W / 2 + 180, CANVAS_H * 0.78);
 
+  // Campaign entry (5.3) — sits between the two archons.
+  const cb = titleCampaignRect();
+  const cleared = STATE.campaignProgress >= CAMPAIGN.length - 1 ? null : CAMPAIGN[STATE.campaignProgress];
+  ctx.fillStyle = "rgba(31, 28, 48, 0.9)";
+  ctx.fillRect(cb.x, cb.y, cb.w, cb.h);
+  ctx.strokeStyle = PAL.gold;
+  ctx.lineWidth = 1;
+  ctx.strokeRect(cb.x + 0.5, cb.y + 0.5, cb.w - 1, cb.h - 1);
+  ctx.font = "bold 13px 'Courier New', monospace";
+  ctx.fillStyle = PAL.gold;
+  ctx.fillText("CAMPAIGN", cb.x + cb.w / 2, cb.y + 17);
+  ctx.font = "9px 'Courier New', monospace";
+  ctx.fillStyle = PAL.inkDim;
+  ctx.fillText(cleared ? "next: " + cleared.name : "all missions open", cb.x + cb.w / 2, cb.y + 30);
+
   ctx.font = "13px 'Courier New', monospace";
   ctx.fillStyle = PAL.inkDim;
   const lore = [
@@ -4374,6 +4523,109 @@ function titleMapRects() {
   return MAPS.map((m, i) => ({ index: i, x: x0 + i * (w + gap), y, w, h }));
 }
 
+// Campaign button between the title archons (5.3); shared by render+click.
+function titleCampaignRect() {
+  return { x: CANVAS_W / 2 - 90, y: CANVAS_H * 0.60, w: 180, h: 38 };
+}
+
+// Leave a finished match: back to title, drop the campaign tag, and restore
+// the player's persisted skirmish prefs (a campaign mission overrode
+// STATE.difficulty for its own match).
+function returnToTitle() {
+  STATE.screen = "title";
+  STATE.campaign = null;
+  STATE.story = null;
+  STATE.matchDifficulty = null;
+}
+
+// =========================================================================
+// 14b. Campaign screens (5.3)
+// =========================================================================
+
+// Mission list rows; shared by renderCampaignScreen and onClick.
+function campaignRowRects() {
+  const w = 720, h = 70, gap = 16;
+  const x = (CANVAS_W - w) / 2;
+  const y0 = 170;
+  return CAMPAIGN.map((sc, i) => ({ index: i, x, y: y0 + i * (h + gap), w, h }));
+}
+
+function renderCampaignScreen() {
+  ctx.fillStyle = "#05030c";
+  ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+  ctx.textAlign = "center";
+  ctx.font = "bold 28px 'Courier New', monospace";
+  ctx.fillStyle = PAL.gold;
+  ctx.fillText("CAMPAIGN", CANVAS_W / 2, 90);
+  ctx.font = "11px 'Courier New', monospace";
+  ctx.fillStyle = PAL.inkDim;
+  ctx.fillText("— the fall of the crimson archon, in four battles —", CANVAS_W / 2, 116);
+
+  for (const r of campaignRowRects()) {
+    const sc = CAMPAIGN[r.index];
+    const unlocked = r.index <= STATE.campaignProgress;
+    const cleared = r.index < STATE.campaignProgress;
+    ctx.fillStyle = unlocked ? PAL.panelLight : "rgba(19, 17, 31, 0.7)";
+    ctx.fillRect(r.x, r.y, r.w, r.h);
+    ctx.strokeStyle = unlocked ? PAL.gold : PAL.inkFaint;
+    ctx.lineWidth = 1;
+    ctx.strokeRect(r.x + 0.5, r.y + 0.5, r.w - 1, r.h - 1);
+
+    ctx.textAlign = "left";
+    ctx.font = "bold 16px 'Courier New', monospace";
+    ctx.fillStyle = unlocked ? PAL.gold : PAL.inkFaint;
+    ctx.fillText((r.index + 1) + ".  " + sc.name, r.x + 18, r.y + 28);
+    ctx.font = "10px 'Courier New', monospace";
+    ctx.fillStyle = unlocked ? PAL.inkDim : PAL.inkFaint;
+    ctx.fillText(unlocked ? sc.intro[0] + " ..." : "locked — clear the previous mission",
+      r.x + 18, r.y + 48);
+    ctx.textAlign = "right";
+    ctx.font = "bold 11px 'Courier New', monospace";
+    if (cleared) { ctx.fillStyle = PAL.green; ctx.fillText("CLEARED", r.x + r.w - 16, r.y + 28); }
+    else if (unlocked) { ctx.fillStyle = PAL.gold; ctx.fillText("READY", r.x + r.w - 16, r.y + 28); }
+    else { ctx.fillStyle = PAL.inkFaint; ctx.fillText("LOCKED", r.x + r.w - 16, r.y + 28); }
+    ctx.font = "10px 'Courier New', monospace";
+    ctx.fillStyle = unlocked ? PAL.inkDim : PAL.inkFaint;
+    ctx.fillText(sc.difficulty.toUpperCase(), r.x + r.w - 16, r.y + 48);
+    ctx.textAlign = "center";
+  }
+
+  ctx.font = "11px 'Courier New', monospace";
+  ctx.fillStyle = PAL.inkDim;
+  ctx.fillText("click a mission to begin  ·  ESC to return", CANVAS_W / 2, CANVAS_H - 40);
+}
+
+function renderStoryScreen() {
+  const sc = CAMPAIGN[STATE.story.index];
+  ctx.fillStyle = "#05030c";
+  ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+  ctx.textAlign = "center";
+  ctx.font = "10px 'Courier New', monospace";
+  ctx.fillStyle = PAL.inkFaint;
+  ctx.fillText("MISSION " + (STATE.story.index + 1) + " OF " + CAMPAIGN.length, CANVAS_W / 2, CANVAS_H * 0.3);
+  ctx.font = "bold 24px 'Courier New', monospace";
+  ctx.fillStyle = PAL.gold;
+  ctx.fillText(sc.name.toUpperCase(), CANVAS_W / 2, CANVAS_H * 0.3 + 34);
+
+  ctx.font = "14px 'Courier New', monospace";
+  ctx.fillStyle = PAL.ink;
+  // Lines fade in one after another for a little ceremony.
+  for (let i = 0; i < sc.intro.length; i++) {
+    const a = Math.max(0, Math.min(1, (frame - (STATE.story.shownAt || 0) - i * 26) / 26));
+    if (a <= 0) continue;
+    ctx.globalAlpha = a;
+    ctx.fillText(sc.intro[i], CANVAS_W / 2, CANVAS_H * 0.46 + i * 24);
+  }
+  ctx.globalAlpha = 1;
+
+  if (Math.floor(frame / 30) % 2 === 0) {
+    ctx.font = "bold 14px 'Courier New', monospace";
+    ctx.fillStyle = PAL.gold;
+    ctx.fillText("CLICK TO BEGIN", CANVAS_W / 2, CANVAS_H * 0.78);
+  }
+  ctx.textAlign = "left";
+}
+
 function renderGameOver() {
   ctx.fillStyle = "#05030c";
   ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
@@ -4420,6 +4672,21 @@ function renderGameOver() {
     ctx.fillText(String(row[1]), colL, ry);
     ctx.fillText(String(row[2]), colR, ry);
   });
+
+  // Campaign verdict (5.3)
+  if (STATE.campaign) {
+    ctx.font = "bold 13px 'Courier New', monospace";
+    ctx.textAlign = "center";
+    if (STATE.winner === 0) {
+      const last = STATE.campaign.index >= CAMPAIGN.length - 1;
+      ctx.fillStyle = PAL.green;
+      ctx.fillText(last ? "CAMPAIGN COMPLETE — THE REALM IS YOURS"
+                        : "MISSION COMPLETE — THE NEXT BATTLE AWAITS", CANVAS_W / 2, CANVAS_H / 2 + 196);
+    } else {
+      ctx.fillStyle = PAL.red;
+      ctx.fillText("MISSION FAILED — THE FRONTIER REMEMBERS", CANVAS_W / 2, CANVAS_H / 2 + 196);
+    }
+  }
 
   const blink = Math.floor(frame / 30) % 2 === 0;
   if (blink) {
