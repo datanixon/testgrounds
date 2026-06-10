@@ -308,6 +308,7 @@ function makeUnit(typeKey, owner, q, r) {
     hp: t.maxHp, maxHp: t.maxHp,
     move: t.move, range: t.range, power: t.power, def: t.def,
     flying: t.flying, sprite: t.sprite, attack: t.attack,
+    level: 1, xp: 0,
     acted: false, isMaster: false,
   };
 }
@@ -324,8 +325,45 @@ function makeMaster(owner, q, r) {
     power: MASTER_TEMPLATE.power, def: MASTER_TEMPLATE.def,
     mpRegen: MASTER_TEMPLATE.mpRegen,
     flying: false, sprite: "archon", attack: "bolt",
+    level: 1, xp: 0,
     acted: false, isMaster: true,
   };
+}
+
+// ---- XP & leveling (section 4 cont.) ----
+// Units earn XP equal to damage dealt in battle, plus a bonus on a kill.
+// Five levels; each level-up bumps maxHp/power/def and fully restores HP
+// (classic Master of Monsters behaviour). Stats live on the unit instance so
+// computeDamage picks the growth up automatically.
+const MAX_LEVEL = 5;
+const KILL_XP_BONUS = 10;
+
+// XP required to advance FROM `level` to the next (12, 20, 28, 36).
+function xpToNext(level) { return level >= MAX_LEVEL ? Infinity : 12 + (level - 1) * 8; }
+
+function applyLevelGrowth(unit) {
+  unit.maxHp += unit.isMaster ? 6 : 4;
+  unit.power += 1;
+  unit.def += 1;
+  unit.hp = unit.maxHp; // full restore on level-up
+}
+
+// Award XP; resolves multi-level-ups. Returns levels gained this call.
+function gainXp(unit, amount) {
+  if (!unit) return 0;
+  unit.level = unit.level || 1;
+  unit.xp = unit.xp || 0;
+  if (amount <= 0 || unit.level >= MAX_LEVEL) return 0;
+  unit.xp += amount;
+  let gained = 0;
+  while (unit.level < MAX_LEVEL && unit.xp >= xpToNext(unit.level)) {
+    unit.xp -= xpToNext(unit.level);
+    unit.level++;
+    applyLevelGrowth(unit);
+    gained++;
+  }
+  if (unit.level >= MAX_LEVEL) unit.xp = 0;
+  return gained;
 }
 
 // =========================================================================
@@ -1148,12 +1186,25 @@ const B = {
   outro: 32,     // 533 ms — letterbox closes, return to map
 };
 
+// Fired when a combatant levels up mid-battle: log line, fanfare, and a
+// "LEVEL UP!" banner over that side of the arena.
+function onBattleLevelUp(unit, side) {
+  pushLog(unit.name + " reached Level " + unit.level + "!");
+  if (STATE.battle) {
+    STATE.battle.flash = Math.max(STATE.battle.flash, 0.85);
+    STATE.battle.levelUp = { side, ttl: 64 };
+  }
+  beep(523, 0.08, "triangle", 0.2);
+  setTimeout(() => beep(784, 0.13, "triangle", 0.2), 90);
+}
+
 function updateBattle() {
   const b = STATE.battle;
   if (!b) return;
   b.phaseFrame++;
   b.flash *= 0.85;
   b.shake *= 0.85;
+  if (b.levelUp && --b.levelUp.ttl <= 0) b.levelUp = null;
 
   const advance = (next) => { b.phase = next; b.phaseFrame = 0; };
 
@@ -1178,6 +1229,8 @@ function updateBattle() {
         pushLog(b.attacker.name + " strikes " + b.defender.name + " for " + b.aDmg + ".");
         b.applied1 = true;
         if (b.defender.hp <= 0) pushLog(b.defender.name + " is destroyed.");
+        const killed = b.defender.hp <= 0;
+        if (gainXp(b.attacker, b.aDmg + (killed ? KILL_XP_BONUS : 0)) > 0) onBattleLevelUp(b.attacker, "a");
       }
       if (b.phaseFrame >= B.impact) advance("aRecover");
       break;
@@ -1204,6 +1257,8 @@ function updateBattle() {
         pushLog(b.defender.name + " counters for " + b.cDmg + ".");
         b.applied2 = true;
         if (b.attacker.hp <= 0) pushLog(b.attacker.name + " is destroyed.");
+        const killed = b.attacker.hp <= 0;
+        if (gainXp(b.defender, b.cDmg + (killed ? KILL_XP_BONUS : 0)) > 0) onBattleLevelUp(b.defender, "c");
       }
       if (b.phaseFrame >= B.impact) advance("cRecover");
       break;
@@ -1277,8 +1332,21 @@ function renderBattle() {
   ctx.fillRect(0, CANVAS_H - barH, CANVAS_W, barH);
 
   // HUD overlays (name plates, HP bars)
-  drawCombatantHud(b.attacker, 24, CANVAS_H - 88, false, b);
-  drawCombatantHud(b.defender, CANVAS_W - 24, CANVAS_H - 88, true, b);
+  drawCombatantHud(b.attacker, 24, CANVAS_H - 100, false, b);
+  drawCombatantHud(b.defender, CANVAS_W - 24, CANVAS_H - 100, true, b);
+
+  // "LEVEL UP!" banner over the side that leveled
+  if (b.levelUp) {
+    const lx = b.levelUp.side === "a" ? CANVAS_W * 0.30 : CANVAS_W * 0.70;
+    const k = b.levelUp.ttl / 64;
+    const rise = (1 - k) * 30;
+    ctx.font = "bold 30px 'Courier New', monospace";
+    ctx.textAlign = "center";
+    ctx.fillStyle = `rgba(0,0,0,${k})`;
+    ctx.fillText("LEVEL UP!", lx + 2, CANVAS_H * 0.30 - rise + 2);
+    ctx.fillStyle = `rgba(240, 198, 116, ${k})`;
+    ctx.fillText("LEVEL UP!", lx, CANVAS_H * 0.30 - rise);
+  }
 
   // "BATTLE" banner intro
   if (b.phase === "intro" || (b.phase === "standoff" && b.phaseFrame < 12)) {
@@ -1557,15 +1625,15 @@ function drawArenaBackground(terrainKind, seed) {
 }
 
 function drawCombatantHud(unit, anchorX, y, alignRight, b) {
-  const w = 280;
+  const w = 280, h = 76;
   const x = alignRight ? anchorX - w : anchorX;
   const player = PLAYERS[unit.owner];
   // panel
   ctx.fillStyle = "rgba(8, 6, 14, 0.85)";
-  ctx.fillRect(x, y, w, 64);
+  ctx.fillRect(x, y, w, h);
   ctx.strokeStyle = player.color;
   ctx.lineWidth = 2;
-  ctx.strokeRect(x + 0.5, y + 0.5, w - 1, 63);
+  ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
 
   // name + element
   ctx.font = "bold 14px 'Courier New', monospace";
@@ -1577,22 +1645,42 @@ function drawCombatantHud(unit, anchorX, y, alignRight, b) {
   const el = ELEMENT[unit.element];
   ctx.fillStyle = el.color;
   ctx.font = "11px 'Courier New', monospace";
-  ctx.fillText("[" + el.short + "]", x + w - 50, y + 18);
+  ctx.textAlign = "right";
+  ctx.fillText("Lv " + (unit.level || 1) + "  [" + el.short + "]", x + w - 10, y + 18);
 
   // HP bar
   const hpFrac = Math.max(0, unit.hp / unit.maxHp);
   const barW = w - 20;
   ctx.fillStyle = "#000";
-  ctx.fillRect(x + 10, y + 44, barW, 12);
+  ctx.fillRect(x + 10, y + 42, barW, 12);
   ctx.fillStyle = "#3a1010";
-  ctx.fillRect(x + 11, y + 45, barW - 2, 10);
+  ctx.fillRect(x + 11, y + 43, barW - 2, 10);
   const col = hpFrac > 0.5 ? "#5fd06a" : hpFrac > 0.25 ? "#f0c674" : "#cc4a4a";
   ctx.fillStyle = col;
-  ctx.fillRect(x + 11, y + 45, Math.round((barW - 2) * hpFrac), 10);
+  ctx.fillRect(x + 11, y + 43, Math.round((barW - 2) * hpFrac), 10);
   ctx.fillStyle = PAL.ink;
   ctx.font = "10px 'Courier New', monospace";
   ctx.textAlign = "right";
-  ctx.fillText(unit.hp + " / " + unit.maxHp, x + w - 10, y + 54);
+  ctx.fillText(unit.hp + " / " + unit.maxHp, x + w - 10, y + 52);
+
+  // XP bar (thin gold), or "MAX" at top level
+  const lvl = unit.level || 1;
+  ctx.fillStyle = "#000";
+  ctx.fillRect(x + 10, y + 60, barW, 7);
+  if (lvl >= MAX_LEVEL) {
+    ctx.fillStyle = PAL.gold;
+    ctx.fillRect(x + 11, y + 61, barW - 2, 5);
+    ctx.fillStyle = "#000";
+    ctx.font = "8px 'Courier New', monospace";
+    ctx.textAlign = "center";
+    ctx.fillText("MAX LEVEL", x + 10 + barW / 2, y + 66);
+  } else {
+    const xpFrac = Math.max(0, Math.min(1, (unit.xp || 0) / xpToNext(lvl)));
+    ctx.fillStyle = "#2a2410";
+    ctx.fillRect(x + 11, y + 61, barW - 2, 5);
+    ctx.fillStyle = PAL.gold;
+    ctx.fillRect(x + 11, y + 61, Math.round((barW - 2) * xpFrac), 5);
+  }
 }
 
 function renderBattleAnims() {
@@ -1763,6 +1851,21 @@ function renderUnits() {
     const frac = Math.max(0, u.hp / u.maxHp);
     ctx.fillStyle = frac > 0.5 ? "#5fd06a" : frac > 0.25 ? "#f0c674" : "#cc4a4a";
     ctx.fillRect(p.x - barW / 2, p.y + 21, Math.round(barW * frac), barH);
+
+    // level pips below the HP bar (level 2+ shows level-1 gold chevrons)
+    const lvl = u.level || 1;
+    if (lvl > 1) {
+      const n = lvl - 1;
+      for (let i = 0; i < n; i++) {
+        const cx2 = p.x - (n - 1) * 3 + i * 6;
+        const cy2 = p.y + 28;
+        ctx.fillStyle = "#000";
+        ctx.fillRect(cx2 - 3, cy2 - 1, 6, 4);
+        ctx.fillStyle = PAL.gold;
+        ctx.fillRect(cx2 - 2, cy2, 4, 1);   // chevron base
+        ctx.fillRect(cx2 - 1, cy2 - 1, 2, 1); // chevron tip
+      }
+    }
 
     if (u.isMaster) {
       ctx.fillStyle = PAL.gold;
