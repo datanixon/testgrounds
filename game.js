@@ -464,6 +464,7 @@ const STATE = {
   pendingAI: false,
   animations: [],
   battle: null,      // active battle scene; see startBattle()
+  moveAnim: null,    // active hex-to-hex slide; see startMove()/updateMove()
   music: { wanted: true, started: false, trackIndex: 0 },
 };
 
@@ -578,6 +579,82 @@ function canCapture(unit, cell) {
   if (!cell) return false;
   if (cell.terrain !== "tower") return false;
   return cell.owner !== unit.owner;
+}
+
+// ---- Animated movement (milestone 2.1) ------------------------------------
+// Units slide hex-to-hex along the Dijkstra path before their action menu
+// opens. Input and the AI step chain are blocked while STATE.moveAnim is live
+// (same gating pattern as the battle scene). Time-based so speed is FPS-stable.
+const MOVE_TICK_MS = 16;      // slide ticker cadence (~60Hz), setTimeout-driven
+const MOVE_STEP = 0.2;        // progress per tick for one hex step (~85ms/hex)
+const MOVE_EASE = t => t * t * (3 - 2 * t); // smoothstep
+
+// Walk `prev` links in a computeReachable() result back from (q,r) to the
+// unit's start, returning the full path as [{q,r}, ...] start-first.
+function reconstructPath(reach, q, r) {
+  const path = [];
+  let key = hexKey(q, r);
+  let guard = 0;
+  while (key && guard++ < 4096) {
+    const node = reach.get(key);
+    if (!node) break;
+    path.push({ q: node.q, r: node.r });
+    key = node.prev;
+  }
+  path.reverse();
+  return path;
+}
+
+// Begin sliding `unit` to (destQ,destR) along its reachable path, then invoke
+// onArrive() once the unit settles. No path (or a zero-length hop) arrives
+// immediately so callers never special-case standing still. The slide is
+// advanced by a setTimeout ticker (tickMove) — NOT the rAF render loop — so it
+// keeps progressing under headless virtual-time, where an empty timer queue
+// halts the virtual clock and starves rAF.
+function startMove(unit, destQ, destR, reach, onArrive) {
+  const path = reach ? reconstructPath(reach, destQ, destR) : null;
+  if (!path || path.length < 2) {
+    moveUnitTo(unit, destQ, destR);
+    if (onArrive) onArrive();
+    return;
+  }
+  STATE.moveAnim = { unit, path, seg: 0, t: 0, onArrive };
+  setTimeout(tickMove, MOVE_TICK_MS);
+}
+
+// One slide tick: advance progress, follow the camera, commit + fire onArrive
+// when the last segment finishes, else schedule the next tick.
+function tickMove() {
+  const m = STATE.moveAnim;
+  if (!m) return;
+  m.t += MOVE_STEP;
+  while (m.t >= 1) {
+    m.t -= 1;
+    m.seg++;
+    if (m.seg >= m.path.length - 1) {
+      const dest = m.path[m.path.length - 1];
+      STATE.moveAnim = null;
+      moveUnitTo(m.unit, dest.q, dest.r);
+      if (m.onArrive) m.onArrive();
+      return;
+    }
+  }
+  // Gentle camera follow: ease toward keeping the slider near centre so long
+  // marches stay on-screen without snapping on short hops.
+  const p = moveAnimPixel(m);
+  const tx = Math.max(MAP_W - mapPixelWidth(), Math.min(0, MAP_W / 2 - p.x));
+  const ty = Math.max(MAP_H - mapPixelHeight(), Math.min(0, MAP_H / 2 - p.y));
+  STATE.cam.x += (tx - STATE.cam.x) * 0.08;
+  STATE.cam.y += (ty - STATE.cam.y) * 0.08;
+  setTimeout(tickMove, MOVE_TICK_MS);
+}
+
+// Interpolated map-pixel position of the sliding unit this frame.
+function moveAnimPixel(m) {
+  const a = axialToPixel(m.path[m.seg].q, m.path[m.seg].r);
+  const b = axialToPixel(m.path[m.seg + 1].q, m.path[m.seg + 1].r);
+  const e = MOVE_EASE(Math.min(1, m.t));
+  return { x: a.x + (b.x - a.x) * e, y: a.y + (b.y - a.y) * e };
 }
 
 // =========================================================================
@@ -703,15 +780,16 @@ function aiActUnit(u, enemyMaster, done) {
       if (node.cost < bestTowerCost) { bestTower = t; bestTowerCost = node.cost; }
     }
     if (bestTower) {
-      moveUnitTo(u, bestTower.q, bestTower.r);
-      const cell = cellAt(bestTower);
-      if (cell && cell.terrain === "tower" && cell.owner !== u.owner) {
-        cell.owner = u.owner;
-        pushLog(u.name + " claims a spire.");
-        beep(520, 0.12, "triangle", 0.18);
-      }
-      u.acted = true;
-      setTimeout(done, 260);
+      startMove(u, bestTower.q, bestTower.r, reach, () => {
+        const cell = cellAt(bestTower);
+        if (cell && cell.terrain === "tower" && cell.owner !== u.owner) {
+          cell.owner = u.owner;
+          pushLog(u.name + " claims a spire.");
+          beep(520, 0.12, "triangle", 0.18);
+        }
+        u.acted = true;
+        setTimeout(done, 260);
+      });
       return;
     }
   }
@@ -733,9 +811,10 @@ function aiActUnit(u, enemyMaster, done) {
   }
 
   if (best) {
-    moveUnitTo(u, best.moveTo.q, best.moveTo.r);
-    u.acted = true;
-    beginBattle(u, best.target, () => setTimeout(done, 400));
+    startMove(u, best.moveTo.q, best.moveTo.r, reach, () => {
+      u.acted = true;
+      beginBattle(u, best.target, () => setTimeout(done, 400));
+    });
     return;
   }
 
@@ -745,9 +824,12 @@ function aiActUnit(u, enemyMaster, done) {
     const d = hexDistance({ q: node.q, r: node.r }, enemyMaster);
     if (d < bestDist) { bestDist = d; bestStep = node; }
   }
-  if (bestStep) moveUnitTo(u, bestStep.q, bestStep.r);
-  u.acted = true;
-  setTimeout(done, 260);
+  if (bestStep) {
+    startMove(u, bestStep.q, bestStep.r, reach, () => { u.acted = true; setTimeout(done, 260); });
+  } else {
+    u.acted = true;
+    setTimeout(done, 260);
+  }
 }
 
 function enemyAdjacentThreat(q, r, owner) {
@@ -1934,8 +2016,9 @@ function renderUnits() {
   const list = STATE.units.filter(u => u.hp > 0).slice();
   list.sort((a, b) => a.r - b.r);
 
+  const slide = STATE.moveAnim;
   for (const u of list) {
-    const p = axialToPixel(u.q, u.r);
+    const p = (slide && slide.unit === u) ? moveAnimPixel(slide) : axialToPixel(u.q, u.r);
     const player = PLAYERS[u.owner];
     ctx.fillStyle = u.acted ? "rgba(20,18,30,0.55)" : player.dark;
     ctx.beginPath();
@@ -2291,6 +2374,7 @@ function onClick(ev) {
   if (STATE.screen === "title") { startNewGame(); return; }
   if (STATE.screen === "gameover") { STATE.screen = "title"; return; }
   if (STATE.screen === "battle") return;
+  if (STATE.moveAnim) return;
   if (STATE.pendingAI) return;
   if (PLAYERS[STATE.currentPlayer].isAI) return;
 
@@ -2322,21 +2406,11 @@ function onClick(ev) {
     const k = hexKey(local.q, local.r);
     if (STATE.reachable.has(k)) {
       const unit = STATE.selected;
-      moveUnitTo(unit, local.q, local.r);
-      const targets = computeAttackTargets(unit, unit.q, unit.r);
-      const cellHere = cellAt({ q: unit.q, r: unit.r });
-      const items = [];
-      if (targets.size > 0) items.push({ label: "Attack", kind: "attackMode" });
-      if (canCapture(unit, cellHere)) items.push({ label: "Capture", kind: "capture" });
-      if (unit.isMaster && unit.mp >= 6) items.push({ label: "Summon", kind: "summon" });
-      items.push({ label: "Wait", kind: "wait" });
+      const reach = STATE.reachable;
+      STATE.selected = null;
       STATE.reachable = null;
       STATE.attackTargets = null;
-      const px2 = axialToPixel(unit.q, unit.r);
-      STATE.menu = {
-        kind: "postMove", unit, items, index: 0,
-        anchor: { x: px2.x + STATE.cam.x, y: px2.y + STATE.cam.y + TOPBAR_H },
-      };
+      startMove(unit, local.q, local.r, reach, () => openPostMoveMenu(unit));
       return;
     } else if (STATE.attackTargets && STATE.attackTargets.has(hexKey(local.q, local.r))) {
       const target = unitAt(local.q, local.r);
@@ -2377,6 +2451,7 @@ function onKey(ev) {
     return;
   }
   if (STATE.screen === "battle") return;
+  if (STATE.moveAnim) return;
   if (PLAYERS[STATE.currentPlayer].isAI && STATE.pendingAI) return;
 
   if (STATE.menu) {
@@ -2408,6 +2483,23 @@ function onKey(ev) {
 
 function mapPixelWidth() { return HEX_STEP_X * (COLS + 0.5) + 12; }
 function mapPixelHeight() { return HEX_STEP_Y * ROWS + HEX_SIZE + 12; }
+
+// Build the post-move action menu for `unit` at its current tile. Shared by
+// the move handler, the summon-picker "Back", and the cancel-out path.
+function openPostMoveMenu(unit) {
+  const items = [];
+  const targets = computeAttackTargets(unit, unit.q, unit.r);
+  const cellHere = cellAt({ q: unit.q, r: unit.r });
+  if (targets.size > 0) items.push({ label: "Attack", kind: "attackMode" });
+  if (canCapture(unit, cellHere)) items.push({ label: "Capture", kind: "capture" });
+  if (unit.isMaster && unit.mp >= 6) items.push({ label: "Summon", kind: "summon" });
+  items.push({ label: "Wait", kind: "wait" });
+  const px = axialToPixel(unit.q, unit.r);
+  STATE.menu = {
+    kind: "postMove", unit, items, index: 0,
+    anchor: { x: px.x + STATE.cam.x, y: px.y + STATE.cam.y + TOPBAR_H },
+  };
+}
 
 function selectMenuItem(item) {
   if (item.disabled) return;
@@ -2456,18 +2548,7 @@ function selectMenuItem(item) {
     beep(660, 0.08, "triangle", 0.18);
     unit.acted = true; closeMenu();
   } else if (item.kind === "back") {
-    const items = [];
-    const targets = computeAttackTargets(unit, unit.q, unit.r);
-    const cellHere = cellAt({ q: unit.q, r: unit.r });
-    if (targets.size > 0) items.push({ label: "Attack", kind: "attackMode" });
-    if (canCapture(unit, cellHere)) items.push({ label: "Capture", kind: "capture" });
-    if (unit.isMaster && unit.mp >= 6) items.push({ label: "Summon", kind: "summon" });
-    items.push({ label: "Wait", kind: "wait" });
-    const px = axialToPixel(unit.q, unit.r);
-    STATE.menu = {
-      kind: "postMove", unit, items, index: 0,
-      anchor: { x: px.x + STATE.cam.x, y: px.y + STATE.cam.y + TOPBAR_H },
-    };
+    openPostMoveMenu(unit);
   }
 }
 
@@ -2483,19 +2564,7 @@ function cancelMenu() {
   // Submenu (Summon picker) — back out to the parent post-move menu so
   // the player can still pick a different action for this unit.
   if (STATE.menu.kind === "summonMenu") {
-    const unit = STATE.menu.unit;
-    const items = [];
-    const targets = computeAttackTargets(unit, unit.q, unit.r);
-    const cellHere = cellAt({ q: unit.q, r: unit.r });
-    if (targets.size > 0) items.push({ label: "Attack", kind: "attackMode" });
-    if (canCapture(unit, cellHere)) items.push({ label: "Capture", kind: "capture" });
-    if (unit.isMaster && unit.mp >= 6) items.push({ label: "Summon", kind: "summon" });
-    items.push({ label: "Wait", kind: "wait" });
-    const px = axialToPixel(unit.q, unit.r);
-    STATE.menu = {
-      kind: "postMove", unit, items, index: 0,
-      anchor: { x: px.x + STATE.cam.x, y: px.y + STATE.cam.y + TOPBAR_H },
-    };
+    openPostMoveMenu(STATE.menu.unit);
     return;
   }
   // Post-move menu cancel commits the move (move is already applied; this
