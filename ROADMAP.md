@@ -140,9 +140,12 @@ Check off with a one-line note when done. Mark `BLOCKED:`/`PARKED:` per rules.
   terrain def + threat (master drifts to unowned spires, never beelines).
   Weights in AI_W for 4.3 difficulty profiles. Soak: 16 turns headless, 0
   errors, all 4 spires by t8, master untouched. [claude-fable-5 | high]
-- [ ] 4.2 Summon economy: pick summons by element counters vs player army +
-  map terrain, save MP for big units when ahead, emergency cheap bodies when
-  master threatened. [claude-opus-4-8 | high]
+- [x] 4.2 Summon economy (S4): aiTrySummons rewritten — scoreType = element
+  edge vs enemy army (offense ×20, their counter-edge ×-10) + map terrain
+  resonance fraction + stat-per-MP + variety penalty; ahead (army value
+  >1.25×) → bank MP for cost≥12 units unless regen would overflow the cap;
+  enemy within move+range of master → cheap-half flood to wall off. Verified:
+  vs pyro-heavy player army AI fields hydro counters. [claude-opus-4-8 | high]
 - [ ] 4.3 Difficulty levels: Easy (current random-ish), Normal (4.1+4.2),
   Hard (Normal + aggression tuning + perfect focus fire); title-screen
   selector. [claude-sonnet-4-6 | medium]

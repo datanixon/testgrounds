@@ -1042,19 +1042,69 @@ function aiActUnit(u, enemyMaster, done, threat) {
   }
 }
 
+// AI summon economy (4.2): summons are scored by element matchup against the
+// enemy army (offense and how hard they hit back), how much of the map
+// resonates with the element, raw stat value per MP, and a variety nudge.
+// When clearly ahead the AI banks MP for heavy hitters instead of trickling
+// chaff; when enemies are in striking range of the master it floods cheap
+// bodies to wall it off.
 function aiTrySummons(master) {
+  const owner = master.owner;
+  const enemies = aliveUnits(1 - owner);
+  const myArmy = aliveUnits(owner).filter(u => !u.isMaster);
+
+  // Fraction of the map that empowers each element (+20% terrain).
+  const terrFrac = {};
+  for (const el of Object.keys(ELEMENT)) {
+    let n = 0, tot = 0;
+    for (const c of MAP.cells.values()) { tot++; if (affinityFor(el, c.terrain)) n++; }
+    terrFrac[el] = tot ? n / tot : 0;
+  }
+
+  const armyValue = (list) => list.reduce((a, u) => a + u.power + u.maxHp * 0.25, 0);
+  const ahead = armyValue(myArmy) > armyValue(enemies.filter(e => !e.isMaster)) * 1.25;
+  const emergency = enemies.some(e => hexDistance(e, master) <= e.move + e.range);
+
+  const scoreType = (k) => {
+    const t = UNIT_TYPES[k];
+    let s = 0;
+    if (enemies.length) {
+      // offense: avg element edge vs their army; defense: how hard they counter-hit
+      s += enemies.reduce((a, e) => a + (ELEM_MATRIX[t.element][e.element] - 1), 0) / enemies.length * 20;
+      s -= enemies.reduce((a, e) => a + (ELEM_MATRIX[e.element][t.element] - 1), 0) / enemies.length * 10;
+    }
+    s += terrFrac[t.element] * 12;
+    s += (t.maxHp * 0.25 + t.power) / t.cost * 6;   // stat value per MP
+    s -= myArmy.filter(m => m.typeKey === k).length * 4; // variety
+    return s;
+  };
+
   let attempts = 4;
   while (attempts-- > 0 && master.mp >= 6) {
-    const affordable = SUMMON_LIST.filter(k => UNIT_TYPES[k].cost <= master.mp);
-    if (!affordable.length) break;
-    const choice = affordable[Math.floor(Math.random() * affordable.length)];
+    let pool = SUMMON_LIST.filter(k => UNIT_TYPES[k].cost <= master.mp);
+    if (!pool.length) break;
+    if (emergency) {
+      // Wall off the master: cheap half of the affordable pool, best-scored.
+      pool.sort((a, b) => UNIT_TYPES[a].cost - UNIT_TYPES[b].cost);
+      pool = pool.slice(0, Math.max(1, Math.ceil(pool.length / 2)));
+    } else if (ahead) {
+      // Bank MP for big units — unless next turn's regen would overflow the
+      // cap, in which case spending now is free.
+      const bigs = pool.filter(k => UNIT_TYPES[k].cost >= 12);
+      const regen = master.mpRegen + MAP.towers.filter(t => t.owner === owner).length * 2;
+      if (!bigs.length && master.mp + regen <= master.maxMp) break;
+      if (bigs.length) pool = bigs;
+    }
+    pool.sort((a, b) => scoreType(b) - scoreType(a));
+    const choice = pool[0];
     const slot = findSummonSlot(master);
     if (!slot) break;
     master.mp -= UNIT_TYPES[choice].cost;
-    const u = makeUnit(choice, master.owner, slot.q, slot.r);
+    const u = makeUnit(choice, owner, slot.q, slot.r);
     u.acted = true;
     STATE.units.push(u);
-    if (STATE.stats) STATE.stats.summoned[master.owner]++;
+    myArmy.push(u); // keep the variety penalty honest across this loop
+    if (STATE.stats) STATE.stats.summoned[owner]++;
     pushLog(master.name + " summons " + u.name + ".");
     pushAnim("summon", slot.q, slot.r, "", PAL.gold, "190, 150, 230");
     beep(660, 0.08, "triangle", 0.18);
