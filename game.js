@@ -311,19 +311,25 @@ const UNIT_TYPES = {
   skyharrow:   { name: "Skyharrow",   element: "zephyr", maxHp: 16, move: 4, range: 2, power: 7, def: 2, cost: 13, flying: true,  sprite: "raptor",   attack: "dive",   evolvesTo: "skytyrant" },
 
   // Evolved forms (terminal tier; not directly summonable). Reached when a
-  // level-4+ unit starts its turn on an owned tower/castle. Sprites are stubs
-  // that reuse the base form's sprite id (real art lands in milestone 5.1).
-  infernite:    { name: "Infernite",    element: "pyro",   maxHp: 22, move: 4, range: 1, power: 9,  def: 3, cost: 18, flying: false, sprite: "imp",     attack: "melee",  evolved: true },
-  emberdrake:   { name: "Emberdrake",   element: "pyro",   maxHp: 30, move: 3, range: 2, power: 11, def: 4, cost: 26, flying: false, sprite: "wyrm",    attack: "breath", evolved: true },
-  tidelord:     { name: "Tidelord",     element: "hydro",  maxHp: 24, move: 4, range: 1, power: 9,  def: 4, cost: 18, flying: false, sprite: "merfolk", attack: "melee",  evolved: true },
-  leviathan:    { name: "Leviathan",    element: "hydro",  maxHp: 32, move: 3, range: 2, power: 10, def: 5, cost: 28, flying: false, sprite: "serpent", attack: "spray",  evolved: true },
-  colossus:     { name: "Colossus",     element: "terra",  maxHp: 36, move: 2, range: 1, power: 9,  def: 6, cost: 20, flying: false, sprite: "golem",   attack: "melee",  evolved: true },
-  earthbreaker: { name: "Earthbreaker", element: "terra",  maxHp: 42, move: 2, range: 1, power: 14, def: 6, cost: 30, flying: false, sprite: "ogre",    attack: "melee",  evolved: true },
-  stormwisp:    { name: "Stormwisp",    element: "zephyr", maxHp: 18, move: 5, range: 2, power: 8,  def: 2, cost: 18, flying: true,  sprite: "wisp",    attack: "spark",  evolved: true },
-  skytyrant:    { name: "Skytyrant",    element: "zephyr", maxHp: 26, move: 4, range: 2, power: 11, def: 3, cost: 24, flying: true,  sprite: "raptor",  attack: "dive",   evolved: true },
+  // level-4+ unit starts its turn on an owned tower/castle. Real sprites added
+  // in milestone 5.1 — each evolved form now has its own unique sprite id.
+  infernite:    { name: "Infernite",    element: "pyro",   maxHp: 22, move: 4, range: 1, power: 9,  def: 3, cost: 18, flying: false, sprite: "infernite",    attack: "melee",  evolved: true },
+  emberdrake:   { name: "Emberdrake",   element: "pyro",   maxHp: 30, move: 3, range: 2, power: 11, def: 4, cost: 26, flying: false, sprite: "emberdrake",   attack: "breath", evolved: true },
+  tidelord:     { name: "Tidelord",     element: "hydro",  maxHp: 24, move: 4, range: 1, power: 9,  def: 4, cost: 18, flying: false, sprite: "tidelord",     attack: "melee",  evolved: true },
+  leviathan:    { name: "Leviathan",    element: "hydro",  maxHp: 32, move: 3, range: 2, power: 10, def: 5, cost: 28, flying: false, sprite: "leviathan",    attack: "spray",  evolved: true },
+  colossus:     { name: "Colossus",     element: "terra",  maxHp: 36, move: 2, range: 1, power: 9,  def: 6, cost: 20, flying: false, sprite: "colossus",     attack: "melee",  evolved: true },
+  earthbreaker: { name: "Earthbreaker", element: "terra",  maxHp: 42, move: 2, range: 1, power: 14, def: 6, cost: 30, flying: false, sprite: "earthbreaker", attack: "melee",  evolved: true },
+  stormwisp:    { name: "Stormwisp",    element: "zephyr", maxHp: 18, move: 5, range: 2, power: 8,  def: 2, cost: 18, flying: true,  sprite: "stormwisp",    attack: "spark",  evolved: true },
+  skytyrant:    { name: "Skytyrant",    element: "zephyr", maxHp: 26, move: 4, range: 2, power: 11, def: 3, cost: 24, flying: true,  sprite: "skytyrant",    attack: "dive",   evolved: true },
+
+  // New base monsters (milestone 5.1 — arcane element coverage + roster depth)
+  hexwisp:   { name: "Hexwisp",   element: "arcane", maxHp: 11, move: 5, range: 2, power: 5,  def: 1, cost: 8,  flying: true,  sprite: "hexwisp",   attack: "bolt" },
+  runeward:  { name: "Runeward",  element: "arcane", maxHp: 24, move: 2, range: 1, power: 7,  def: 5, cost: 15, flying: false, sprite: "runeward",  attack: "melee" },
+  frostmaw:  { name: "Frostmaw",  element: "hydro",  maxHp: 28, move: 3, range: 1, power: 10, def: 3, cost: 18, flying: false, sprite: "frostmaw",  attack: "melee" },
+  duneskink: { name: "Duneskink", element: "terra",  maxHp: 13, move: 5, range: 1, power: 6,  def: 1, cost: 6,  flying: false, sprite: "duneskink", attack: "melee" },
 };
 
-const SUMMON_LIST = ["cinderling", "tidekin", "stoneward", "galewisp", "pyrowyrm", "mistleviath", "geomaul", "skyharrow"];
+const SUMMON_LIST = ["cinderling", "tidekin", "stoneward", "galewisp", "duneskink", "pyrowyrm", "hexwisp", "mistleviath", "runeward", "geomaul", "frostmaw", "skyharrow"];
 
 const MASTER_TEMPLATE = {
   name: "Archon", element: "arcane", maxHp: 40, maxMp: 30, move: 3, range: 1, power: 7, def: 3,
@@ -1299,6 +1305,202 @@ function drawMapSprite(ctx, unit, cx, cy, t) {
       px(-3, 7, 2, 2, dark); px(1, 7, 2, 2, dark);
       break;
     }
+    // ---- Evolved forms (milestone 5.1) ----
+    case "infernite": {
+      // Ascended imp: broader silhouette, armored chest, crown of horns, second tail
+      px(-7, -11, 14, 10, color);                  // head (wider)
+      px(-10, -13, 4, 4, color); px(6, -13, 4, 4, color); // large outer horns
+      px(-5, -14, 3, 3, dark); px(2, -14, 3, 3, dark);    // inner horns
+      px(-3, -8, 2, 2, "#100"); px(1, -8, 2, 2, "#100");  // eyes
+      px(-1, -5, 2, 1, "#ff4040");                 // ember grin
+      px(-7, -1, 14, 10, dark);                    // body
+      px(-5, 1, 10, 5, color);
+      px(-4, 9, 2, 5, dark); px(2, 9, 2, 5, dark);        // legs
+      px(-12, 1, 4, 6, color); px(8, 1, 4, 6, color);     // wings
+      px(-14, -4, 3, 5, dark); px(11, -4, 3, 5, dark);    // wing tips
+      // dual tails
+      px(7, 8, 2, 2, color); px(9, 10, 2, 2, color); px(11, 11, 2, 1, trim);
+      px(5, 10, 2, 2, color); px(7, 12, 2, 2, color);
+      break;
+    }
+    case "emberdrake": {
+      // Ascended wyrm: larger body, frill crest, armored back plates, fiercer head
+      px(-13, -4, 25, 10, color);                  // body (wider)
+      px(-11, -1, 20, 5, dark);                    // belly
+      px(10, -7, 7, 11, color);                    // head
+      px(14, -5, 2, 2, "#ff9020"); px(15, -4, 1, 1, "#100"); // eye
+      px(16, -3, 3, 3, color);                     // snout
+      px(-15, 1, 7, 3, color); px(-17, 2, 3, 2, color);     // tail
+      px(-7, 7, 3, 6, dark); px(3, 7, 3, 6, dark);          // legs
+      // back armor plates
+      px(-8, -9, 4, 4, dark); px(-2, -9, 4, 4, dark); px(4, -10, 4, 4, dark);
+      // head frill
+      px(8, -10, 5, 4, trim); px(10, -12, 3, 2, color);
+      break;
+    }
+    case "tidelord": {
+      // Ascended merfolk: taller silhouette, crown crest, dual fins, scales shimmer
+      px(-5, -13, 10, 8, color);                   // head (taller)
+      px(-2, -10, 1, 1, "#100"); px(1, -10, 1, 1, "#100");
+      px(-1, -7, 2, 1, trim);                      // mouth
+      px(-1, -16, 2, 3, trim); px(-3, -15, 1, 2, color); px(2, -15, 1, 2, color); // triple crown
+      px(-7, -5, 14, 9, dark);                     // torso
+      px(-6, -3, 12, 5, color);
+      px(-10, -4, 3, 7, color); px(7, -4, 3, 7, color);    // arms
+      px(-5, 4, 10, 6, color);                     // tail base
+      px(-11, 10, 7, 5, color); px(4, 10, 7, 5, color);    // tail fins (wider)
+      px(-9, 13, 4, 2, dark); px(5, 13, 4, 2, dark);
+      // scale row
+      px(-4, -1, 1, 1, trim); px(-1, -1, 1, 1, trim); px(2, -1, 1, 1, trim);
+      break;
+    }
+    case "leviathan": {
+      // Ascended serpent: thicker coils, double crest, armored head, longer body
+      px(-14, 1, 7, 6, color); px(-7, -4, 7, 6, color);
+      px(-1, 1, 7, 6, color); px(6, -4, 7, 6, color);
+      px(12, 1, 6, 6, color); px(13, -7, 5, 7, color);     // head (larger)
+      px(15, -6, 1, 1, "#fff"); px(15, -4, 1, 1, "#100");
+      px(17, -4, 2, 3, color);                     // snout
+      // double crest
+      px(12, -10, 4, 4, dark); px(13, -12, 2, 2, trim);
+      px(10, -8, 3, 3, dark); px(11, -10, 1, 1, trim);
+      // armored belly strip
+      px(-13, 3, 27, 2, dark);
+      px(-15, 6, 3, 3, dark);                      // tail fin
+      break;
+    }
+    case "colossus": {
+      // Ascended golem: massive frame, shoulder spires, glowing gem array
+      px(-12, -12, 24, 26, dark);                  // body (larger)
+      px(-9, -9, 18, 7, color);                    // chest plate
+      px(-5, -16, 10, 6, dark);                    // head
+      px(-3, -14, 1, 1, "#ffcd5a"); px(2, -14, 1, 1, "#ffcd5a");
+      px(-1, -12, 2, 1, "#fff");
+      px(-14, -6, 3, 15, color); px(11, -6, 3, 15, color); // arm pauldrons (taller)
+      px(-15, 9, 6, 5, dark); px(9, 9, 6, 5, dark);        // fists
+      // shoulder spires
+      px(-16, -10, 3, 6, dark); px(-14, -13, 2, 4, trim);
+      px(13, -10, 3, 6, dark); px(14, -13, 2, 4, trim);
+      // gem array on chest
+      px(-7, 1, 14, 3, trim); px(-4, 4, 8, 2, trim); px(-2, 6, 4, 1, "#ffe080");
+      break;
+    }
+    case "earthbreaker": {
+      // Ascended ogre: hulking, stone armor plating, war-maul, stone crown
+      px(-10, -15, 20, 10, color);                 // head
+      px(-3, -12, 2, 2, "#100"); px(1, -12, 2, 2, "#100");
+      px(-4, -8, 9, 2, dark);                      // grimace
+      px(-2, -7, 1, 1, "#fff"); px(3, -7, 2, 2, dark);     // tusk (larger)
+      // stone crown
+      px(-8, -19, 3, 5, dark); px(-4, -20, 3, 5, dark); px(1, -20, 3, 5, dark); px(5, -19, 3, 5, dark);
+      px(-11, -6, 22, 15, dark);                   // torso (wider)
+      px(-9, -4, 18, 9, color);
+      px(-14, 1, 5, 9, color); px(9, 1, 5, 9, color);      // arms (thicker)
+      // stone armor shoulder plates
+      px(-15, -4, 5, 5, dark); px(10, -4, 5, 5, dark);
+      // massive war-maul
+      px(12, -12, 4, 14, "#888");                  // haft
+      px(9, -15, 10, 6, "#bbb");                   // head
+      px(10, -17, 3, 3, "#fff"); px(15, -17, 2, 2, dark);  // spikes
+      px(-6, 10, 5, 5, dark); px(1, 10, 5, 5, dark);
+      break;
+    }
+    case "stormwisp": {
+      // Ascended wisp: larger corona, crackling lightning arcs, dual motes
+      px(-5, -5, 10, 10, color);                   // core (larger)
+      px(-4, -4, 8, 8, "#d8f0ff");
+      px(-3, -3, 6, 6, "#ffffff");
+      // static ring
+      px(-9, 0, 2, 2, color); px(7, 0, 2, 2, color);
+      px(-12, -1, 2, 2, dark); px(10, -1, 2, 2, dark);
+      px(0, -9, 2, 2, color); px(0, 7, 2, 2, color);
+      // lightning arcs
+      px(-7, -6, 1, 2, "#c8e8ff"); px(6, -6, 1, 2, "#c8e8ff");
+      px(-7, 4, 1, 2, "#c8e8ff"); px(6, 4, 1, 2, "#c8e8ff");
+      px(-5, -9, 2, 1, "rgba(200,230,255,0.7)");
+      px(3, -9, 2, 1, "rgba(200,230,255,0.7)");
+      break;
+    }
+    case "skytyrant": {
+      // Ascended raptor: broader wings, armored body, talons, twin tail fans
+      px(-15, -4, 11, 7, dark); px(4, -4, 11, 7, dark);   // wings (wider)
+      px(-14, -2, 9, 4, color); px(5, -2, 9, 4, color);
+      // wing armor edge
+      px(-16, -3, 2, 5, trim); px(14, -3, 2, 5, trim);
+      px(-5, -6, 10, 10, color);                   // body
+      px(-2, -11, 5, 5, color);                    // head
+      px(2, -9, 1, 1, "#ffcd5a"); px(2, -7, 1, 1, "#100");
+      px(3, -10, 3, 1, trim);                      // crest
+      px(3, -12, 2, 2, trim);
+      px(-4, 4, 5, 5, dark);                       // tail base
+      // twin tail fans
+      px(-5, 9, 3, 3, dark); px(-3, 11, 2, 2, trim);
+      px(2, 9, 3, 3, dark); px(3, 11, 2, 2, trim);
+      break;
+    }
+    // ---- New base monsters (milestone 5.1) ----
+    case "hexwisp": {
+      // Floating arcane rune-eye wisp — purple/violet, visibly different from galewisp
+      px(-3, -3, 6, 6, "#7040c0");                 // core (violet, smaller than stormwisp)
+      px(-2, -2, 4, 4, "#c0a0ff");                 // mid glow
+      px(-1, -1, 2, 2, "#ffffff");                 // bright eye center
+      // rune pupils
+      px(-1, -1, 1, 1, "#300060"); px(0, 0, 1, 1, "#300060");
+      // radial rune sparks (6-fold)
+      px(-6, 0, 2, 1, "#9060d0"); px(4, 0, 2, 1, "#9060d0");
+      px(-3, -5, 1, 2, "#9060d0"); px(2, -5, 1, 2, "#9060d0");
+      px(-3, 3, 1, 2, "#9060d0"); px(2, 3, 1, 2, "#9060d0");
+      // outer haze
+      px(-8, -1, 1, 1, dark); px(7, -1, 1, 1, dark);
+      px(-1, -8, 1, 1, dark); px(-1, 7, 1, 1, dark);
+      break;
+    }
+    case "runeward": {
+      // Squat obsidian guardian with glowing glyphs — wide, low, heavily armored
+      px(-10, -8, 20, 20, dark);                   // body block (obsidian)
+      px(-8, -6, 16, 5, color);                    // shoulder plate
+      px(-5, -14, 10, 6, dark);                    // head
+      px(-3, -12, 1, 1, trim); px(2, -12, 1, 1, trim);     // glyph eyes
+      px(-1, -10, 2, 1, "#fff");                   // glyph mouth-line
+      // glyph runes on chest
+      px(-7, 0, 3, 2, trim); px(-2, 0, 2, 2, trim); px(3, 0, 3, 2, trim);
+      px(-5, 4, 2, 2, trim); px(1, 4, 2, 2, trim);
+      // stubby arms
+      px(-13, -4, 3, 14, color); px(10, -4, 3, 14, color);
+      px(-14, 8, 5, 4, dark); px(9, 8, 5, 4, dark);        // fists
+      break;
+    }
+    case "frostmaw": {
+      // Hulking ice-jawed beast — broad, pale blue/white
+      px(-10, -8, 20, 12, color);                  // body
+      px(-8, -5, 16, 6, "#d0eeff");                // pale belly
+      px(-8, -15, 16, 8, color);                   // head
+      px(-3, -12, 2, 2, "#100"); px(1, -12, 2, 2, "#100"); // eyes (beady)
+      // ice jaw
+      px(-9, -8, 18, 4, "#c0e8ff");                // lower jaw
+      px(-7, -7, 3, 3, "#ffffff"); px(-2, -7, 3, 3, "#ffffff"); // teeth
+      px(2, -7, 3, 3, "#ffffff"); px(5, -7, 3, 3, "#ffffff");
+      // frost plating on shoulders
+      px(-13, -4, 3, 8, "#d0eeff"); px(10, -4, 3, 8, "#d0eeff");
+      px(-4, 4, 8, 8, dark);                       // hindquarters
+      px(-6, 7, 3, 5, dark); px(3, 7, 3, 5, dark);         // hind legs
+      break;
+    }
+    case "duneskink": {
+      // Low fast sand lizard — tan/ochre, elongated, alert
+      px(-12, -2, 22, 6, color);                   // body (long, low)
+      px(-14, 0, 4, 3, color);                     // tail
+      px(-16, 1, 3, 2, dark);                      // tail tip
+      px(8, -5, 6, 6, color);                      // head
+      px(11, -4, 1, 1, "#100"); px(11, -2, 1, 1, "#fff");  // eye
+      px(13, -3, 3, 2, dark);                      // snout
+      // dorsal stripe
+      px(-10, -3, 18, 1, dark);
+      // four stubby legs
+      px(-7, 4, 2, 4, dark); px(-2, 4, 2, 4, dark);
+      px(3, 4, 2, 4, dark); px(6, 4, 2, 4, dark);
+      break;
+    }
   }
   ctx.restore();
 }
@@ -1511,6 +1713,239 @@ function drawBattleSprite(ctx, unit, cx, cy, facing, pose, t) {
         P(3, -8, 2, 1, trim);                                         // beak
         P(-3, 5, 6, 4, dark);                                         // tail base
         P(-4, 9, 3, 3, dark); P(1, 9, 3, 3, dark);                    // tail feathers
+        break;
+      }
+      // ---- Evolved forms (milestone 5.1) ----
+      case "infernite": {
+        // Ascended imp: broader frame, crown of horns, armor chest, dual tails
+        P(-7, -9, 14, 9, color);                                      // head
+        P(-10, -12, 4, 4, color); P(6, -12, 4, 4, color);             // outer horns
+        P(-5, -13, 3, 4, dark); P(2, -13, 3, 4, dark);                // inner horns
+        P(-3, -5, 2, 2, "#100"); P(1, -5, 2, 2, "#100");              // eyes
+        P(-1, -2, 2, 1, "#ff4040");                                   // ember grin
+        P(-7, 0, 14, 9, dark);                                        // body
+        P(-5, 1, 10, 5, color);
+        // armor chest stripe
+        P(-5, 3, 10, 2, trim);
+        P(-3, 9, 2, 5, dark); P(1, 9, 2, 5, dark);                    // legs
+        P(-12, 0, 4, 6, color); P(8, 0, 4, 6, color);                 // wing nubs (larger)
+        P(-14, -4, 2, 5, dark); P(12, -4, 2, 5, dark);                // wing tips
+        // dual tails
+        P(7, 8, 2, 2, color); P(9, 10, 2, 2, color); P(11, 11, 2, 1, trim);
+        P(5, 10, 2, 2, color); P(7, 12, 2, 2, color); P(9, 13, 1, 1, trim);
+        break;
+      }
+      case "emberdrake": {
+        // Ascended wyrm: thicker body, head frill, back armor, larger tail
+        P(-13, -3, 26, 10, color);                                    // body
+        P(-11, 0, 22, 5, dark);                                       // belly
+        P(10, -7, 8, 12, color);                                      // head (larger)
+        P(14, -5, 3, 3, "#ff9020"); P(15, -4, 1, 1, "#100");          // eye
+        P(17, -3, 3, 3, color);                                       // snout
+        P(-15, 1, 8, 3, color); P(-18, 2, 4, 2, color);               // tail
+        P(-7, 7, 3, 6, dark); P(3, 7, 3, 6, dark);                    // legs
+        // back armor plates
+        P(-9, -9, 4, 5, dark); P(-2, -10, 4, 5, dark); P(5, -11, 4, 5, dark);
+        // head frill
+        P(9, -11, 5, 4, trim); P(12, -13, 3, 3, color);
+        // little wings (larger)
+        P(-3, -12, 6, 4, dark); P(-3, -12, 6, 1, color);
+        break;
+      }
+      case "tidelord": {
+        // Ascended merfolk: taller frame, triple crown, wide tail fins, scale shimmer
+        P(-5, -12, 10, 9, color);                                     // head (taller)
+        P(-2, -9, 1, 1, "#100"); P(1, -9, 1, 1, "#100");
+        P(-3, -6, 6, 2, trim);                                        // gills
+        // triple crown
+        P(-1, -15, 2, 4, trim); P(-3, -14, 1, 3, color); P(2, -14, 1, 3, color);
+        P(-8, -4, 16, 9, dark);                                       // torso
+        P(-6, -2, 12, 5, color);
+        P(-10, -3, 3, 7, color); P(7, -3, 3, 7, color);               // arms
+        P(-5, 5, 10, 7, color);                                       // tail base
+        P(-12, 12, 8, 6, color); P(4, 12, 8, 6, color);               // tail fins (wider)
+        P(-10, 15, 5, 2, dark); P(5, 15, 5, 2, dark);
+        // scale row on torso
+        P(-4, 0, 1, 1, trim); P(-1, 0, 1, 1, trim); P(2, 0, 1, 1, trim);
+        // crown spike
+        P(-1, -15, 2, 4, trim);
+        break;
+      }
+      case "leviathan": {
+        // Ascended serpent: thicker coils, armored head, double crest, imposing
+        P(-16, 5, 8, 5, color); P(-10, 1, 8, 5, color);
+        P(-4, 5, 8, 5, color); P(2, 1, 8, 5, color);
+        P(8, 5, 7, 5, color); P(12, -3, 6, 7, color);                 // head
+        P(15, -2, 1, 1, "#fff"); P(15, 1, 1, 1, "#100");
+        P(17, 1, 2, 2, color);                                        // snout
+        // armored belly band
+        P(-15, 6, 28, 3, dark);
+        // double crest
+        P(13, -7, 5, 3, dark); P(14, -9, 3, 2, trim);
+        P(11, -5, 4, 2, dark); P(12, -7, 2, 2, trim);
+        // tail fin
+        P(-18, 6, 3, 4, dark); P(-18, 9, 4, 2, trim);
+        break;
+      }
+      case "colossus": {
+        // Ascended golem: massive frame, shoulder spires, gem array
+        P(-10, -11, 20, 22, dark);                                    // body (larger)
+        P(-8, -9, 16, 7, color);                                      // chest plate
+        P(-4, -16, 8, 5, dark);                                       // head
+        P(-2, -14, 1, 1, "#ffcd5a"); P(1, -14, 1, 1, "#ffcd5a");
+        P(-1, -12, 2, 1, "#fff");
+        P(-13, -6, 3, 16, color); P(10, -6, 3, 16, color);            // arm pauldrons (taller)
+        P(-14, 10, 6, 5, dark); P(8, 10, 6, 5, dark);                 // fists
+        // shoulder spires
+        P(-16, -11, 3, 7, dark); P(-14, -14, 2, 4, trim);
+        P(13, -11, 3, 7, dark); P(14, -14, 2, 4, trim);
+        // gem array
+        P(-7, 1, 14, 3, trim); P(-4, 5, 8, 3, trim); P(-2, 8, 4, 2, "#ffe080");
+        P(-5, 11, 4, 5, dark); P(1, 11, 4, 5, dark);                  // feet
+        break;
+      }
+      case "earthbreaker": {
+        // Ascended ogre: hulking, stone armor, stone crown, massive war-maul
+        P(-9, -15, 18, 10, color);                                    // head
+        P(-2, -12, 2, 2, "#100"); P(0, -12, 2, 2, "#100");
+        P(-3, -7, 8, 2, dark);                                        // grimace
+        P(-2, -6, 1, 1, "#fff"); P(2, -6, 2, 2, dark);                // tusk (larger)
+        // stone crown (5 battlements)
+        P(-9, -20, 3, 6, dark); P(-5, -21, 3, 6, dark); P(-1, -21, 3, 6, dark); P(3, -21, 3, 6, dark); P(6, -20, 3, 6, dark);
+        P(-11, -6, 22, 15, dark);                                     // torso (wider)
+        P(-9, -4, 18, 9, color);
+        P(-15, 1, 5, 10, color); P(10, 1, 5, 10, color);              // arms (thicker)
+        // shoulder armor plates
+        P(-16, -5, 5, 6, dark); P(11, -5, 5, 6, dark);
+        // massive war-maul
+        P(13, -12, 4, 14, "#888");                                    // haft
+        P(10, -16, 10, 6, "#ccc");                                    // weapon head
+        P(11, -18, 3, 3, "#fff"); P(16, -18, 2, 2, dark);             // spikes
+        P(-6, 10, 5, 5, dark); P(1, 10, 5, 5, dark);
+        break;
+      }
+      case "stormwisp": {
+        // Ascended wisp: larger glow corona, blue-white, crackling lightning
+        for (let r = 9; r >= 1; r--) {
+          const alpha = (10 - r) / 10;
+          ctx.fillStyle = `rgba(180, 220, 255, ${alpha * 0.35})`;
+          ctx.beginPath();
+          ctx.arc(0, 0, r * SCALE * 0.9, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        P(-5, -5, 10, 10, color);
+        P(-4, -4, 8, 8, "#d8f0ff");
+        P(-3, -3, 6, 6, "#ffffff");
+        // floating lightning motes (different orbit from galewisp)
+        for (let i = 0; i < 6; i++) {
+          const ang = t / 22 + i * 1.05;
+          const rd = 11 + Math.sin(t / 14 + i) * 2;
+          ctx.fillStyle = "#d0f0ff";
+          ctx.fillRect(Math.cos(ang) * rd * SCALE - 1, Math.sin(ang) * rd * SCALE - 1, SCALE, SCALE);
+        }
+        // lightning arcs
+        P(-8, 0, 2, 1, trim); P(6, 0, 2, 1, trim);
+        P(0, -8, 1, 2, trim); P(0, 6, 1, 2, trim);
+        break;
+      }
+      case "skytyrant": {
+        // Ascended raptor: armored wings, spiked crest, talons, twin tail fans
+        const flap2 = Math.sin(t / 5) * 2;
+        P(-16, -3 - flap2, 12, 5, dark);                              // wings (broader)
+        P(4, -3 - flap2, 12, 5, dark);
+        P(-15, -1 - flap2, 10, 3, color);
+        P(5, -1 - flap2, 10, 3, color);
+        // wing armor edge
+        P(-17, -2, 2, 6, trim); P(15, -2, 2, 6, trim);
+        // body
+        P(-5, -5, 10, 10, color);
+        P(-2, -10, 5, 6, color);                                      // head
+        P(2, -8, 1, 1, "#ffcd5a"); P(2, -6, 1, 1, "#100");
+        // spiked head crest
+        P(3, -11, 3, 2, trim); P(4, -13, 2, 3, color); P(5, -15, 1, 2, trim);
+        P(-4, 5, 7, 5, dark);                                         // tail base
+        // twin tail fans
+        P(-5, 10, 3, 4, dark); P(-3, 13, 2, 2, trim);
+        P(2, 10, 3, 4, dark); P(3, 13, 2, 2, trim);
+        break;
+      }
+      // ---- New base monsters (milestone 5.1) ----
+      case "hexwisp": {
+        // Floating arcane rune-eye wisp — purple/violet glow, distinct from galewisp
+        for (let r = 7; r >= 1; r--) {
+          const alpha = (8 - r) / 8;
+          ctx.fillStyle = `rgba(160, 80, 240, ${alpha * 0.38})`;
+          ctx.beginPath();
+          ctx.arc(0, 0, r * SCALE * 0.9, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        P(-4, -4, 8, 8, "#7040c0");                                   // core
+        P(-3, -3, 6, 6, "#c0a0ff");
+        P(-2, -2, 4, 4, "#ffffff");                                   // bright eye
+        // rune pupils
+        P(-1, -1, 1, 1, "#300060"); P(0, 0, 1, 1, "#300060");
+        // orbital rune motes (6-fold, different from galewisp's 5-fold orbit)
+        for (let i = 0; i < 6; i++) {
+          const ang = t / 25 + i * (Math.PI / 3);
+          const rd = 8 + Math.sin(t / 16 + i) * 1.5;
+          ctx.fillStyle = "#9060d0";
+          ctx.fillRect(Math.cos(ang) * rd * SCALE - 1, Math.sin(ang) * rd * SCALE - 1, SCALE, SCALE);
+        }
+        break;
+      }
+      case "runeward": {
+        // Squat obsidian guardian — wide low silhouette, glowing glyphs on chest
+        P(-10, -9, 20, 21, dark);                                     // body block
+        P(-8, -7, 16, 6, color);                                      // shoulder plate
+        P(-5, -16, 10, 7, dark);                                      // head
+        P(-3, -13, 1, 1, trim); P(2, -13, 1, 1, trim);                // glyph eyes
+        P(-1, -11, 2, 1, "#fff");                                     // glyph mouth
+        // glyph inscriptions on chest (arcane rune pattern)
+        P(-7, 1, 3, 3, trim); P(-2, 1, 2, 3, trim); P(3, 1, 3, 3, trim);
+        P(-6, 6, 2, 2, trim); P(-1, 5, 4, 2, "#ffe080"); P(4, 6, 2, 2, trim);
+        P(-4, 9, 8, 2, trim);
+        // arms
+        P(-14, -5, 3, 16, color); P(11, -5, 3, 16, color);
+        P(-15, 10, 6, 5, dark); P(9, 10, 6, 5, dark);                 // fists
+        P(-5, 12, 4, 5, dark); P(1, 12, 4, 5, dark);                  // feet
+        break;
+      }
+      case "frostmaw": {
+        // Hulking ice-jawed beast — broad, pale blue/white, massive jaw
+        P(-11, -9, 22, 14, color);                                    // body
+        P(-9, -5, 18, 7, "#d0eeff");                                  // pale belly
+        P(-9, -17, 18, 9, color);                                     // head
+        P(-3, -13, 2, 2, "#100"); P(1, -13, 2, 2, "#100");            // eyes
+        // massive ice jaw
+        P(-10, -9, 20, 5, "#c0e8ff");                                 // lower jaw
+        P(-8, -8, 3, 3, "#ffffff"); P(-3, -8, 3, 3, "#ffffff");        // teeth
+        P(1, -8, 3, 3, "#ffffff"); P(5, -8, 3, 3, "#ffffff");
+        // frost plating on shoulders
+        P(-14, -5, 4, 9, "#d0eeff"); P(10, -5, 4, 9, "#d0eeff");
+        P(-13, -7, 2, 2, "#ffffff"); P(11, -7, 2, 2, "#ffffff");       // ice shoulder spikes
+        P(-5, 5, 10, 8, dark);                                        // hindquarters
+        P(-7, 9, 4, 6, dark); P(3, 9, 4, 6, dark);                    // hind legs
+        P(-5, 15, 4, 3, dark); P(1, 15, 4, 3, dark);                  // paws
+        break;
+      }
+      case "duneskink": {
+        // Low fast sand lizard — elongated body, tan/ochre, quick alert posture
+        P(-13, -2, 25, 7, color);                                     // body (long)
+        P(-11, 0, 21, 3, "#d0a050");                                  // pale underbelly
+        P(-15, 1, 5, 3, color);                                       // tail
+        P(-17, 2, 3, 2, dark); P(-18, 3, 2, 1, dark);                 // tail tip
+        P(10, -7, 7, 7, color);                                       // head
+        P(13, -5, 1, 1, "#100"); P(13, -3, 1, 1, "#fff");             // eye
+        P(16, -4, 3, 2, dark);                                        // snout
+        P(17, -3, 2, 1, trim);                                        // tongue flick
+        // dorsal stripe
+        P(-11, -3, 20, 1, dark);
+        // four legs, splayed wide
+        P(-8, 5, 2, 5, dark); P(-3, 5, 2, 5, dark);
+        P(3, 5, 2, 5, dark); P(7, 5, 2, 5, dark);
+        // toe details
+        P(-9, 9, 2, 1, dark); P(-7, 9, 2, 1, dark);
+        P(2, 9, 2, 1, dark); P(8, 9, 2, 1, dark);
         break;
       }
     }

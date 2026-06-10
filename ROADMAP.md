@@ -156,9 +156,12 @@ Check off with a one-line note when done. Mark `BLOCKED:`/`PARKED:` per rules.
 
 ### Phase 5 — Content
 
-- [ ] 5.1 Roster wave: 8 evolved forms get real sprites (map + battle) +
-  4 new base monsters (incl. arcane element coverage); balance pass on
-  cost/stats table. [claude-sonnet-4-6 | medium]
+- [x] 5.1 Roster wave (S4): 8 evolved forms get own sprite ids + map & battle
+  cases (base look, ascended — bigger silhouette, hotter palette, extra
+  features); 4 new bases — hexwisp (arcane flyer rng2 c8), runeward (arcane
+  tank c15), frostmaw (hydro bruiser c18), duneskink (terra runner c6) —
+  SUMMON_LIST now 12. No evolvesTo on the new four (future). Stale index.html
+  hint bar refreshed for the 3.4 keyboard layer. [claude-sonnet-4-6 | medium]
 - [ ] 5.2 Map system: named map definitions (seed + params + handcrafted
   overrides: size, terrain mix, tower count, start positions); 4 distinct
   maps; map select on title screen. [claude-opus-4-8 | high]
