@@ -1,0 +1,7 @@
+config_version=5
+
+[application]
+
+config/name="Wraithspire (Godot port)"
+config/features=PackedStringArray("4.6")
+run/main_scene=""
