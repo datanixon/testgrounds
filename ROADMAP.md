@@ -86,9 +86,11 @@ Check off with a one-line note when done. Mark `BLOCKED:`/`PARKED:` per rules.
   heal "+N" floats in endTurn; capture sparkle + summon ring burst at both
   player & AI sites. Generalised pushAnim with `ring` ("r,g,b" burst) + `dy`
   (stack offset); renderAnimationsMap rings key off `a.ring`. [claude-sonnet-4-6 | medium]
-- [ ] 2.3 Smooth camera: lerp `STATE.cam` toward targets instead of snapping;
-  edge-pan with mouse near map edge; spacebar to center on active unit.
-  [claude-sonnet-4-6 | medium]
+- [x] 2.3 Smooth camera (S3): STATE.camTarget + updateCamera() eases cam toward
+  target each frame (k=0.18, snap when <0.3px). centerCameraOn sets the target
+  (instant flag for fresh match); arrows + move-follow + battle handoff all set
+  the target. RTS edge-pan from parked mouse (STATE.mouse, cleared on
+  mouseleave); Space centers on selected unit / active master. [claude-sonnet-4-6 | medium]
 - [ ] 2.4 Transitions: title→play wipe, battle cutaway iris-in/out,
   turn-banner slide+fade restyle, gameover fade. [claude-sonnet-4-6 | medium]
 

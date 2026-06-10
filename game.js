@@ -461,6 +461,8 @@ const STATE = {
   log: [],
   winner: null,
   cam: { x: 0, y: 0 },
+  camTarget: { x: 0, y: 0 },  // cam eases toward this each frame (2.3)
+  mouse: null,                // {x,y} canvas coords for edge-pan (2.3)
   pendingAI: false,
   animations: [],
   battle: null,      // active battle scene; see startBattle()
@@ -491,7 +493,7 @@ function startNewGame() {
   STATE.stats = { summoned: [0, 0], lost: [0, 0], battles: 0 };
   for (const u of STATE.units) u.acted = false;
   pushLog("Battle begins on the Wraithspire frontier.");
-  centerCameraOn(masterOf(0));
+  centerCameraOn(masterOf(0), true);
 }
 
 function unitAt(q, r) {
@@ -511,11 +513,35 @@ function pushLog(line) {
   if (STATE.log.length > 40) STATE.log.length = 40;
 }
 
-function centerCameraOn(unit) {
+function clampCamX(x) { return Math.max(MAP_W - mapPixelWidth(), Math.min(0, x)); }
+function clampCamY(y) { return Math.max(MAP_H - mapPixelHeight(), Math.min(0, y)); }
+
+// Glide the camera so `unit` is centred. Sets the lerp target; pass instant to
+// also snap immediately (used on a fresh match so the first frame isn't a pan).
+function centerCameraOn(unit, instant) {
   if (!unit) return;
   const p = axialToPixel(unit.q, unit.r);
-  STATE.cam.x = Math.max(MAP_W - mapPixelWidth(), Math.min(0, MAP_W / 2 - p.x));
-  STATE.cam.y = Math.max(MAP_H - mapPixelHeight(), Math.min(0, MAP_H / 2 - p.y));
+  STATE.camTarget.x = clampCamX(MAP_W / 2 - p.x);
+  STATE.camTarget.y = clampCamY(MAP_H / 2 - p.y);
+  if (instant) { STATE.cam.x = STATE.camTarget.x; STATE.cam.y = STATE.camTarget.y; }
+}
+
+// Per-frame: RTS edge-pan from the parked mouse, then ease cam → camTarget.
+function updateCamera() {
+  const mo = STATE.mouse;
+  if (mo && !STATE.menu) {
+    const EDGE = 42, SPEED = 13;
+    if (mo.x >= 0 && mo.x <= MAP_W && mo.y >= TOPBAR_H && mo.y <= CANVAS_H) {
+      if (mo.x < EDGE)               STATE.camTarget.x = clampCamX(STATE.camTarget.x + SPEED);
+      else if (mo.x > MAP_W - EDGE)  STATE.camTarget.x = clampCamX(STATE.camTarget.x - SPEED);
+      if (mo.y < TOPBAR_H + EDGE)    STATE.camTarget.y = clampCamY(STATE.camTarget.y + SPEED);
+      else if (mo.y > CANVAS_H - EDGE) STATE.camTarget.y = clampCamY(STATE.camTarget.y - SPEED);
+    }
+  }
+  STATE.cam.x += (STATE.camTarget.x - STATE.cam.x) * 0.18;
+  STATE.cam.y += (STATE.camTarget.y - STATE.cam.y) * 0.18;
+  if (Math.abs(STATE.camTarget.x - STATE.cam.x) < 0.3) STATE.cam.x = STATE.camTarget.x;
+  if (Math.abs(STATE.camTarget.y - STATE.cam.y) < 0.3) STATE.cam.y = STATE.camTarget.y;
 }
 
 // =========================================================================
@@ -639,13 +665,11 @@ function tickMove() {
       return;
     }
   }
-  // Gentle camera follow: ease toward keeping the slider near centre so long
-  // marches stay on-screen without snapping on short hops.
+  // Camera follow: aim the lerp target at the slider; updateCamera() eases the
+  // actual cam toward it each frame, so long marches stay on-screen.
   const p = moveAnimPixel(m);
-  const tx = Math.max(MAP_W - mapPixelWidth(), Math.min(0, MAP_W / 2 - p.x));
-  const ty = Math.max(MAP_H - mapPixelHeight(), Math.min(0, MAP_H / 2 - p.y));
-  STATE.cam.x += (tx - STATE.cam.x) * 0.08;
-  STATE.cam.y += (ty - STATE.cam.y) * 0.08;
+  STATE.camTarget.x = clampCamX(MAP_W / 2 - p.x);
+  STATE.camTarget.y = clampCamY(MAP_H / 2 - p.y);
   setTimeout(tickMove, MOVE_TICK_MS);
 }
 
@@ -1926,6 +1950,7 @@ function render() {
     return;
   }
 
+  updateCamera();
   renderMap();
   renderOverlays();
   renderUnits();
@@ -2363,6 +2388,7 @@ function clientToCanvas(ev) {
 
 function onMouseMove(ev) {
   const p = clientToCanvas(ev);
+  STATE.mouse = { x: p.x, y: p.y };  // for RTS edge-pan in updateCamera()
   // Menu hover takes precedence — move the selection cursor to whichever
   // item the mouse is over.
   if (STATE.menu) {
@@ -2490,15 +2516,20 @@ function onKey(ev) {
   }
 
   if (ev.key === "e" || ev.key === "E") { endTurn(); return; }
+  if (ev.key === " ") {  // centre on the selected unit, else the active master
+    ev.preventDefault();
+    centerCameraOn(STATE.selected || masterOf(STATE.currentPlayer));
+    return;
+  }
   if (ev.key === "Escape") {
     STATE.selected = null; STATE.reachable = null; STATE.attackTargets = null;
     return;
   }
-  const PAN = 36;
-  if (ev.key === "ArrowLeft")  STATE.cam.x = Math.min(0, STATE.cam.x + PAN);
-  if (ev.key === "ArrowRight") STATE.cam.x = Math.max(MAP_W - mapPixelWidth(), STATE.cam.x - PAN);
-  if (ev.key === "ArrowUp")    STATE.cam.y = Math.min(0, STATE.cam.y + PAN);
-  if (ev.key === "ArrowDown")  STATE.cam.y = Math.max(MAP_H - mapPixelHeight(), STATE.cam.y - PAN);
+  const PAN = 60;
+  if (ev.key === "ArrowLeft")  STATE.camTarget.x = clampCamX(STATE.camTarget.x + PAN);
+  if (ev.key === "ArrowRight") STATE.camTarget.x = clampCamX(STATE.camTarget.x - PAN);
+  if (ev.key === "ArrowUp")    STATE.camTarget.y = clampCamY(STATE.camTarget.y + PAN);
+  if (ev.key === "ArrowDown")  STATE.camTarget.y = clampCamY(STATE.camTarget.y - PAN);
 }
 
 function mapPixelWidth() { return HEX_STEP_X * (COLS + 0.5) + 12; }
@@ -3198,6 +3229,7 @@ function boot() {
   generateMap(123);
 
   canvas.addEventListener("mousemove", onMouseMove);
+  canvas.addEventListener("mouseleave", () => { STATE.mouse = null; });
   canvas.addEventListener("click", onClick);
   window.addEventListener("keydown", onKey);
   window.addEventListener("resize", resizeCanvasCSS);
