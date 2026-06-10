@@ -106,9 +106,12 @@ Check off with a one-line note when done. Mark `BLOCKED:`/`PARKED:` per rules.
   selected → FORECAST block (deal X–Y, elem mult, KO!, counter X–Y / none).
   computeDamage now also returns pre-jitter `base`; forecastBattle mirrors
   beginBattle's counter rule for stable UI ranges. [claude-opus-4-8 | high]
-- [ ] 3.2 Terrain tooltip + summon menu upgrade: hover tile shows terrain
-  name/cost/defense; summon menu shows portrait, stats, element vs enemy
-  composition hint. [claude-sonnet-4-6 | medium]
+- [x] 3.2 Terrain tooltip + summon menu upgrade (S4): renderTerrainTooltip —
+  cursor-anchored box (terrain name, move cost/impassable, DEF), map-area
+  clamped, hidden during menu/moveAnim; renderSummonPanel — side panel on the
+  summon menu's highlighted item (clipped 1.5× portrait, HP/element/MP cost,
+  avg ELEM_MATRIX hint strong/even/weak vs foe, stat row).
+  [claude-sonnet-4-6 | medium]
 - [ ] 3.3 Settings & help: gear menu (music track, music/SFX volume, battle
   scene on/off toggle for fast play), `?` overlay with controls + element
   wheel diagram. [claude-sonnet-4-6 | medium]

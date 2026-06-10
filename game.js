@@ -1978,6 +1978,7 @@ function render() {
     renderSidebar();
     renderMenu();
     renderBanner();
+    renderTerrainTooltip();
   }
   renderTransition();
 }
@@ -2492,6 +2493,155 @@ function renderMenu() {
     }
     ctx.fillText(it.label, x + padX, y + padY + i * lineH + 14);
   }
+
+  // Summon menu side-panel: portrait + stats for the currently highlighted unit.
+  if (m.kind === "summonMenu") {
+    const hov = m.items[m.index];
+    if (hov && hov.kind === "summonChoice" && hov.choice) {
+      renderSummonPanel(hov.choice, m.unit, r);
+    }
+  }
+}
+
+// Part A — floating terrain info tooltip near the cursor while hovering the map.
+// Shown when: screen=play, hover set, mouse in map area, no menu, no moveAnim.
+function renderTerrainTooltip() {
+  if (STATE.menu) return;
+  if (STATE.moveAnim) return;
+  if (!STATE.hover || !inBounds(STATE.hover.q, STATE.hover.r)) return;
+  if (!STATE.mouse) return;
+  const mo = STATE.mouse;
+  if (mo.x > MAP_W || mo.y < TOPBAR_H) return;
+
+  const cell = cellAt(STATE.hover);
+  if (!cell) return;
+  const t = TERRAIN[cell.terrain];
+
+  // Build two lines of text.
+  const line1 = t.name.toUpperCase();
+  const costStr = t.moveCost === 99 ? "impassable" : ("move " + t.moveCost);
+  const line2 = costStr + "   DEF " + t.def;
+
+  const tw = 130, th = 40, pad = 5;
+  let tx = mo.x + 14;
+  let ty = mo.y - th - 6;
+  // Clamp: never leave the map area (x < MAP_W, y > TOPBAR_H).
+  if (tx + tw > MAP_W - 2) tx = MAP_W - tw - 4;
+  if (tx < 2) tx = 2;
+  if (ty < TOPBAR_H + 2) ty = mo.y + 14;
+  if (ty + th > CANVAS_H - 2) ty = CANVAS_H - th - 4;
+
+  ctx.save();
+  ctx.fillStyle = PAL.panel;
+  ctx.fillRect(tx, ty, tw, th);
+  ctx.strokeStyle = PAL.inkFaint;
+  ctx.lineWidth = 1;
+  ctx.strokeRect(tx + 0.5, ty + 0.5, tw - 1, th - 1);
+  ctx.font = "10px 'Courier New', monospace";
+  ctx.textAlign = "left";
+  ctx.fillStyle = PAL.ink;
+  ctx.fillText(line1, tx + pad, ty + pad + 10);
+  ctx.fillStyle = PAL.inkDim;
+  ctx.fillText(line2, tx + pad, ty + pad + 24);
+  ctx.restore();
+}
+
+// Part B — summon preview side-panel next to the summon menu.
+// Shows portrait, stats, element, cost, and element-vs-enemy hint.
+function renderSummonPanel(typeKey, master, menuR) {
+  const t = UNIT_TYPES[typeKey];
+  if (!t) return;
+  const el = ELEMENT[t.element];
+
+  // Panel geometry: appear to the LEFT of the menu (preferred) or right.
+  const pw = 164, ph = 122;
+  let px = menuR.x - pw - 6;
+  if (px < 2) px = menuR.x + menuR.w + 6;
+  let py = menuR.y;
+  // Clamp vertically inside the canvas.
+  if (py + ph > CANVAS_H - 4) py = CANVAS_H - ph - 4;
+  if (py < TOPBAR_H + 2) py = TOPBAR_H + 2;
+
+  ctx.save();
+  ctx.fillStyle = "rgba(8, 6, 14, 0.95)";
+  ctx.fillRect(px, py, pw, ph);
+  ctx.strokeStyle = PAL.gold;
+  ctx.lineWidth = 1;
+  ctx.strokeRect(px + 0.5, py + 0.5, pw - 1, ph - 1);
+
+  // Portrait: map sprite scaled 1.5× in a clipped box (mirrors drawUnitCard).
+  const pbx = px + 6, pby = py + 6, pbSize = 48;
+  ctx.fillStyle = "#0b0916";
+  ctx.fillRect(pbx, pby, pbSize, pbSize);
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(pbx, pby, pbSize, pbSize);
+  ctx.clip();
+  ctx.translate(pbx + pbSize / 2, pby + pbSize / 2 + 4);
+  ctx.scale(1.5, 1.5);
+  // Build a throwaway unit object literal; avoids incrementing nextUnitId.
+  const fakeUnit = {
+    typeKey, name: t.name, element: t.element,
+    owner: master.owner, q: 0, r: 0,
+    hp: t.maxHp, maxHp: t.maxHp,
+    move: t.move, range: t.range, power: t.power, def: t.def,
+    flying: t.flying, sprite: t.sprite, attack: t.attack,
+    level: 1, xp: 0, acted: false, isMaster: false,
+    id: 0,
+  };
+  drawMapSprite(ctx, fakeUnit, 0, 3, frame);
+  ctx.restore();
+  ctx.strokeStyle = el.color;
+  ctx.strokeRect(pbx + 0.5, pby + 0.5, pbSize - 1, pbSize - 1);
+
+  // Stats block to the right of the portrait.
+  const sx = pbx + pbSize + 6;
+  const sy = py + 8;
+  ctx.font = "bold 10px 'Courier New', monospace";
+  ctx.textAlign = "left";
+  ctx.fillStyle = el.color;
+  ctx.fillText(t.name.toUpperCase(), sx, sy + 10);
+  ctx.font = "9px 'Courier New', monospace";
+  ctx.fillStyle = PAL.inkDim;
+  ctx.fillText("HP " + t.maxHp, sx, sy + 22);
+  ctx.fillStyle = el.color;
+  ctx.fillText(el.short, sx, sy + 34);
+  ctx.fillStyle = PAL.gold;
+  ctx.fillText(t.cost + " MP", sx + 40, sy + 34);
+
+  // Element vs enemy composition hint.
+  const enemyPlayer = 1 - master.owner;
+  const enemies = aliveUnits(enemyPlayer);
+  let hint = "", hintColor = PAL.inkDim;
+  if (enemies.length > 0) {
+    let sumMul = 0;
+    for (const e of enemies) {
+      sumMul += ELEM_MATRIX[t.element][e.element] || 1;
+    }
+    const avg = sumMul / enemies.length;
+    if (avg > 1.05) {
+      hint = "strong vs foe"; hintColor = PAL.green;
+    } else if (avg < 0.95) {
+      hint = "weak vs foe"; hintColor = PAL.red;
+    } else {
+      hint = "even vs foe"; hintColor = PAL.inkDim;
+    }
+  }
+  if (hint) {
+    ctx.fillStyle = hintColor;
+    ctx.font = "9px 'Courier New', monospace";
+    ctx.fillText(hint, sx, sy + 46);
+  }
+
+  // Separator + stat row along the bottom of the panel.
+  const bottomY = py + ph - 20;
+  ctx.fillStyle = PAL.inkFaint;
+  ctx.fillRect(px + 4, bottomY - 6, pw - 8, 1);
+  ctx.font = "10px 'Courier New', monospace";
+  ctx.fillStyle = PAL.ink;
+  ctx.fillText("ATK " + t.power + "  DEF " + t.def + "  RNG " + t.range + "  MOV " + t.move, px + 6, bottomY + 10);
+
+  ctx.restore();
 }
 
 function renderBanner() {
