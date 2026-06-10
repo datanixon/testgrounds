@@ -487,6 +487,7 @@ function startNewGame() {
   STATE.screen = "play";
   STATE.pendingAI = false;
   STATE.battle = null;
+  STATE.stats = { summoned: [0, 0], lost: [0, 0], battles: 0 };
   for (const u of STATE.units) u.acted = false;
   pushLog("Battle begins on the Wraithspire frontier.");
   centerCameraOn(masterOf(0));
@@ -631,6 +632,7 @@ function beginBattle(attacker, defender, afterDone) {
     arenaSeed: Math.floor(Math.random() * 1e6),
   };
   STATE.screen = "battle";
+  if (STATE.stats) STATE.stats.battles++;
   musicDuck(0.35); // dim music during battle
 }
 
@@ -769,6 +771,7 @@ function aiTrySummons(master) {
     const u = makeUnit(choice, master.owner, slot.q, slot.r);
     u.acted = true;
     STATE.units.push(u);
+    if (STATE.stats) STATE.stats.summoned[master.owner]++;
     pushLog(master.name + " summons " + u.name + ".");
     beep(660, 0.08, "triangle", 0.18);
   }
@@ -1307,7 +1310,7 @@ function updateBattle() {
         pushAnim("dmgB", b.defender.q, b.defender.r, "-" + b.aDmg, PAL.red);
         pushLog(b.attacker.name + " strikes " + b.defender.name + " for " + b.aDmg + ".");
         b.applied1 = true;
-        if (b.defender.hp <= 0) pushLog(b.defender.name + " is destroyed.");
+        if (b.defender.hp <= 0) { pushLog(b.defender.name + " is destroyed."); if (STATE.stats) STATE.stats.lost[b.defender.owner]++; }
         const killed = b.defender.hp <= 0;
         if (gainXp(b.attacker, b.aDmg + (killed ? KILL_XP_BONUS : 0)) > 0) onBattleLevelUp(b.attacker, "a");
       }
@@ -1335,7 +1338,7 @@ function updateBattle() {
         pushAnim("dmgB", b.attacker.q, b.attacker.r, "-" + b.cDmg, PAL.red);
         pushLog(b.defender.name + " counters for " + b.cDmg + ".");
         b.applied2 = true;
-        if (b.attacker.hp <= 0) pushLog(b.attacker.name + " is destroyed.");
+        if (b.attacker.hp <= 0) { pushLog(b.attacker.name + " is destroyed."); if (STATE.stats) STATE.stats.lost[b.attacker.owner]++; }
         const killed = b.attacker.hp <= 0;
         if (gainXp(b.defender, b.cDmg + (killed ? KILL_XP_BONUS : 0)) > 0) onBattleLevelUp(b.defender, "c");
       }
@@ -2448,6 +2451,7 @@ function selectMenuItem(item) {
     const u = makeUnit(item.choice, unit.owner, slot.q, slot.r);
     u.acted = true;
     STATE.units.push(u);
+    if (STATE.stats) STATE.stats.summoned[unit.owner]++;
     pushLog(unit.name + " summons " + u.name + ".");
     beep(660, 0.08, "triangle", 0.18);
     unit.acted = true; closeMenu();
@@ -2655,15 +2659,43 @@ function renderGameOver() {
   ctx.fillStyle = color;
   ctx.fillText(text, CANVAS_W / 2, CANVAS_H / 2 + 80);
 
-  ctx.font = "16px 'Courier New', monospace";
-  ctx.fillStyle = PAL.ink;
-  ctx.fillText("Turns elapsed: " + STATE.turn, CANVAS_W / 2, CANVAS_H / 2 + 116);
+  // Match summary
+  const st = STATE.stats || { summoned: [0, 0], lost: [0, 0], battles: 0 };
+  const towers = [
+    MAP.towers.filter(t => t.owner === 0).length,
+    MAP.towers.filter(t => t.owner === 1).length,
+  ];
+  ctx.font = "14px 'Courier New', monospace";
+  ctx.textAlign = "center";
+  ctx.fillStyle = PAL.inkDim;
+  ctx.fillText("Turns elapsed: " + STATE.turn + "     Battles fought: " + st.battles, CANVAS_W / 2, CANVAS_H / 2 + 116);
+
+  // two-column stat table
+  const cx0 = CANVAS_W / 2, colL = cx0 - 90, colR = cx0 + 90, top = CANVAS_H / 2 + 140;
+  ctx.font = "bold 13px 'Courier New', monospace";
+  ctx.fillStyle = PAL.p0; ctx.fillText("AZURE", colL, top);
+  ctx.fillStyle = PAL.p1; ctx.fillText("CRIMSON", colR, top);
+  const rows = [
+    ["Summoned", st.summoned[0], st.summoned[1]],
+    ["Lost",     st.lost[0],     st.lost[1]],
+    ["Spires",   towers[0],      towers[1]],
+  ];
+  ctx.font = "12px 'Courier New', monospace";
+  rows.forEach((row, i) => {
+    const ry = top + 20 + i * 17;
+    ctx.fillStyle = PAL.inkDim; ctx.textAlign = "center";
+    ctx.fillText(row[0], cx0, ry);
+    ctx.fillStyle = PAL.ink; ctx.textAlign = "center";
+    ctx.fillText(String(row[1]), colL, ry);
+    ctx.fillText(String(row[2]), colR, ry);
+  });
 
   const blink = Math.floor(frame / 30) % 2 === 0;
   if (blink) {
     ctx.font = "14px 'Courier New', monospace";
     ctx.fillStyle = PAL.gold;
-    ctx.fillText("PRESS ENTER TO RETURN", CANVAS_W / 2, CANVAS_H / 2 + 170);
+    ctx.textAlign = "center";
+    ctx.fillText("PRESS ENTER TO RETURN", CANVAS_W / 2, CANVAS_H / 2 + 224);
   }
 }
 
@@ -3126,6 +3158,7 @@ function runDemo() {
     const u = makeUnit(type, 0, slot.q, slot.r);
     u.acted = true;
     STATE.units.push(u);
+    if (STATE.stats) STATE.stats.summoned[0]++;
     pushLog(azureMaster.name + " summons " + u.name + ".");
   }
   summonAdjacent("tidekin");
