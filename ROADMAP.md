@@ -148,7 +148,7 @@ Check off with a one-line note when done. Mark `BLOCKED:`/`PARKED:` per rules.
 Done: Phase 0 — repo audit, this roadmap, `.claude/agents/grinder.md` +
 `architect.md`, `#smoke` hook in `game.js` + `smoke-test.sh` (verified green:
 `SMOKE_OK turn=2 units=6`), `.gitignore` for stray screenshots.
-State: GREEN — last green commit: (this commit)
+State: GREEN — last green commit: 6c7e7c2
 Next: 1.1 XP & leveling
 NEXT_MODEL: claude-opus-4-8
 NEXT_EFFORT: high
