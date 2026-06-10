@@ -279,6 +279,27 @@ const ELEM_MATRIX = {
   arcane: { pyro: 1.1, hydro: 1.1, terra: 1.1, zephyr: 1.1, arcane: 1.0 },
 };
 
+// Element ↔ terrain affinity: a unit attacking FROM a terrain its element
+// resonates with deals +20% damage. Adds a terrain dimension to positioning
+// on top of the element rock-paper-scissors above.
+const AFFINITY_MULT = 1.2;
+const ELEM_AFFINITY = {
+  pyro:   { terrains: ["hill", "mountain"], label: "scorching heights" },
+  hydro:  { terrains: ["water", "forest"],  label: "drenched ground" },
+  terra:  { terrains: ["mountain", "hill"], label: "raw bedrock" },
+  zephyr: { terrains: ["plain", "mountain"], label: "open skies" },
+  arcane: { terrains: ["tower", "castle"],  label: "ley nexus" },
+};
+// Returns the affinity record if `element` is empowered on `terrain`, else null.
+function affinityFor(element, terrain) {
+  const a = ELEM_AFFINITY[element];
+  return a && a.terrains.indexOf(terrain) >= 0 ? a : null;
+}
+// Elements empowered by a given terrain (reverse lookup, for tile tooltips).
+function elementsEmpoweredBy(terrain) {
+  return Object.keys(ELEM_AFFINITY).filter(e => ELEM_AFFINITY[e].terrains.indexOf(terrain) >= 0);
+}
+
 const UNIT_TYPES = {
   cinderling:  { name: "Cinderling",  element: "pyro",   maxHp: 12, move: 4, range: 1, power: 5, def: 1, cost: 6,  flying: false, sprite: "imp",      attack: "melee",  evolvesTo: "infernite" },
   pyrowyrm:    { name: "Pyrowyrm",    element: "pyro",   maxHp: 18, move: 3, range: 2, power: 7, def: 2, cost: 12, flying: false, sprite: "wyrm",     attack: "breath", evolvesTo: "emberdrake" },
@@ -568,11 +589,13 @@ function computeDamage(attacker, defender) {
   const aTDef = TERRAIN[aCell.terrain].def;
   const dTDef = TERRAIN[dCell.terrain].def;
   const elemMul = ELEM_MATRIX[attacker.element][defender.element];
+  const aff = affinityFor(attacker.element, aCell.terrain);
+  const affMul = aff ? AFFINITY_MULT : 1.0;
   const raw = attacker.power * (attacker.hp / attacker.maxHp * 0.5 + 0.5);
   const mit = defender.def + dTDef * 0.5;
-  let dmg = Math.max(1, Math.round(raw * elemMul - mit * 0.6));
+  let dmg = Math.max(1, Math.round(raw * elemMul * affMul - mit * 0.6));
   dmg = Math.max(1, dmg + Math.floor(Math.random() * 3) - 1);
-  return { dmg, elemMul, aTDef, dTDef };
+  return { dmg, elemMul, affMul, hasAffinity: !!aff, aTDef, dTDef };
 }
 
 // Begins an attack: computes both swings up front, then opens the battle
@@ -1843,6 +1866,7 @@ function renderOverlays() {
   ctx.translate(STATE.cam.x, STATE.cam.y + TOPBAR_H);
 
   if (STATE.reachable) {
+    const selEl = STATE.selected ? STATE.selected.element : null;
     for (const node of STATE.reachable.values()) {
       const p = axialToPixel(node.q, node.r);
       ctx.fillStyle = "rgba(120, 180, 255, 0.22)";
@@ -1850,6 +1874,15 @@ function renderOverlays() {
       ctx.strokeStyle = "rgba(120, 180, 255, 0.55)";
       ctx.lineWidth = 1;
       hexPath(p.x, p.y); ctx.stroke();
+      // affinity glint: tile empowers the selected unit's element
+      if (selEl && affinityFor(selEl, cellAt(node).terrain)) {
+        const tw = (Math.sin(frame / 8 + node.q * 2 + node.r) + 1) / 2;
+        ctx.fillStyle = `rgba(240, 198, 116, ${0.35 + tw * 0.4})`;
+        for (let s = 0; s < 3; s++) {
+          const ang = frame / 20 + s * (Math.PI * 2 / 3);
+          ctx.fillRect(p.x + Math.cos(ang) * 9 - 1, p.y + Math.sin(ang) * 7 - 1, 2, 2);
+        }
+      }
     }
   }
   if (STATE.attackTargets) {
@@ -2061,8 +2094,25 @@ function renderSidebar() {
     ctx.fillStyle = PAL.gold;
     ctx.fillText("TERRAIN: " + t.name.toUpperCase(), SIDEBAR_X + 14, y + 12);
     ctx.fillStyle = PAL.inkDim;
-    ctx.fillText("def +" + t.def + "   move cost " + (t.moveCost === 99 ? "X" : t.moveCost), SIDEBAR_X + 14, y + 26);
-    y += 38;
+    ctx.fillText("move cost " + (t.moveCost === 99 ? "X" : t.moveCost), SIDEBAR_X + 14, y + 26);
+    ctx.fillText("DEF", SIDEBAR_X + 14, y + 42);
+    drawDefStars(SIDEBAR_X + 48, y + 38, t.def);
+    y += 52;
+    // which elements this terrain empowers (+20% attack)
+    const emp = elementsEmpoweredBy(cell.terrain);
+    if (emp.length) {
+      ctx.fillStyle = PAL.inkDim;
+      ctx.font = "10px 'Courier New', monospace";
+      ctx.fillText("Empowers:", SIDEBAR_X + 14, y);
+      let ex = SIDEBAR_X + 84;
+      for (const e of emp) {
+        ctx.fillStyle = ELEMENT[e].color;
+        ctx.fillText(ELEMENT[e].short, ex, y);
+        ex += 34;
+      }
+      ctx.font = "11px 'Courier New', monospace";
+      y += 16;
+    }
     if (cell.terrain === "tower" || cell.terrain === "castle") {
       const owner = cell.owner === null ? "neutral" : PLAYERS[cell.owner].name;
       ctx.fillStyle = cell.owner === null ? PAL.neutral : PLAYERS[cell.owner].color;
@@ -2082,6 +2132,12 @@ function renderSidebar() {
       ctx.fillStyle = u.acted ? PAL.inkDim : PAL.green;
       ctx.fillText(u.acted ? "spent this turn" : "ready", SIDEBAR_X + 14, y + 56);
       y += 70;
+      const ua = affinityFor(u.element, cell.terrain);
+      if (ua) {
+        ctx.fillStyle = PAL.gold;
+        ctx.fillText("* empowered: " + ua.label + " (+20% atk)", SIDEBAR_X + 14, y);
+        y += 16;
+      }
     }
   }
 
@@ -2097,6 +2153,19 @@ function renderSidebar() {
     ctx.fillStyle = i === 0 ? PAL.ink : PAL.inkDim;
     wrapText(line, SIDEBAR_X + 14, CANVAS_H - 138 + i * 13, SIDEBAR_W - 26, 12);
   }
+}
+
+// Defense rating as a row of gold diamonds (filled = terrain def points).
+function drawDefStars(x, y, n) {
+  const max = 5;
+  for (let i = 0; i < max; i++) {
+    const cx = x + i * 11;
+    ctx.fillStyle = i < n ? PAL.gold : "#3a3622";
+    ctx.beginPath();
+    ctx.moveTo(cx, y - 4); ctx.lineTo(cx + 4, y); ctx.lineTo(cx, y + 4); ctx.lineTo(cx - 4, y);
+    ctx.closePath(); ctx.fill();
+  }
+  ctx.textAlign = "left";
 }
 
 function drawStatBar(x, y, w, h, val, max, color, label) {

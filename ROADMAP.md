@@ -52,14 +52,16 @@ Check off with a one-line note when done. Mark `BLOCKED:`/`PARKED:` per rules.
 
 ### Phase 1 — Core completeness
 
-- [ ] 1.1 XP & leveling: units earn XP at `aImpact`/`cImpact` (damage dealt,
-  +bonus on kill), level 1–5, per-level stat growth (+hp/+power/+def, heal on
-  level-up), level chevrons on map sprite, level + XP bar in battle scene HUD.
-  Wire through `computeDamage` display and sidebar. [claude-opus-4-8 | high]
-- [ ] 1.2 Evolution system: at level 4+, standing on owned tower/castle at turn
-  start, unit evolves to an upgraded form (`evolvesTo` key in `UNIT_TYPES`);
-  evolution flash + fanfare; battle sprite swap. Add 8 evolved type *stubs*
-  (reuse base sprites tinted, real sprites come in 5.1). [claude-opus-4-8 | high]
+- [x] 1.1 XP & leveling (S2): gainXp at aImpact/cImpact (dmg dealt +10 kill
+  bonus), levels 1–5, +hp/+power/+def per level, full heal on level-up. Gold
+  pips on map sprite, Lv label + XP bar in battle HUD, "LEVEL UP!" banner +
+  fanfare. Stats live on the instance so computeDamage absorbs growth.
+  [claude-opus-4-8 | high]
+- [x] 1.2 Evolution system (S2): 8 evolved forms + `evolvesTo` links; non-master
+  level-4+ unit on owned tower/castle evolves at turn start (tryEvolve in
+  endTurn), growth absorbed into evolved base, full restore. Gold ring burst +
+  "EVOLVED!" + 3-note fanfare; pulsing gold halo on map + battle (sprite stubs
+  reuse base ids until 5.1). [claude-opus-4-8 | high]
 - [ ] 1.3 Terrain & element depth: element↔terrain affinity (e.g. pyro +power
   on volcano/desert, hydro on water; data table + hook in `computeDamage`),
   defense stars shown on hover, affinity glint on favorable tiles.
