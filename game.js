@@ -469,7 +469,43 @@ const STATE = {
   moveAnim: null,    // active hex-to-hex slide; see startMove()/updateMove()
   transition: null,  // full-screen scene wipe/fade; see renderTransition()
   music: { wanted: true, started: false, trackIndex: 0 },
+  settings: { musicVol: 1, sfxVol: 1, battleScene: true }, // 3.3
+  settingsOpen: false,  // 3.3 gear overlay
+  helpOpen: false,      // 3.3 ? overlay
 };
+
+// ---- Settings persistence (3.3) ----
+// Merged from localStorage key "wraithspire.settings.v1" at boot.
+// saveSettings() is called after every change so the overlay stays in sync.
+const SETTINGS_KEY = "wraithspire.settings.v1";
+
+function loadSettings() {
+  try {
+    const raw = localStorage.getItem(SETTINGS_KEY);
+    if (!raw) return;
+    const saved = JSON.parse(raw);
+    if (typeof saved.musicVol   === "number") STATE.settings.musicVol   = saved.musicVol;
+    if (typeof saved.sfxVol     === "number") STATE.settings.sfxVol     = saved.sfxVol;
+    if (typeof saved.battleScene === "boolean") STATE.settings.battleScene = saved.battleScene;
+    // Restore last track so music resumes where the player left it.
+    if (typeof saved.trackIndex === "number" &&
+        saved.trackIndex >= 0 && saved.trackIndex < TRACKS.length) {
+      STATE.music.trackIndex = saved.trackIndex;
+    }
+  } catch (_) { /* localStorage can throw on file:// in some browsers */ }
+}
+
+function saveSettings() {
+  try {
+    const blob = {
+      musicVol:    STATE.settings.musicVol,
+      sfxVol:      STATE.settings.sfxVol,
+      battleScene: STATE.settings.battleScene,
+      trackIndex:  STATE.music.trackIndex,
+    };
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(blob));
+  } catch (_) { /* ignore write failures */ }
+}
 
 function startNewGame() {
   nextUnitId = 1;
@@ -531,7 +567,7 @@ function centerCameraOn(unit, instant) {
 // Per-frame: RTS edge-pan from the parked mouse, then ease cam → camTarget.
 function updateCamera() {
   const mo = STATE.mouse;
-  if (mo && !STATE.menu) {
+  if (mo && !STATE.menu && !STATE.settingsOpen && !STATE.helpOpen) {
     const EDGE = 42, SPEED = 13;
     if (mo.x >= 0 && mo.x <= MAP_W && mo.y >= TOPBAR_H && mo.y <= CANVAS_H) {
       if (mo.x < EDGE)               STATE.camTarget.x = clampCamX(STATE.camTarget.x + SPEED);
@@ -751,8 +787,20 @@ function beginBattle(attacker, defender, afterDone) {
     afterDone,
     arenaSeed: Math.floor(Math.random() * 1e6),
   };
-  STATE.screen = "battle";
   if (STATE.stats) STATE.stats.battles++;
+
+  // Settings can turn the cutaway off (3.3): resolve both swings right here
+  // on the map screen — same damage/XP/floats path, no scene, no input block.
+  if (STATE.settings && !STATE.settings.battleScene) {
+    const b = STATE.battle;
+    applySwing(b, false); b.applied1 = true;
+    if (b.hasCounter && b.defender.hp > 0) { applySwing(b, true); b.applied2 = true; }
+    beep(150, 0.08, "square", 0.18);
+    endBattleAndResume();
+    return;
+  }
+
+  STATE.screen = "battle";
   musicDuck(0.35); // dim music during battle
 }
 
@@ -1410,6 +1458,31 @@ function onBattleLevelUp(unit, side) {
   setTimeout(() => beep(784, 0.13, "triangle", 0.2), 90);
 }
 
+// Applies one battle swing — damage, log, loss stats, XP, map floats.
+// Shared by the cutaway's impact frames and the instant resolver used when
+// battle scenes are disabled in settings (3.3). The direct dmgB anim only
+// fires under the cutaway (it pre-dates floats and ages double there); the
+// instant path relies on the floats emitted by endBattleAndResume.
+function applySwing(b, counter) {
+  const src = counter ? b.defender : b.attacker;
+  const dst = counter ? b.attacker : b.defender;
+  const dmg = counter ? b.cDmg : b.aDmg;
+  dst.hp -= dmg;
+  if (STATE.screen === "battle") pushAnim("dmgB", dst.q, dst.r, "-" + dmg, PAL.red);
+  pushLog(counter
+    ? src.name + " counters for " + dmg + "."
+    : src.name + " strikes " + dst.name + " for " + dmg + ".");
+  if (dst.hp <= 0) { pushLog(dst.name + " is destroyed."); if (STATE.stats) STATE.stats.lost[dst.owner]++; }
+  const killed = dst.hp <= 0;
+  const xpAmt = dmg + (killed ? KILL_XP_BONUS : 0);
+  if (gainXp(src, xpAmt) > 0) {
+    onBattleLevelUp(src, counter ? "c" : "a");
+    b.floats.push({ q: src.q, r: src.r, text: "LEVEL UP!", color: PAL.gold, dy: -22 });
+  }
+  b.floats.push({ q: dst.q, r: dst.r, text: "-" + dmg, color: PAL.red, dy: 0 });
+  if (xpAmt > 0) b.floats.push({ q: src.q, r: src.r, text: "+" + xpAmt + " xp", color: PAL.gold, dy: -10 });
+}
+
 function updateBattle() {
   const b = STATE.battle;
   if (!b) return;
@@ -1435,21 +1508,7 @@ function updateBattle() {
       }
       break;
     case "aImpact":
-      if (!b.applied1) {
-        b.defender.hp -= b.aDmg;
-        pushAnim("dmgB", b.defender.q, b.defender.r, "-" + b.aDmg, PAL.red);
-        pushLog(b.attacker.name + " strikes " + b.defender.name + " for " + b.aDmg + ".");
-        b.applied1 = true;
-        if (b.defender.hp <= 0) { pushLog(b.defender.name + " is destroyed."); if (STATE.stats) STATE.stats.lost[b.defender.owner]++; }
-        const killed = b.defender.hp <= 0;
-        const xpAmt = b.aDmg + (killed ? KILL_XP_BONUS : 0);
-        if (gainXp(b.attacker, xpAmt) > 0) {
-          onBattleLevelUp(b.attacker, "a");
-          b.floats.push({ q: b.attacker.q, r: b.attacker.r, text: "LEVEL UP!", color: PAL.gold, dy: -22 });
-        }
-        b.floats.push({ q: b.defender.q, r: b.defender.r, text: "-" + b.aDmg, color: PAL.red, dy: 0 });
-        if (xpAmt > 0) b.floats.push({ q: b.attacker.q, r: b.attacker.r, text: "+" + xpAmt + " xp", color: PAL.gold, dy: -10 });
-      }
+      if (!b.applied1) { applySwing(b, false); b.applied1 = true; }
       if (b.phaseFrame >= B.impact) advance("aRecover");
       break;
     case "aRecover":
@@ -1469,21 +1528,7 @@ function updateBattle() {
       }
       break;
     case "cImpact":
-      if (!b.applied2) {
-        b.attacker.hp -= b.cDmg;
-        pushAnim("dmgB", b.attacker.q, b.attacker.r, "-" + b.cDmg, PAL.red);
-        pushLog(b.defender.name + " counters for " + b.cDmg + ".");
-        b.applied2 = true;
-        if (b.attacker.hp <= 0) { pushLog(b.attacker.name + " is destroyed."); if (STATE.stats) STATE.stats.lost[b.attacker.owner]++; }
-        const killed = b.attacker.hp <= 0;
-        const xpAmt = b.cDmg + (killed ? KILL_XP_BONUS : 0);
-        if (gainXp(b.defender, xpAmt) > 0) {
-          onBattleLevelUp(b.defender, "c");
-          b.floats.push({ q: b.defender.q, r: b.defender.r, text: "LEVEL UP!", color: PAL.gold, dy: -22 });
-        }
-        b.floats.push({ q: b.attacker.q, r: b.attacker.r, text: "-" + b.cDmg, color: PAL.red, dy: 0 });
-        if (xpAmt > 0) b.floats.push({ q: b.defender.q, r: b.defender.r, text: "+" + xpAmt + " xp", color: PAL.gold, dy: -10 });
-      }
+      if (!b.applied2) { applySwing(b, true); b.applied2 = true; }
       if (b.phaseFrame >= B.impact) advance("cRecover");
       break;
     case "cRecover":
@@ -1979,6 +2024,10 @@ function render() {
     renderMenu();
     renderBanner();
     renderTerrainTooltip();
+    // Settings/help overlays drawn last (before renderTransition) so they
+    // sit above all map content but below the scene wipe (3.3).
+    if (STATE.settingsOpen) renderSettingsOverlay();
+    if (STATE.helpOpen)     renderHelpOverlay();
   }
   renderTransition();
 }
@@ -2202,6 +2251,19 @@ function renderAnimationsMap() {
   ctx.restore();
 }
 
+// Single source for the two top-bar icon buttons (gear + ?) so renderTopBar
+// and onClick both use the exact same rects and can never drift.
+function topBarButtonRects() {
+  const bSize = 24, gap = 6, right = CANVAS_W - 10;
+  const gearX = right - bSize;
+  const helpX = gearX - gap - bSize;
+  const by = Math.floor((TOPBAR_H - bSize) / 2);
+  return {
+    gear: { x: gearX, y: by, w: bSize, h: bSize },
+    help: { x: helpX, y: by, w: bSize, h: bSize },
+  };
+}
+
 function renderTopBar() {
   ctx.fillStyle = PAL.panel;
   ctx.fillRect(0, 0, CANVAS_W, TOPBAR_H);
@@ -2221,14 +2283,33 @@ function renderTopBar() {
   ctx.textAlign = "center";
   ctx.fillText("TURN " + STATE.turn + " — " + PLAYERS[STATE.currentPlayer].name + " PHASE", CANVAS_W / 2, 30);
 
+  // Keyboard hint text — shifted left to make room for the two icon buttons.
+  const btns = topBarButtonRects();
+  const textRight = btns.help.x - 8;
   ctx.fillStyle = PAL.inkDim;
   ctx.font = "11px 'Courier New', monospace";
   ctx.textAlign = "right";
   const trackLabel = STATE.music.wanted
     ? "♪ " + (TRACKS[STATE.music.trackIndex] || TRACKS[0]).name
     : "music OFF";
-  ctx.fillText("E end turn  |  M mute  |  N next  |  " + trackLabel, CANVAS_W - 16, 30);
+  ctx.fillText("E end turn  |  M mute  |  N next  |  " + trackLabel, textRight, 30);
   ctx.textAlign = "left";
+
+  // Gear button (⚙) and help button (?)
+  const drawIconBtn = (r, label, active) => {
+    ctx.fillStyle = active ? PAL.gold : PAL.panelLight;
+    ctx.fillRect(r.x, r.y, r.w, r.h);
+    ctx.strokeStyle = active ? PAL.gold : PAL.inkFaint;
+    ctx.lineWidth = 1;
+    ctx.strokeRect(r.x + 0.5, r.y + 0.5, r.w - 1, r.h - 1);
+    ctx.font = "bold 14px 'Courier New', monospace";
+    ctx.textAlign = "center";
+    ctx.fillStyle = active ? PAL.bg : PAL.ink;
+    ctx.fillText(label, r.x + r.w / 2, r.y + r.h / 2 + 5);
+    ctx.textAlign = "left";
+  };
+  drawIconBtn(btns.gear, "⚙", STATE.settingsOpen);
+  drawIconBtn(btns.help, "?", STATE.helpOpen);
 }
 
 function renderSidebar() {
@@ -2508,6 +2589,7 @@ function renderMenu() {
 function renderTerrainTooltip() {
   if (STATE.menu) return;
   if (STATE.moveAnim) return;
+  if (STATE.settingsOpen || STATE.helpOpen) return;
   if (!STATE.hover || !inBounds(STATE.hover.q, STATE.hover.r)) return;
   if (!STATE.mouse) return;
   const mo = STATE.mouse;
@@ -2674,6 +2756,345 @@ function renderBanner() {
 }
 
 // =========================================================================
+// 11b. Settings & help overlays (3.3)
+// =========================================================================
+
+// Single source of truth for all clickable rects in the settings overlay.
+// Returns an object with one entry per interactive element. Used by both
+// renderSettingsOverlay (to draw) and onClick (to hit-test).
+function settingsRects() {
+  const pw = 420, ph = 310;
+  const ox = Math.floor((CANVAS_W - pw) / 2);
+  const oy = Math.floor((CANVAS_H - ph) / 2);
+  // Labels live in the left column (ox+20); controls start at rowLeft so
+  // the two never overlap.
+  const rowH = 36, rowLeft = ox + 130, rowRight = ox + pw - 20;
+  const rowY = (i) => oy + 72 + i * rowH; // first data row at oy+72
+  // Track arrows
+  const arrowW = 24;
+  const trackY = rowY(0);
+  const trackLeft  = { x: rowLeft, y: trackY, w: arrowW, h: 22 };
+  const trackRight = { x: rowRight - arrowW, y: trackY, w: arrowW, h: 22 };
+  // Music vol segments (10 + mute)
+  const mvY = rowY(1);
+  const segW = 18, segH = 20, segGap = 3;
+  const mvSegs = [];
+  for (let i = 0; i < 10; i++) mvSegs.push({ x: rowLeft + i * (segW + segGap), y: mvY, w: segW, h: segH });
+  const mvMute = { x: rowLeft + 10 * (segW + segGap) + 8, y: mvY, w: 40, h: segH };
+  // SFX vol segments (10 + mute)
+  const svY = rowY(2);
+  const svSegs = [];
+  for (let i = 0; i < 10; i++) svSegs.push({ x: rowLeft + i * (segW + segGap), y: svY, w: segW, h: segH });
+  const svMute = { x: rowLeft + 10 * (segW + segGap) + 8, y: svY, w: 40, h: segH };
+  // Battle scene toggle
+  const bsY = rowY(3);
+  const bsOn  = { x: rowRight - 76, y: bsY, w: 34, h: 22 };
+  const bsOff = { x: rowRight - 38, y: bsY, w: 34, h: 22 };
+  // Close button
+  const closeW = 100, closeH = 28;
+  const closeBtn = { x: ox + Math.floor((pw - closeW) / 2), y: oy + ph - 42, w: closeW, h: closeH };
+  return { ox, oy, pw, ph, trackLeft, trackRight, mvSegs, mvMute, svSegs, svMute, bsOn, bsOff, closeBtn };
+}
+
+function renderSettingsOverlay() {
+  const r = settingsRects();
+  ctx.save();
+  // Scrim
+  ctx.fillStyle = "rgba(0, 0, 0, 0.55)";
+  ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+  // Panel
+  ctx.fillStyle = PAL.panel;
+  ctx.fillRect(r.ox, r.oy, r.pw, r.ph);
+  ctx.strokeStyle = PAL.gold;
+  ctx.lineWidth = 1;
+  ctx.strokeRect(r.ox + 0.5, r.oy + 0.5, r.pw - 1, r.ph - 1);
+  // Header
+  ctx.font = "bold 18px 'Courier New', monospace";
+  ctx.textAlign = "center";
+  ctx.fillStyle = PAL.gold;
+  ctx.fillText("SETTINGS", r.ox + r.pw / 2, r.oy + 28);
+  ctx.fillStyle = PAL.inkFaint;
+  ctx.fillRect(r.ox + 12, r.oy + 36, r.pw - 24, 1);
+
+  const labelX = r.ox + 20;
+
+  // Helper: row label
+  const rowLabel = (label, y) => {
+    ctx.font = "11px 'Courier New', monospace";
+    ctx.textAlign = "left";
+    ctx.fillStyle = PAL.inkDim;
+    ctx.fillText(label, labelX, y + 15);
+  };
+
+  // ---- MUSIC TRACK row ----
+  const trackY = r.oy + 72;
+  rowLabel("MUSIC TRACK", trackY);
+  const track = TRACKS[STATE.music.trackIndex] || TRACKS[0];
+  // < arrow
+  ctx.fillStyle = PAL.panelLight;
+  ctx.fillRect(r.trackLeft.x, r.trackLeft.y, r.trackLeft.w, r.trackLeft.h);
+  ctx.strokeStyle = PAL.inkFaint; ctx.lineWidth = 1;
+  ctx.strokeRect(r.trackLeft.x + 0.5, r.trackLeft.y + 0.5, r.trackLeft.w - 1, r.trackLeft.h - 1);
+  ctx.font = "bold 13px 'Courier New', monospace";
+  ctx.textAlign = "center";
+  ctx.fillStyle = PAL.ink;
+  ctx.fillText("<", r.trackLeft.x + r.trackLeft.w / 2, r.trackLeft.y + 15);
+  // > arrow
+  ctx.fillStyle = PAL.panelLight;
+  ctx.fillRect(r.trackRight.x, r.trackRight.y, r.trackRight.w, r.trackRight.h);
+  ctx.strokeStyle = PAL.inkFaint; ctx.lineWidth = 1;
+  ctx.strokeRect(r.trackRight.x + 0.5, r.trackRight.y + 0.5, r.trackRight.w - 1, r.trackRight.h - 1);
+  ctx.textAlign = "center";
+  ctx.fillStyle = PAL.ink;
+  ctx.fillText(">", r.trackRight.x + r.trackRight.w / 2, r.trackRight.y + 15);
+  // Track name
+  ctx.font = "11px 'Courier New', monospace";
+  ctx.fillStyle = PAL.gold;
+  // Track name centred between the two arrows (controls column, not panel).
+  ctx.fillText(track.name, (r.trackLeft.x + r.trackRight.x + r.trackRight.w) / 2, trackY + 15);
+
+  // Helper: draw a 10-segment + mute volume row
+  const drawVolRow = (label, y, segs, muteR, vol) => {
+    rowLabel(label, y);
+    const activeCount = Math.round(vol * 10);
+    for (let i = 0; i < 10; i++) {
+      const s = segs[i];
+      ctx.fillStyle = i < activeCount ? PAL.gold : PAL.panelLight;
+      ctx.fillRect(s.x, s.y, s.w, s.h);
+      ctx.strokeStyle = PAL.inkFaint; ctx.lineWidth = 1;
+      ctx.strokeRect(s.x + 0.5, s.y + 0.5, s.w - 1, s.h - 1);
+    }
+    ctx.fillStyle = vol === 0 ? PAL.gold : PAL.panelLight;
+    ctx.fillRect(muteR.x, muteR.y, muteR.w, muteR.h);
+    ctx.strokeStyle = PAL.inkFaint; ctx.lineWidth = 1;
+    ctx.strokeRect(muteR.x + 0.5, muteR.y + 0.5, muteR.w - 1, muteR.h - 1);
+    ctx.font = "9px 'Courier New', monospace";
+    ctx.textAlign = "center";
+    ctx.fillStyle = vol === 0 ? PAL.bg : PAL.ink;
+    ctx.fillText("MUTE", muteR.x + muteR.w / 2, muteR.y + 13);
+    ctx.textAlign = "left";
+  };
+
+  const rowY1 = r.oy + 72 + 36;     // row index 1
+  const rowY2 = r.oy + 72 + 72;     // row index 2
+  drawVolRow("MUSIC VOL", rowY1, r.mvSegs, r.mvMute, STATE.settings.musicVol);
+  drawVolRow("SFX VOL",   rowY2, r.svSegs, r.svMute, STATE.settings.sfxVol);
+
+  // ---- BATTLE SCENES row ----
+  const bsY = r.oy + 72 + 108;      // row index 3
+  rowLabel("BATTLE SCENES", bsY);
+  const bsVal = STATE.settings.battleScene;
+  ctx.fillStyle = bsVal ? PAL.gold : PAL.panelLight;
+  ctx.fillRect(r.bsOn.x, r.bsOn.y, r.bsOn.w, r.bsOn.h);
+  ctx.strokeStyle = PAL.inkFaint; ctx.lineWidth = 1;
+  ctx.strokeRect(r.bsOn.x + 0.5, r.bsOn.y + 0.5, r.bsOn.w - 1, r.bsOn.h - 1);
+  ctx.font = "10px 'Courier New', monospace";
+  ctx.textAlign = "center";
+  ctx.fillStyle = bsVal ? PAL.bg : PAL.ink;
+  ctx.fillText("ON", r.bsOn.x + r.bsOn.w / 2, r.bsOn.y + 15);
+
+  ctx.fillStyle = !bsVal ? PAL.gold : PAL.panelLight;
+  ctx.fillRect(r.bsOff.x, r.bsOff.y, r.bsOff.w, r.bsOff.h);
+  ctx.strokeStyle = PAL.inkFaint; ctx.lineWidth = 1;
+  ctx.strokeRect(r.bsOff.x + 0.5, r.bsOff.y + 0.5, r.bsOff.w - 1, r.bsOff.h - 1);
+  ctx.textAlign = "center";
+  ctx.fillStyle = !bsVal ? PAL.bg : PAL.ink;
+  ctx.fillText("OFF", r.bsOff.x + r.bsOff.w / 2, r.bsOff.y + 15);
+  ctx.textAlign = "left";
+
+  // ---- CLOSE button ----
+  ctx.fillStyle = PAL.panelLight;
+  ctx.fillRect(r.closeBtn.x, r.closeBtn.y, r.closeBtn.w, r.closeBtn.h);
+  ctx.strokeStyle = PAL.gold; ctx.lineWidth = 1;
+  ctx.strokeRect(r.closeBtn.x + 0.5, r.closeBtn.y + 0.5, r.closeBtn.w - 1, r.closeBtn.h - 1);
+  ctx.font = "bold 12px 'Courier New', monospace";
+  ctx.textAlign = "center";
+  ctx.fillStyle = PAL.gold;
+  ctx.fillText("CLOSE", r.closeBtn.x + r.closeBtn.w / 2, r.closeBtn.y + 19);
+  ctx.textAlign = "left";
+  ctx.restore();
+}
+
+function handleSettingsClick(p) {
+  const r = settingsRects();
+  const hit = (rect) => p.x >= rect.x && p.x <= rect.x + rect.w && p.y >= rect.y && p.y <= rect.y + rect.h;
+  // Close
+  if (hit(r.closeBtn)) { STATE.settingsOpen = false; return; }
+  // Track arrows — reuse cycleTrack pattern (step ±1, reset audio.step)
+  if (hit(r.trackLeft)) {
+    STATE.music.trackIndex = (STATE.music.trackIndex - 1 + TRACKS.length) % TRACKS.length;
+    audio.step = 0;
+    STATE.banner = { text: "♪ " + TRACKS[STATE.music.trackIndex].name, ttl: 60 };
+    saveSettings(); return;
+  }
+  if (hit(r.trackRight)) {
+    cycleTrack(); saveSettings(); return;
+  }
+  // Music vol segments
+  for (let i = 0; i < r.mvSegs.length; i++) {
+    if (hit(r.mvSegs[i])) { STATE.settings.musicVol = (i + 1) / 10; saveSettings(); return; }
+  }
+  if (hit(r.mvMute)) { STATE.settings.musicVol = 0; saveSettings(); return; }
+  // SFX vol segments
+  for (let i = 0; i < r.svSegs.length; i++) {
+    if (hit(r.svSegs[i])) {
+      STATE.settings.sfxVol = (i + 1) / 10;
+      saveSettings();
+      // Play a confirmation beep at the new volume so the user can hear it.
+      beep(660, 0.12, "triangle", 0.18);
+      return;
+    }
+  }
+  if (hit(r.svMute)) { STATE.settings.sfxVol = 0; saveSettings(); return; }
+  // Battle scene toggle
+  if (hit(r.bsOn))  { STATE.settings.battleScene = true;  saveSettings(); return; }
+  if (hit(r.bsOff)) { STATE.settings.battleScene = false; saveSettings(); return; }
+}
+
+function renderHelpOverlay() {
+  const pw = 640, ph = 460;
+  const ox = Math.floor((CANVAS_W - pw) / 2);
+  const oy = Math.floor((CANVAS_H - ph) / 2);
+  ctx.save();
+  // Scrim
+  ctx.fillStyle = "rgba(0, 0, 0, 0.55)";
+  ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+  // Panel
+  ctx.fillStyle = PAL.panel;
+  ctx.fillRect(ox, oy, pw, ph);
+  ctx.strokeStyle = PAL.gold;
+  ctx.lineWidth = 1;
+  ctx.strokeRect(ox + 0.5, oy + 0.5, pw - 1, ph - 1);
+  // Header
+  ctx.font = "bold 18px 'Courier New', monospace";
+  ctx.textAlign = "center";
+  ctx.fillStyle = PAL.gold;
+  ctx.fillText("HELP", ox + pw / 2, oy + 28);
+  ctx.fillStyle = PAL.inkFaint;
+  ctx.fillRect(ox + 12, oy + 36, pw - 24, 1);
+  ctx.textAlign = "left";
+
+  // ---- Left column: CONTROLS ----
+  const lx = ox + 20, ly = oy + 52;
+  ctx.font = "bold 11px 'Courier New', monospace";
+  ctx.fillStyle = PAL.gold;
+  ctx.fillText("CONTROLS", lx, ly);
+  const controls = [
+    ["click",            "select unit / move / attack"],
+    ["right-click / Esc","cancel / deselect"],
+    ["E",                "end turn"],
+    ["M",                "toggle music"],
+    ["N",                "next music track"],
+    ["Space",            "center camera on unit"],
+    ["arrows",           "pan camera"],
+    ["?  or  H",         "this help screen"],
+    ["⚙ (top-right)",   "settings"],
+  ];
+  ctx.font = "10px 'Courier New', monospace";
+  let cy2 = ly + 16;
+  for (const [key, desc] of controls) {
+    ctx.fillStyle = PAL.gold;
+    ctx.fillText(key, lx, cy2);
+    ctx.fillStyle = PAL.inkDim;
+    ctx.fillText(desc, lx + 116, cy2);
+    cy2 += 16;
+  }
+
+  // ---- Right column: ELEMENT WHEEL ----
+  const rx = ox + pw / 2 + 20;
+  const ry = oy + 52;
+  ctx.font = "bold 11px 'Courier New', monospace";
+  ctx.fillStyle = PAL.gold;
+  ctx.fillText("STRONG VS →", rx, ry);
+
+  // Draw the 5 elements as labeled nodes in a pentagon, with advantage arrows.
+  const elemKeys = Object.keys(ELEMENT);  // ["pyro","hydro","terra","zephyr","arcane"]
+  const wheelCX = rx + (pw / 2 - 20 - 20) / 2;
+  const wheelCY = ry + 130;
+  const wheelR = 90;
+  // Compute positions
+  const nodePos = {};
+  for (let i = 0; i < elemKeys.length; i++) {
+    const ang = -Math.PI / 2 + i * (Math.PI * 2 / elemKeys.length);
+    nodePos[elemKeys[i]] = {
+      x: wheelCX + Math.cos(ang) * wheelR,
+      y: wheelCY + Math.sin(ang) * wheelR,
+    };
+  }
+  // Draw advantage arrows first (behind nodes)
+  for (const a of elemKeys) {
+    for (const b of elemKeys) {
+      if (a === b) continue;
+      if ((ELEM_MATRIX[a] || {})[b] <= 1) continue;
+      const pa = nodePos[a], pb = nodePos[b];
+      const dx = pb.x - pa.x, dy = pb.y - pa.y;
+      const len = Math.sqrt(dx * dx + dy * dy);
+      const ux = dx / len, uy = dy / len;
+      const nodeRad = 14;
+      const ax = pa.x + ux * nodeRad, ay = pa.y + uy * nodeRad;
+      const bx = pb.x - ux * nodeRad, by = pb.y - uy * nodeRad;
+      ctx.strokeStyle = ELEMENT[a].color;
+      ctx.lineWidth = 1.5;
+      ctx.globalAlpha = 0.7;
+      ctx.beginPath();
+      ctx.moveTo(ax, ay);
+      ctx.lineTo(bx, by);
+      ctx.stroke();
+      // Arrowhead
+      const hw = 5;
+      const px2 = bx - ux * hw - uy * hw;
+      const py2 = by - uy * hw + ux * hw;
+      const px3 = bx - ux * hw + uy * hw;
+      const py3 = by - uy * hw - ux * hw;
+      ctx.fillStyle = ELEMENT[a].color;
+      ctx.beginPath();
+      ctx.moveTo(bx, by);
+      ctx.lineTo(px2, py2);
+      ctx.lineTo(px3, py3);
+      ctx.closePath();
+      ctx.fill();
+    }
+  }
+  ctx.globalAlpha = 1;
+  // Draw element nodes
+  for (const key of elemKeys) {
+    const pos = nodePos[key];
+    const el = ELEMENT[key];
+    ctx.fillStyle = el.color;
+    ctx.beginPath();
+    ctx.arc(pos.x, pos.y, 14, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.font = "bold 8px 'Courier New', monospace";
+    ctx.textAlign = "center";
+    ctx.fillStyle = "#000";
+    ctx.fillText(el.short, pos.x, pos.y + 3);
+  }
+  ctx.textAlign = "left";
+
+  // Affinity note below the wheel
+  ctx.font = "9px 'Courier New', monospace";
+  ctx.fillStyle = PAL.inkDim;
+  ctx.textAlign = "center";
+  ctx.fillText("+20% atk on resonant terrain (gold glint)", wheelCX, wheelCY + wheelR + 22);
+  ctx.textAlign = "left";
+
+  // ---- CLOSE button ----
+  const closeW = 100, closeH = 28;
+  const cbx = ox + Math.floor((pw - closeW) / 2);
+  const cby = oy + ph - 42;
+  ctx.fillStyle = PAL.panelLight;
+  ctx.fillRect(cbx, cby, closeW, closeH);
+  ctx.strokeStyle = PAL.gold; ctx.lineWidth = 1;
+  ctx.strokeRect(cbx + 0.5, cby + 0.5, closeW - 1, closeH - 1);
+  ctx.font = "bold 12px 'Courier New', monospace";
+  ctx.textAlign = "center";
+  ctx.fillStyle = PAL.gold;
+  ctx.fillText("CLOSE", cbx + closeW / 2, cby + 19);
+  ctx.textAlign = "left";
+  ctx.restore();
+}
+
+// =========================================================================
 // 12. Input & action menus
 // =========================================================================
 
@@ -2724,6 +3145,19 @@ function onClick(ev) {
   if (PLAYERS[STATE.currentPlayer].isAI) return;
 
   const p = clientToCanvas(ev);
+
+  // Overlays intercept all map input (3.3). Settings clicks are routed to
+  // handleSettingsClick; any click closes the help screen.
+  if (STATE.screen === "play" && STATE.settingsOpen) { handleSettingsClick(p); return; }
+  if (STATE.screen === "play" && STATE.helpOpen)     { STATE.helpOpen = false; return; }
+
+  // Top-bar icon buttons — check before map/menu logic.
+  if (STATE.screen === "play" && p.y < TOPBAR_H) {
+    const btns = topBarButtonRects();
+    const hit = (r) => p.x >= r.x && p.x <= r.x + r.w && p.y >= r.y && p.y <= r.y + r.h;
+    if (hit(btns.gear)) { STATE.settingsOpen = true; STATE.helpOpen = false; return; }
+    if (hit(btns.help)) { STATE.helpOpen = true; STATE.settingsOpen = false; return; }
+  }
 
   // If a menu is open, route the click to its hit-test before touching the map.
   if (STATE.menu) {
@@ -2798,6 +3232,19 @@ function onKey(ev) {
   if (STATE.screen === "battle") return;
   if (STATE.moveAnim) return;
   if (PLAYERS[STATE.currentPlayer].isAI && STATE.pendingAI) return;
+
+  // Overlay close / toggle — handle before menu logic so Esc also closes overlays (3.3).
+  if (STATE.screen === "play") {
+    if (ev.key === "Escape") {
+      if (STATE.settingsOpen) { STATE.settingsOpen = false; return; }
+      if (STATE.helpOpen)     { STATE.helpOpen = false;     return; }
+    }
+    if (ev.key === "?" || ev.key === "h" || ev.key === "H") {
+      STATE.helpOpen = !STATE.helpOpen;
+      STATE.settingsOpen = false;
+      return;
+    }
+  }
 
   if (STATE.menu) {
     if (ev.key === "ArrowDown" || ev.key === "s") {
@@ -3361,10 +3808,12 @@ function cycleTrack() {
   STATE.music.trackIndex = (STATE.music.trackIndex + 1) % TRACKS.length;
   audio.step = 0; // restart the new track at bar 1
   STATE.banner = { text: "♪ " + TRACKS[STATE.music.trackIndex].name, ttl: 60 };
+  saveSettings(); // persist the new track choice (3.3)
 }
 
 function playSynth(freq, type, dur, gain, filterHz, attack, reverbSend) {
   if (!audio.ctx) return;
+  if (STATE.settings.musicVol <= 0) return; // muted — skip (avoids exponentialRamp from 0)
   const t = audio.ctx.currentTime;
   const osc = audio.ctx.createOscillator();
   const g = audio.ctx.createGain();
@@ -3374,7 +3823,7 @@ function playSynth(freq, type, dur, gain, filterHz, attack, reverbSend) {
   lp.Q.value = 0.7;
   osc.type = type;
   osc.frequency.value = freq;
-  const peak = gain * audio.duck;
+  const peak = gain * audio.duck * STATE.settings.musicVol;
   const a = attack || 0.005;
   g.gain.setValueAtTime(0, t);
   g.gain.linearRampToValueAtTime(peak, t + a);
@@ -3394,6 +3843,7 @@ function playSynth(freq, type, dur, gain, filterHz, attack, reverbSend) {
 // drifts back closed across the note's tail.
 function playBass(freq, dur, gain, sweepTo) {
   if (!audio.ctx) return;
+  if (STATE.settings.musicVol <= 0) return;
   const t = audio.ctx.currentTime;
   const osc = audio.ctx.createOscillator();
   const g = audio.ctx.createGain();
@@ -3405,7 +3855,7 @@ function playBass(freq, dur, gain, sweepTo) {
   lp.frequency.exponentialRampToValueAtTime(180, t + dur);
   osc.type = "sawtooth";
   osc.frequency.value = freq;
-  const peak = gain * audio.duck;
+  const peak = gain * audio.duck * STATE.settings.musicVol;
   g.gain.setValueAtTime(0, t);
   g.gain.linearRampToValueAtTime(peak, t + 0.005);
   g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
@@ -3418,6 +3868,7 @@ function playBass(freq, dur, gain, sweepTo) {
 // a quick lowpassed noise click on top for transient body.
 function playKick(gain) {
   if (!audio.ctx) return;
+  if (STATE.settings.musicVol <= 0) return;
   const t = audio.ctx.currentTime;
   const osc = audio.ctx.createOscillator();
   const g = audio.ctx.createGain();
@@ -3425,7 +3876,7 @@ function playKick(gain) {
   osc.frequency.setValueAtTime(110, t);
   osc.frequency.exponentialRampToValueAtTime(40, t + 0.08);
   g.gain.setValueAtTime(0, t);
-  g.gain.linearRampToValueAtTime(gain * audio.duck, t + 0.002);
+  g.gain.linearRampToValueAtTime(gain * audio.duck * STATE.settings.musicVol, t + 0.002);
   g.gain.exponentialRampToValueAtTime(0.0001, t + 0.22);
   osc.connect(g); g.connect(audio.musicGain);
   osc.start(t);
@@ -3439,7 +3890,7 @@ function playKick(gain) {
   clickFilt.type = "lowpass";
   clickFilt.frequency.value = 3500;
   const clickG = audio.ctx.createGain();
-  clickG.gain.setValueAtTime(gain * 0.5 * audio.duck, t);
+  clickG.gain.setValueAtTime(gain * 0.5 * audio.duck * STATE.settings.musicVol, t);
   clickG.gain.exponentialRampToValueAtTime(0.0001, t + 0.015);
   src.connect(clickFilt); clickFilt.connect(clickG); clickG.connect(audio.musicGain);
   src.start(t, 0, 0.02);
@@ -3449,6 +3900,7 @@ function playKick(gain) {
 // triangle at 200→100 Hz layered underneath.
 function playSnare(gain) {
   if (!audio.ctx) return;
+  if (STATE.settings.musicVol <= 0) return;
   const t = audio.ctx.currentTime;
   // Noise body
   const src = audio.ctx.createBufferSource();
@@ -3459,7 +3911,7 @@ function playSnare(gain) {
   bp.Q.value = 0.7;
   const ng = audio.ctx.createGain();
   ng.gain.setValueAtTime(0, t);
-  ng.gain.linearRampToValueAtTime(gain * audio.duck, t + 0.002);
+  ng.gain.linearRampToValueAtTime(gain * audio.duck * STATE.settings.musicVol, t + 0.002);
   ng.gain.exponentialRampToValueAtTime(0.0001, t + 0.13);
   src.connect(bp); bp.connect(ng); ng.connect(audio.musicGain);
   src.start(t, 0, 0.18);
@@ -3470,7 +3922,7 @@ function playSnare(gain) {
   osc.frequency.exponentialRampToValueAtTime(110, t + 0.06);
   const og = audio.ctx.createGain();
   og.gain.setValueAtTime(0, t);
-  og.gain.linearRampToValueAtTime(gain * 0.45 * audio.duck, t + 0.002);
+  og.gain.linearRampToValueAtTime(gain * 0.45 * audio.duck * STATE.settings.musicVol, t + 0.002);
   og.gain.exponentialRampToValueAtTime(0.0001, t + 0.09);
   osc.connect(og); og.connect(audio.musicGain);
   osc.start(t);
@@ -3486,6 +3938,7 @@ function playSnare(gain) {
 // Closed hi-hat: high-passed noise with a very short envelope.
 function playHihat(gain) {
   if (!audio.ctx) return;
+  if (STATE.settings.musicVol <= 0) return;
   const t = audio.ctx.currentTime;
   const src = audio.ctx.createBufferSource();
   src.buffer = audio.noiseBuf;
@@ -3494,7 +3947,7 @@ function playHihat(gain) {
   hp.frequency.value = 7000;
   const g = audio.ctx.createGain();
   g.gain.setValueAtTime(0, t);
-  g.gain.linearRampToValueAtTime(gain * audio.duck, t + 0.001);
+  g.gain.linearRampToValueAtTime(gain * audio.duck * STATE.settings.musicVol, t + 0.001);
   g.gain.exponentialRampToValueAtTime(0.0001, t + 0.04);
   src.connect(hp); hp.connect(g); g.connect(audio.musicGain);
   src.start(t, 0, 0.06);
@@ -3508,8 +3961,10 @@ function beep(freq, dur, type, gain) {
   const g = audio.ctx.createGain();
   osc.type = type || "square";
   osc.frequency.value = freq;
+  const sfxPeak = (gain || 0.1) * STATE.settings.sfxVol;
+  if (sfxPeak <= 0) { osc.start(t); osc.stop(t); return; } // muted — skip
   g.gain.setValueAtTime(0, t);
-  g.gain.linearRampToValueAtTime(gain || 0.1, t + 0.005);
+  g.gain.linearRampToValueAtTime(sfxPeak, t + 0.005);
   g.gain.exponentialRampToValueAtTime(0.001, t + dur);
   osc.connect(g); g.connect(audio.master);
   osc.start(t);
@@ -3524,6 +3979,9 @@ function boot() {
   canvas = document.getElementById("game");
   ctx = canvas.getContext("2d");
   ctx.imageSmoothingEnabled = false;
+
+  // Load persisted settings before any music starts (3.3).
+  loadSettings();
 
   generateMap(123);
 

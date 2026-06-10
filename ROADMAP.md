@@ -112,9 +112,14 @@ Check off with a one-line note when done. Mark `BLOCKED:`/`PARKED:` per rules.
   summon menu's highlighted item (clipped 1.5× portrait, HP/element/MP cost,
   avg ELEM_MATRIX hint strong/even/weak vs foe, stat row).
   [claude-sonnet-4-6 | medium]
-- [ ] 3.3 Settings & help: gear menu (music track, music/SFX volume, battle
-  scene on/off toggle for fast play), `?` overlay with controls + element
-  wheel diagram. [claude-sonnet-4-6 | medium]
+- [x] 3.3 Settings & help (S4): STATE.settings {musicVol, sfxVol, battleScene}
+  persisted to localStorage ("wraithspire.settings.v1", incl. trackIndex);
+  topbar gear/? buttons (topBarButtonRects shared by render+click); settings
+  overlay (track </>, 10-seg vol bars + MUTE, battle scene ON/OFF, all rects
+  from settingsRects); help overlay (controls list + ELEM_MATRIX pentagon
+  wheel). Battle-scene OFF → beginBattle resolves instantly via extracted
+  applySwing (same dmg/XP/floats path, no cutaway). musicVol multiplies the
+  five music voices, sfxVol multiplies beep. [claude-sonnet-4-6 | medium]
 - [ ] 3.4 Keyboard layer: arrow/WASD cursor + Enter select, Tab cycle unready
   units, E end turn, Esc cancel — full match playable mouse-free.
   [claude-sonnet-4-6 | medium]
