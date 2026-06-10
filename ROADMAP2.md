@@ -16,9 +16,13 @@ Tag legend: `[model | effort]` routing hints, same rubric as v1.
 
 ## Phase 1 — Combat core: abilities, statuses, weather
 
-- [ ] 1.1 Status engine: u.status {key:turns} — burn/slow/regen ticks +
-  bulwark/ward/mark turn-scoped flags; endTurn ticking; slow hook in
-  computeReachable; map icons + card line. [claude-opus-4-8 | high]
+- [x] 1.1 Status engine (S1): section 17 — STATUS_META, addStatus (max-merge),
+  hasStatus, effectiveMove (slow → max(1, move−2)), tickStatuses (burn −3 w/
+  death handling, regen +2 capped, decrement-and-delete, checkWinCondition);
+  endTurn ticks incoming player pre-heal-loop w/ gameover guard; one Dijkstra
+  budget read swapped to effectiveMove; map status dots + card status line
+  (card h +12). Spec-reviewed ✅, quality-reviewed (2 nits, accepted).
+  [claude-opus-4-8 | high]
 - [ ] 1.2 Ability framework + first 4: ABILITIES table, per-type `ability`
   key (evolved −1 cd), u.cd ticking, "Ability" post-move menu entry, resolve
   + floats/sfx. Ships Heal Pulse, Quake, Skitter, Frost Bite.

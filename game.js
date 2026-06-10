@@ -828,7 +828,7 @@ function computeReachable(unit) {
       const step = moveCostFor(unit, cell);
       if (!isFinite(step)) continue;
       const newCost = cur.cost + step;
-      if (newCost > unit.move) continue;
+      if (newCost > effectiveMove(unit)) continue;
       const key = hexKey(n.q, n.r);
       const existing = out.get(key);
       if (!existing || existing.cost > newCost) {
@@ -3084,6 +3084,17 @@ function renderUnits() {
       }
     }
 
+    // status dots: up to 3 colored 3×3 px squares centered under the unit
+    if (u.status) {
+      const keys = Object.keys(u.status).filter(k => u.status[k] > 0);
+      const show = keys.slice(0, 3);
+      const dotSpan = show.length * 5 - 2; // total width (3px dot + 2px gap each, no trailing gap)
+      for (let di = 0; di < show.length; di++) {
+        ctx.fillStyle = STATUS_META[show[di]] ? STATUS_META[show[di]].color : "#ffffff";
+        ctx.fillRect(p.x - Math.floor(dotSpan / 2) + di * 5, p.y + 33, 3, 3);
+      }
+    }
+
     if (u.isMaster) {
       ctx.fillStyle = PAL.gold;
       ctx.fillRect(p.x - 5, p.y - 26, 10, 2);
@@ -3308,7 +3319,9 @@ function drawUnitCard(u, y) {
   const x = SIDEBAR_X + 10, w = SIDEBAR_W - 20;
   const sel = STATE.selected;
   const showForecast = sel && sel !== u && sel.hp > 0 && sel.owner !== u.owner;
-  const h = 112 + (showForecast ? 44 : 0);
+  const statusKeys = u.status ? Object.keys(u.status).filter(k => u.status[k] > 0) : [];
+  const showStatus = statusKeys.length > 0;
+  const h = 112 + (showStatus ? 12 : 0) + (showForecast ? 44 : 0);
   // never collide with the battle log strip at the sidebar bottom
   if (y + h > CANVAS_H - 178) y = CANVAS_H - 178 - h;
 
@@ -3375,9 +3388,17 @@ function drawUnitCard(u, y) {
     }
   }
 
+  // status labels: one 9px line listing active effect names (option a: card height +12)
+  if (showStatus) {
+    ctx.font = "9px 'Courier New', monospace";
+    ctx.fillStyle = PAL.inkDim;
+    ctx.textAlign = "left";
+    ctx.fillText(statusKeys.map(k => STATUS_META[k] ? STATUS_META[k].label : k).join(" · "), x + 8, y + 114);
+  }
+
   if (showForecast) {
     const f = forecastBattle(sel, u);
-    const fy = y + 112;
+    const fy = y + 112 + (showStatus ? 12 : 0);
     ctx.fillStyle = "#0e0c1a";
     ctx.fillRect(x + 4, fy, w - 8, 36);
     ctx.font = "bold 10px 'Courier New', monospace";
@@ -4501,6 +4522,8 @@ function endTurn() {
     m.mp = Math.min(m.maxMp, m.mp + regen);
     pushLog(PLAYERS[STATE.currentPlayer].name + " gains " + regen + " MP (towers +" + towerBonus + ").", PAL.inkDim);
   }
+  tickStatuses(STATE.currentPlayer);
+  if (STATE.screen !== "play") return; // burn-kill may have ended the match
   for (const u of aliveUnits(STATE.currentPlayer)) {
     u.acted = false;
     const c = cellAt({ q: u.q, r: u.r });
@@ -5342,6 +5365,60 @@ function loop() {
 }
 
 window.addEventListener("DOMContentLoaded", boot);
+
+// =========================================================================
+// 17. Status effects (v2 1.1)
+// =========================================================================
+
+const STATUS_META = {
+  burn:    { color: "#e07050", label: "burning" },
+  slow:    { color: "#5aa8d8", label: "slowed" },
+  regen:   { color: "#7ac075", label: "regenerating" },
+  bulwark: { color: "#f0c674", label: "bulwark +2 DEF" },
+  ward:    { color: "#b078c8", label: "warded" },
+  mark:    { color: "#ff8888", label: "marked +20% dmg taken" },
+};
+
+function addStatus(unit, key, turns) {
+  if (!unit.status) unit.status = {};
+  unit.status[key] = Math.max(unit.status[key] || 0, turns);
+}
+
+function hasStatus(unit, key) {
+  return !!(unit.status && unit.status[key] > 0);
+}
+
+// Movement allowance after statuses (weather hook lands in 1.5).
+function effectiveMove(unit) {
+  let m = unit.move;
+  if (hasStatus(unit, "slow")) m = Math.max(1, m - 2);
+  return m;
+}
+
+// Tick all statuses for `owner`'s units at the start of their turn.
+// Called from endTurn right after the player switch.
+function tickStatuses(owner) {
+  for (const u of aliveUnits(owner)) {
+    if (!u.status) continue;
+    if (u.status.burn > 0) {
+      u.hp = Math.max(0, u.hp - 3);
+      pushAnim("float", u.q, u.r, "-3 burn", PAL.red);
+      if (u.hp <= 0) {
+        pushLog(u.name + " succumbs to burns.", "#ff8888");
+        if (STATE.stats) STATE.stats.lost[u.owner]++;
+      }
+    }
+    if (u.status.regen > 0 && u.hp > 0 && u.hp < u.maxHp) {
+      const heal = Math.min(2, u.maxHp - u.hp);
+      u.hp += heal;
+      pushAnim("float", u.q, u.r, "+" + heal, "#5fd06a");
+    }
+    for (const k of Object.keys(u.status)) {
+      if (--u.status[k] <= 0) delete u.status[k];
+    }
+  }
+  checkWinCondition(); // burn can kill — even a master
+}
 
 // ---------------------------------------------------------------------------
 // Headless smoke-test hooks
