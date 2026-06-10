@@ -3,6 +3,7 @@ extends SceneTree
 ##   godot --headless --path godot --script res://tests/run_tests.gd
 ## Exits 0 if all asserts pass, 1 otherwise. Pure-logic tests only (no display).
 const HexLib = preload("res://core/hex.gd")
+const Rng = preload("res://core/rng.gd")
 
 var _passed := 0
 var _failed := 0
@@ -10,6 +11,7 @@ var _failed := 0
 func _initialize() -> void:
 	_test_harness_smoke()
 	_test_hex()
+	_test_rng()
 	print("\n== %d passed, %d failed ==" % [_passed, _failed])
 	quit(1 if _failed > 0 else 0)
 
@@ -48,3 +50,14 @@ func _test_hex() -> void:
 	# pixel round-trip: a hex center maps back to its own axial
 	for a in [Vector2i(0, 0), Vector2i(3, -2), Vector2i(-4, 5), Vector2i(7, 0), Vector2i(0, 6)]:
 		_eq(HexLib.pixel_to_axial(HexLib.axial_to_pixel(a)), a, "round-trip %s" % str(a))
+
+func _test_rng() -> void:
+	# Bit-exact uint32 sequence for seed 12345, captured from the JS reference.
+	var r := Rng.new(12345)
+	var want := [4207900869, 1317490944, 2079646450, 3513001552, 2187978186]
+	for i in range(want.size()):
+		_eq(r.next_u32(), want[i], "rng: u32[%d] seed 12345" % i)
+	# next() is the uint32 divided by 2^32 (same arithmetic as JS).
+	_eq(Rng.new(12345).next(), 4207900869.0 / 4294967296.0, "rng: next() float")
+	# below(n) = floor(next()*n); seed 0 first next()=0.2664... -> below(10)=2
+	_eq(Rng.new(0).below(10), 2, "rng: below(10) seed 0")
