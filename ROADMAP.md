@@ -62,13 +62,16 @@ Check off with a one-line note when done. Mark `BLOCKED:`/`PARKED:` per rules.
   endTurn), growth absorbed into evolved base, full restore. Gold ring burst +
   "EVOLVED!" + 3-note fanfare; pulsing gold halo on map + battle (sprite stubs
   reuse base ids until 5.1). [claude-opus-4-8 | high]
-- [ ] 1.3 Terrain & element depth: element↔terrain affinity (e.g. pyro +power
-  on volcano/desert, hydro on water; data table + hook in `computeDamage`),
-  defense stars shown on hover, affinity glint on favorable tiles.
+- [x] 1.3 Terrain & element depth (S2): ELEM_AFFINITY — +20% attack from a
+  terrain your element resonates with (pyro hill/mtn, hydro water/forest,
+  terra mtn/hill, zephyr plain/mtn, arcane tower/castle), hooked in
+  computeDamage. Hover sidebar shows DEF as gold diamonds + "Empowers:" element
+  codes + unit "empowered" note; selected unit's reachable favorable tiles
+  glint gold. [claude-sonnet-4-6 | medium]
+- [x] 1.4 Match stats (S2): STATE.stats tracks summoned/lost per player +
+  battles fought (incremented at summon sites & battle death frames); gameover
+  screen shows turns, battles, and an AZURE/CRIMSON summoned/lost/spires table.
   [claude-sonnet-4-6 | medium]
-- [ ] 1.4 Master death = castle fall flow: dramatic gameover sequence already
-  exists — add match stats to gameover screen (turns, units summoned/lost,
-  towers held) tallied in STATE. [claude-sonnet-4-6 | medium]
 
 ### Phase 2 — Game feel & polish
 
@@ -159,3 +162,25 @@ Risks/notes: Smoke test needs Chrome at
 recently slowed (b37e57d) — anything that adds battles to the smoke path may
 need a bigger `--virtual-time-budget`. `runDemo`-summoned units spawn with
 `acted: true`; smoke success condition is player-0 control on turn ≥ 2.
+
+## Session 2 — 2026-06-09
+Done: Phase 1 COMPLETE — 1.1 XP & leveling (gainXp at impact frames, lv1–5,
+stat growth + full heal, map pips, battle HUD XP bar + "LEVEL UP!" banner),
+1.2 Evolution (8 evolved forms + evolvesTo, tryEvolve on owned tower/castle at
+lv4+, growth absorbed, gold ring/halo + fanfare), 1.3 Terrain-element affinity
+(+20% atk on resonant terrain in computeDamage, DEF diamonds + Empowers line +
+reachable glint), 1.4 Match stats (STATE.stats, gameover summary table). Also
+gitignored `.playwright-mcp` verification artifacts.
+State: GREEN — last green commit: 41fa922
+Next: 2.1 Animated unit movement (slide hex-to-hex along Dijkstra path,
+~80ms/hex eased, camera follows, input + AI step blocked during slide).
+NEXT_MODEL: claude-opus-4-8
+NEXT_EFFORT: high
+Risks/notes: New combat fields live on the unit INSTANCE (level, xp, evolved)
+and on STATE (stats) — when save/load (6.1) serializes STATE, include these.
+computeDamage now returns `affMul`/`hasAffinity` too (for future damage
+forecast in 3.1). Evolved types reuse base sprite ids as STUBS — real art is
+milestone 5.1; the gold halo is the only current visual tell. Verified hover/
+glint via Playwright over a local `python -m http.server` (file:// is blocked
+in the Playwright MCP). A stray `python -m http.server 8765` may still be
+running in the background from this session — harmless, dies with the shell.
