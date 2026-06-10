@@ -640,8 +640,9 @@ function computeAttackTargets(unit, fromQ, fromR) {
   return set;
 }
 
+// Any unit can flip a spire (4.1) — matches the original game, and gives the
+// AI's grunts a reason to spread out.
 function canCapture(unit, cell) {
-  if (!unit.isMaster) return false;
   if (!cell) return false;
   if (cell.terrain !== "tower") return false;
   return cell.owner !== unit.owner;
@@ -836,6 +837,77 @@ function checkWinCondition() {
 // 8. AI opponent
 // =========================================================================
 
+// ---- AI v2 (4.1) -----------------------------------------------------------
+// Decisions are scored against a per-turn threat map (how much damage the
+// enemy could land on each tile next turn) plus exact damage forecasts from
+// forecastBattle. Tuning lives in AI_W so difficulty levels (4.3) can swap
+// weight profiles without touching the logic.
+const AI_W = {
+  killBonus: 30,       // a confirmed kill (worst roll still lethal)
+  masterBonus: 18,     // hitting the enemy archon
+  focusFire: 10,       // × target's missing-hp fraction — finish wounded units
+  counterRisk: 0.8,    // × counter damage we'd eat if the target survives
+  counterDeath: 25,    // extra penalty when the counter could kill us
+  terrainDef: 2.0,     // per defense point of the tile we end on
+  threatSafe: 0.35,    // threat weight on end tile while healthy
+  threatHurt: 1.1,     // threat weight while wounded
+  approach: 1.2,       // per-hex pull toward the enemy master (move-only)
+  captureBonus: 26,    // value of flipping a spire
+  retreatHpFrac: 0.35, // below this hp fraction a unit looks for heal tiles
+  atkFloor: 0,         // minimum attack score worth taking
+};
+
+// Sum of potential enemy damage onto every tile: each enemy's reachable
+// nodes are expanded by its attack range. One enemy contributes at most once
+// per tile; separate enemies stack. Built once per AI turn (the defending
+// player's units don't move while the AI acts).
+function buildThreatMap(owner) {
+  const threat = new Map();
+  for (const e of aliveUnits(1 - owner)) {
+    const seen = new Set();
+    const mark = (q, r) => {
+      const k = hexKey(q, r);
+      if (seen.has(k)) return;
+      seen.add(k);
+      threat.set(k, (threat.get(k) || 0) + e.power);
+    };
+    const reach = computeReachable(e);
+    for (const [, node] of reach) {
+      for (const n1 of hexNeighbors(node.q, node.r)) {
+        mark(n1.q, n1.r);
+        if (e.range >= 2) for (const n2 of hexNeighbors(n1.q, n1.r)) mark(n2.q, n2.r);
+      }
+    }
+  }
+  return threat;
+}
+
+// Flip a tower to `unit`'s owner with the shared log/anim/sfx. Player menu
+// and both AI capture paths all route through here.
+function captureTower(unit, cell) {
+  cell.owner = unit.owner;
+  pushLog(unit.name + " captures a spire.");
+  pushAnim("capture", cell.q, cell.r, "CAPTURED", PAL.gold, "120, 220, 240");
+  beep(520, 0.12, "triangle", 0.18);
+}
+
+// Best reachable tile for a wounded unit: close to an owned heal tile
+// (tower/castle), low threat, decent cover.
+function aiRetreatNode(u, reach, threatAt) {
+  const heals = [];
+  for (const cell of MAP.cells.values()) {
+    if ((cell.terrain === "tower" || cell.terrain === "castle") && cell.owner === u.owner) heals.push(cell);
+  }
+  let best = null, bestScore = Infinity;
+  for (const [, node] of reach) {
+    const dHeal = heals.length ? Math.min(...heals.map(h => hexDistance(node, h))) : 0;
+    const tdef = TERRAIN[cellAt(node).terrain].def;
+    const s = dHeal * 2 + threatAt(node.q, node.r) * 1.5 - tdef * 1.5;
+    if (s < bestScore) { bestScore = s; best = node; }
+  }
+  return best;
+}
+
 function aiTakeTurn() {
   const owner = STATE.currentPlayer;
   const myUnits = aliveUnits(owner).filter(u => !u.acted);
@@ -843,6 +915,7 @@ function aiTakeTurn() {
   const enemyMaster = masterOf(1 - owner);
   if (!enemyMaster) { endTurn(); return; }
   const queue = [...myUnits];
+  const threat = buildThreatMap(owner);
 
   function step() {
     if (STATE.screen === "gameover") return;
@@ -856,86 +929,117 @@ function aiTakeTurn() {
     }
     const u = queue.shift();
     if (u.hp <= 0) { step(); return; }
-    aiActUnit(u, enemyMaster, step);
+    aiActUnit(u, enemyMaster, step, threat);
   }
   setTimeout(step, 600);
 }
 
-function aiActUnit(u, enemyMaster, done) {
+function aiActUnit(u, enemyMaster, done, threat) {
   const reach = computeReachable(u);
+  const threatAt = (q, r) => threat.get(hexKey(q, r)) || 0;
+  const lowHp = u.hp < u.maxHp * AI_W.retreatHpFrac;
+  const finish = () => { u.acted = true; setTimeout(done, 260); };
 
-  if (u.isMaster) {
-    let bestTower = null, bestTowerCost = Infinity;
-    for (const t of MAP.towers) {
-      if (t.owner === u.owner) continue;
-      const k = hexKey(t.q, t.r);
-      const node = reach.get(k);
-      if (!node) continue;
-      const threat = enemyAdjacentThreat(t.q, t.r, u.owner);
-      if (threat > u.hp * 0.6) continue;
-      if (node.cost < bestTowerCost) { bestTower = t; bestTowerCost = node.cost; }
-    }
-    if (bestTower) {
-      startMove(u, bestTower.q, bestTower.r, reach, () => {
-        const cell = cellAt(bestTower);
-        if (cell && cell.terrain === "tower" && cell.owner !== u.owner) {
-          cell.owner = u.owner;
-          pushLog(u.name + " claims a spire.");
-          pushAnim("capture", bestTower.q, bestTower.r, "CAPTURED", PAL.gold, "120, 220, 240");
-          beep(520, 0.12, "triangle", 0.18);
-        }
-        u.acted = true;
-        setTimeout(done, 260);
-      });
-      return;
-    }
-  }
-
-  let best = null;
-  for (const [k, node] of reach) {
+  // ---- Score every (end tile, target) attack pair with exact damage math.
+  // u.q/u.r are temporarily set to the candidate tile so computeDamage sees
+  // the right attacker terrain/affinity; restored right after the loop.
+  let bestAtk = null;
+  const oq = u.q, oRr = u.r;
+  for (const [, node] of reach) {
     const targets = computeAttackTargets(u, node.q, node.r);
+    if (!targets.size) continue;
+    u.q = node.q; u.r = node.r;
+    const tdef = TERRAIN[cellAt(node).terrain].def;
     for (const tk of targets) {
-      const enemy = STATE.units.find(e => hexKey(e.q, e.r) === tk && e.hp > 0);
+      const enemy = STATE.units.find(e => e.hp > 0 && hexKey(e.q, e.r) === tk);
       if (!enemy) continue;
-      const elemMul = ELEM_MATRIX[u.element][enemy.element];
-      const expected = u.power * elemMul - enemy.def * 0.6;
-      const killBonus = expected >= enemy.hp ? 25 : 0;
-      const masterBonus = enemy.isMaster ? 18 : 0;
-      const distAfter = hexDistance({ q: node.q, r: node.r }, enemyMaster);
-      const score = expected + killBonus + masterBonus - distAfter * 0.5;
-      if (!best || score > best.score) best = { score, moveTo: node, target: enemy };
+      const f = forecastBattle(u, enemy);
+      const kills = enemy.hp <= f.lo; // worst roll still lethal → no counter
+      let score = (f.lo + f.hi) / 2;
+      if (kills) score += AI_W.killBonus;
+      if (enemy.isMaster) score += AI_W.masterBonus;
+      score += AI_W.focusFire * (1 - enemy.hp / enemy.maxHp); // focus fire
+      if (!kills && f.canCounter) {
+        score -= f.cHi * AI_W.counterRisk;
+        if (u.hp <= f.cHi) score -= AI_W.counterDeath;
+      }
+      score += tdef * AI_W.terrainDef * 0.5;
+      score -= threatAt(node.q, node.r) * (lowHp ? AI_W.threatHurt : AI_W.threatSafe) * 0.5;
+      if (!bestAtk || score > bestAtk.score) bestAtk = { score, node, enemy, kills };
     }
   }
+  u.q = oq; u.r = oRr;
 
-  if (best) {
-    startMove(u, best.moveTo.q, best.moveTo.r, reach, () => {
-      u.acted = true;
-      beginBattle(u, best.target, () => setTimeout(done, 400));
+  const attack = () => startMove(u, bestAtk.node.q, bestAtk.node.r, reach, () => {
+    u.acted = true;
+    beginBattle(u, bestAtk.enemy, () => setTimeout(done, 400));
+  });
+
+  // ---- 1. Confirmed kills are always worth taking (no counter comes back).
+  // The master still refuses if the end tile is hot enough to kill it next turn.
+  if (bestAtk && bestAtk.kills && !(u.isMaster && threatAt(bestAtk.node.q, bestAtk.node.r) >= u.hp)) {
+    attack();
+    return;
+  }
+
+  // ---- 2. Wounded units fall back toward owned heal tiles.
+  if (lowHp) {
+    const node = aiRetreatNode(u, reach, threatAt);
+    if (node) { startMove(u, node.q, node.r, reach, finish); return; }
+  }
+
+  // ---- 3. Capture: any unit can flip a spire now. Score it against the
+  // best attack so a juicy kill still wins over a grab.
+  let bestCap = null;
+  for (const t of MAP.towers) {
+    if (t.owner === u.owner) continue;
+    const node = reach.get(hexKey(t.q, t.r));
+    if (!node) continue;
+    const heat = threatAt(t.q, t.r);
+    if (heat >= u.hp) continue; // don't capture into certain death
+    const capScore = AI_W.captureBonus - heat * 0.5 - node.cost;
+    if (!bestCap || capScore > bestCap.score) bestCap = { score: capScore, node, cell: cellAt(t) };
+  }
+  if (bestCap && (!bestAtk || bestCap.score > bestAtk.score)) {
+    startMove(u, bestCap.node.q, bestCap.node.r, reach, () => {
+      if (bestCap.cell && bestCap.cell.terrain === "tower" && bestCap.cell.owner !== u.owner) captureTower(u, bestCap.cell);
+      finish();
     });
     return;
   }
 
-  let bestStep = null, bestDist = Infinity;
-  for (const [k, node] of reach) {
-    if (unitAt(node.q, node.r) && !(node.q === u.q && node.r === u.r)) continue;
-    const d = hexDistance({ q: node.q, r: node.r }, enemyMaster);
-    if (d < bestDist) { bestDist = d; bestStep = node; }
+  // ---- 4. Plain attacks need to clear the floor; the master is choosier
+  // (it never trades into tiles where the standing threat outweighs it).
+  if (bestAtk && bestAtk.score > AI_W.atkFloor &&
+      !(u.isMaster && (bestAtk.score < 8 || threatAt(bestAtk.node.q, bestAtk.node.r) > u.hp * 0.6))) {
+    attack();
+    return;
+  }
+
+  // ---- 5. Move-only. Non-masters advance on the enemy master, shaped by
+  // cover and threat. The master instead drifts toward the nearest unowned
+  // spire (its capture branch handles the final hop) and otherwise holds on
+  // safe, defensible ground.
+  let bestStep = null, bestScore = -Infinity;
+  const unownedTowers = MAP.towers.filter(t => t.owner !== u.owner);
+  for (const [, node] of reach) {
+    const tdef = TERRAIN[cellAt(node).terrain].def;
+    let s = tdef * AI_W.terrainDef - threatAt(node.q, node.r) * (u.isMaster ? AI_W.threatHurt : AI_W.threatSafe);
+    if (u.isMaster) {
+      if (unownedTowers.length) {
+        const dTower = Math.min(...unownedTowers.map(t => hexDistance(node, t)));
+        s -= dTower * 0.8;
+      }
+    } else {
+      s -= hexDistance(node, enemyMaster) * AI_W.approach;
+    }
+    if (s > bestScore) { bestScore = s; bestStep = node; }
   }
   if (bestStep) {
-    startMove(u, bestStep.q, bestStep.r, reach, () => { u.acted = true; setTimeout(done, 260); });
+    startMove(u, bestStep.q, bestStep.r, reach, finish);
   } else {
-    u.acted = true;
-    setTimeout(done, 260);
+    finish();
   }
-}
-
-function enemyAdjacentThreat(q, r, owner) {
-  let total = 0;
-  for (const n of hexNeighbors(q, r)) {
-    const u = unitAt(n.q, n.r);
-    if (u && u.owner !== owner) total += u.power;
-  }
-  return total;
 }
 
 function aiTrySummons(master) {
@@ -3431,12 +3535,7 @@ function selectMenuItem(item) {
     STATE.menu = null;
   } else if (item.kind === "capture") {
     const cell = cellAt({ q: unit.q, r: unit.r });
-    if (cell && cell.terrain === "tower") {
-      cell.owner = unit.owner;
-      pushLog(unit.name + " captures a spire.");
-      pushAnim("capture", unit.q, unit.r, "CAPTURED", PAL.gold, "120, 220, 240");
-      beep(520, 0.12, "triangle", 0.18);
-    }
+    if (cell && cell.terrain === "tower") captureTower(unit, cell);
     unit.acted = true; closeMenu();
   } else if (item.kind === "summon") {
     const items = SUMMON_LIST.map(k => {

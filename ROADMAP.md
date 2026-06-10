@@ -130,10 +130,16 @@ Check off with a one-line note when done. Mark `BLOCKED:`/`PARKED:` per rules.
 
 ### Phase 4 — AI opponents
 
-- [ ] 4.1 AI v2 core: threat-map evaluation (per-tile enemy reach), retreat
-  when low HP toward heal tiles, prefer high-defense terrain when ending
-  moves, focus-fire to confirm kills, non-master units capture towers too.
-  [claude-fable-5 | high]
+- [x] 4.1 AI v2 core (S4): buildThreatMap (per-enemy reach × attack range,
+  stacked dmg per tile, built once/turn); aiActUnit rewritten as scored
+  decision tree — confirmed kills always taken (no counter on lethal), wounded
+  retreat via aiRetreatNode (heal-tile distance + threat + cover), capture
+  scored vs attack (any unit captures now — canCapture isMaster check dropped,
+  shared captureTower helper), attacks use forecastBattle exact bases w/
+  counter-risk/-death penalties + focus-fire bonus, move-only shaped by
+  terrain def + threat (master drifts to unowned spires, never beelines).
+  Weights in AI_W for 4.3 difficulty profiles. Soak: 16 turns headless, 0
+  errors, all 4 spires by t8, master untouched. [claude-fable-5 | high]
 - [ ] 4.2 Summon economy: pick summons by element counters vs player army +
   map terrain, save MP for big units when ahead, emergency cheap bodies when
   master threatened. [claude-opus-4-8 | high]
