@@ -98,7 +98,7 @@ Check off with a one-line note when done. Mark `BLOCKED:`/`PARKED:` per rules.
   accent rules + in/out fade. Battle cutaway already had its bar-wipe in/out.
   [claude-sonnet-4-6 | medium]
 
-### Phase 3 — UI/UX
+### Phase 3 — UI/UX  ✅ COMPLETE (S4)
 
 - [x] 3.1 Unit info panel (S4): drawUnitCard in sidebar — portrait (map sprite
   1.5× in element-rimmed clipped box), owner/Lv/element, HP/MP/XP bars, stat
@@ -120,8 +120,12 @@ Check off with a one-line note when done. Mark `BLOCKED:`/`PARKED:` per rules.
   wheel). Battle-scene OFF → beginBattle resolves instantly via extracted
   applySwing (same dmg/XP/floats path, no cutaway). musicVol multiplies the
   five music voices, sfxVol multiplies beep. [claude-sonnet-4-6 | medium]
-- [ ] 3.4 Keyboard layer: arrow/WASD cursor + Enter select, Tab cycle unready
-  units, E end turn, Esc cancel — full match playable mouse-free.
+- [x] 3.4 Keyboard layer (S4): STATE.cursor hex cursor (arrows/WASD, parity
+  zigzag for visual up/down, camera follows near edges, syncs STATE.hover so
+  the card/forecast work); Enter acts via interactAt (extracted from onClick —
+  shared mouse/keyboard core); Tab cycles ready units (clears selection first
+  so interactAt can't misread it as a move); Esc clears overlay→menu→selection
+  →cursor. Old arrow camera-pan removed; help text updated.
   [claude-sonnet-4-6 | medium]
 
 ### Phase 4 — AI opponents

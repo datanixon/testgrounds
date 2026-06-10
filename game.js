@@ -457,6 +457,7 @@ const STATE = {
   attackTargets: null,
   menu: null,
   hover: null,
+  cursor: null,    // {q,r} keyboard hex cursor (3.4); null = inactive
   banner: null,
   log: [],
   winner: null,
@@ -520,6 +521,7 @@ function startNewGame() {
   STATE.selected = null;
   STATE.reachable = null;
   STATE.attackTargets = null;
+  STATE.cursor = null;
   STATE.menu = null;
   STATE.banner = { text: PLAYERS[0].name + " — TURN " + STATE.turn, ttl: 90, color: PLAYERS[0].color };
   STATE.log = [];
@@ -2134,6 +2136,15 @@ function renderOverlays() {
     ctx.lineWidth = 3;
     hexPath(p.x, p.y); ctx.stroke();
   }
+  // Keyboard cursor (3.4): gold hex outline with a gentle pulse. Drawn on top
+  // of hover/selected highlights so it's always visible.
+  if (STATE.cursor && inBounds(STATE.cursor.q, STATE.cursor.r)) {
+    const p = axialToPixel(STATE.cursor.q, STATE.cursor.r);
+    const alpha = 0.55 + 0.35 * Math.sin(frame / 9);
+    ctx.strokeStyle = `rgba(240, 198, 116, ${alpha})`;
+    ctx.lineWidth = 2;
+    hexPath(p.x, p.y); ctx.stroke();
+  }
   ctx.restore();
 }
 
@@ -2986,7 +2997,9 @@ function renderHelpOverlay() {
     ["M",                "toggle music"],
     ["N",                "next music track"],
     ["Space",            "center camera on unit"],
-    ["arrows",           "pan camera"],
+    ["arrows / WASD",    "move cursor"],
+    ["Enter",            "select / act at cursor"],
+    ["Tab",              "next ready unit"],
     ["?  or  H",         "this help screen"],
     ["⚙ (top-right)",   "settings"],
   ];
@@ -3179,20 +3192,28 @@ function onClick(ev) {
   const local = pixelToAxial(p.x - STATE.cam.x, p.y - STATE.cam.y - TOPBAR_H);
   if (!inBounds(local.q, local.r)) return;
 
-  const onUnit = unitAt(local.q, local.r);
+  interactAt(local.q, local.r);
+}
+
+// Map-interaction core: select a unit, move into a reachable hex, fire an
+// attack, or deselect. Shared by mouse clicks and the keyboard cursor (3.4).
+function interactAt(q, r) {
+  if (!inBounds(q, r)) return;
+
+  const onUnit = unitAt(q, r);
 
   if (STATE.selected && STATE.reachable) {
-    const k = hexKey(local.q, local.r);
+    const k = hexKey(q, r);
     if (STATE.reachable.has(k)) {
       const unit = STATE.selected;
       const reach = STATE.reachable;
       STATE.selected = null;
       STATE.reachable = null;
       STATE.attackTargets = null;
-      startMove(unit, local.q, local.r, reach, () => openPostMoveMenu(unit));
+      startMove(unit, q, r, reach, () => openPostMoveMenu(unit));
       return;
-    } else if (STATE.attackTargets && STATE.attackTargets.has(hexKey(local.q, local.r))) {
-      const target = unitAt(local.q, local.r);
+    } else if (STATE.attackTargets && STATE.attackTargets.has(hexKey(q, r))) {
+      const target = unitAt(q, r);
       if (target) {
         const atk = STATE.selected;
         atk.acted = true;
@@ -3269,13 +3290,113 @@ function onKey(ev) {
   }
   if (ev.key === "Escape") {
     STATE.selected = null; STATE.reachable = null; STATE.attackTargets = null;
+    // If cursor was active but nothing was selected, clear it too.
+    if (!STATE.selected) STATE.cursor = null;
     return;
   }
-  const PAN = 60;
-  if (ev.key === "ArrowLeft")  STATE.camTarget.x = clampCamX(STATE.camTarget.x + PAN);
-  if (ev.key === "ArrowRight") STATE.camTarget.x = clampCamX(STATE.camTarget.x - PAN);
-  if (ev.key === "ArrowUp")    STATE.camTarget.y = clampCamY(STATE.camTarget.y + PAN);
-  if (ev.key === "ArrowDown")  STATE.camTarget.y = clampCamY(STATE.camTarget.y - PAN);
+
+  // ---- Keyboard cursor (3.4) ----
+  // Arrows and WASD move a hex cursor around the map (replaces old camera pan).
+  // The cursor's camera-follow handles panning. w/s are consumed by menu nav
+  // above (that block returns early) so they only reach here when no menu.
+  const isArrow = ev.key === "ArrowLeft" || ev.key === "ArrowRight" ||
+                  ev.key === "ArrowUp"   || ev.key === "ArrowDown";
+  const isWASD  = ev.key === "a" || ev.key === "d" ||
+                  ev.key === "w" || ev.key === "s";
+
+  if (isArrow || isWASD) {
+    ev.preventDefault();
+    // Initialize cursor if not yet active.
+    if (!STATE.cursor) {
+      if (STATE.selected) {
+        STATE.cursor = { q: STATE.selected.q, r: STATE.selected.r };
+      } else {
+        const m = masterOf(STATE.currentPlayer);
+        if (m) {
+          STATE.cursor = { q: m.q, r: m.r };
+        } else {
+          // Fallback: map centre hex.
+          const cells = [...MAP.cells.values()];
+          const mid = cells[Math.floor(cells.length / 2)];
+          STATE.cursor = { q: mid.q, r: mid.r };
+        }
+      }
+    }
+    const cq = STATE.cursor.q, cr = STATE.cursor.r;
+    let nq = cq, nr = cr;
+    // Pointy-top axial zigzag: up/down pick the diagonal that keeps the cursor
+    // visually above/below the current hex. The choice depends on row parity.
+    // "r odd" means the row index is odd (using standard offset parity).
+    if (ev.key === "ArrowLeft"  || ev.key === "a") { nq = cq - 1; nr = cr; }
+    if (ev.key === "ArrowRight" || ev.key === "d") { nq = cq + 1; nr = cr; }
+    if (ev.key === "ArrowUp"    || ev.key === "w") {
+      // Preferred: r odd → NE(+1,-1); r even → NW(0,-1)
+      if ((cr & 1) === 1) { nq = cq + 1; nr = cr - 1; }
+      else                { nq = cq;     nr = cr - 1; }
+      // Fallback: if preferred is out of bounds, try the other diagonal.
+      if (!inBounds(nq, nr)) {
+        if ((cr & 1) === 1) { nq = cq;     nr = cr - 1; }
+        else                { nq = cq + 1; nr = cr - 1; }
+      }
+      if (!inBounds(nq, nr)) { nq = cq; nr = cr; } // both fail: stay
+    }
+    if (ev.key === "ArrowDown"  || ev.key === "s") {
+      // Preferred: r odd → SE(0,+1); r even → SW(-1,+1)
+      if ((cr & 1) === 1) { nq = cq;     nr = cr + 1; }
+      else                { nq = cq - 1; nr = cr + 1; }
+      // Fallback: try the other diagonal.
+      if (!inBounds(nq, nr)) {
+        if ((cr & 1) === 1) { nq = cq - 1; nr = cr + 1; }
+        else                { nq = cq;     nr = cr + 1; }
+      }
+      if (!inBounds(nq, nr)) { nq = cq; nr = cr; } // both fail: stay
+    }
+    STATE.cursor = { q: nq, r: nr };
+    STATE.hover  = { q: nq, r: nr };   // sidebar card + forecast
+
+    // Follow cursor: if it's near the viewport edge, ease the camera to it.
+    const cp = axialToPixel(nq, nr);
+    const visL = -STATE.cam.x, visR = -STATE.cam.x + MAP_W;
+    const visT = -STATE.cam.y, visB = -STATE.cam.y + MAP_H;
+    const edgePad = HEX_SIZE * 1.5;
+    if (cp.x < visL + edgePad || cp.x > visR - edgePad ||
+        cp.y < visT + edgePad || cp.y > visB - edgePad) {
+      centerCameraOn({ q: nq, r: nr });
+    }
+    return;
+  }
+
+  // Enter confirms action at the cursor hex (or no-op if cursor not set).
+  if (ev.key === "Enter") {
+    if (!STATE.cursor) return;
+    interactAt(STATE.cursor.q, STATE.cursor.r);
+    return;
+  }
+
+  // Tab cycles through the current player's ready units (non-AI turn only).
+  if (ev.key === "Tab") {
+    ev.preventDefault();
+    if (PLAYERS[STATE.currentPlayer].isAI) return;
+    const ready = STATE.units.filter(
+      u => u.hp > 0 && !u.acted && u.owner === STATE.currentPlayer
+    );
+    if (!ready.length) return;
+    // Find the index after the currently selected unit; wrap around.
+    let idx = 0;
+    if (STATE.selected) {
+      const cur = ready.indexOf(STATE.selected);
+      if (cur >= 0) idx = (cur + 1) % ready.length;
+    }
+    const next = ready[idx];
+    // Drop any live selection first so interactAt can't read the next unit's
+    // hex as a move/attack destination for the previously selected unit.
+    STATE.selected = null; STATE.reachable = null; STATE.attackTargets = null;
+    interactAt(next.q, next.r);  // select it the same way a click would
+    STATE.cursor = { q: next.q, r: next.r };
+    STATE.hover  = { q: next.q, r: next.r };
+    centerCameraOn({ q: next.q, r: next.r });
+    return;
+  }
 }
 
 function mapPixelWidth() { return HEX_STEP_X * (COLS + 0.5) + 12; }
