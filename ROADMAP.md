@@ -91,8 +91,12 @@ Check off with a one-line note when done. Mark `BLOCKED:`/`PARKED:` per rules.
   (instant flag for fresh match); arrows + move-follow + battle handoff all set
   the target. RTS edge-pan from parked mouse (STATE.mouse, cleared on
   mouseleave); Space centers on selected unit / active master. [claude-sonnet-4-6 | medium]
-- [ ] 2.4 Transitions: title→play wipe, battle cutaway iris-in/out,
-  turn-banner slide+fade restyle, gameover fade. [claude-sonnet-4-6 | medium]
+- [x] 2.4 Transitions (S3): generic STATE.transition overlay (renderTransition
+  drawn over every screen) — 'wipe' uncovers left→right with a gold leading
+  edge (title→play), 'fade' dissolves from black (→ victory screen). Turn
+  banner restyled: slides in from the left (easeOutCubic) with player-tinted
+  accent rules + in/out fade. Battle cutaway already had its bar-wipe in/out.
+  [claude-sonnet-4-6 | medium]
 
 ### Phase 3 — UI/UX
 

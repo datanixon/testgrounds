@@ -467,6 +467,7 @@ const STATE = {
   animations: [],
   battle: null,      // active battle scene; see startBattle()
   moveAnim: null,    // active hex-to-hex slide; see startMove()/updateMove()
+  transition: null,  // full-screen scene wipe/fade; see renderTransition()
   music: { wanted: true, started: false, trackIndex: 0 },
 };
 
@@ -484,10 +485,11 @@ function startNewGame() {
   STATE.reachable = null;
   STATE.attackTargets = null;
   STATE.menu = null;
-  STATE.banner = { text: PLAYERS[0].name + " — TURN " + STATE.turn, ttl: 90 };
+  STATE.banner = { text: PLAYERS[0].name + " — TURN " + STATE.turn, ttl: 90, color: PLAYERS[0].color };
   STATE.log = [];
   STATE.winner = null;
   STATE.screen = "play";
+  startTransition("wipe", 30);   // title → play uncover
   STATE.pendingAI = false;
   STATE.battle = null;
   STATE.stats = { summoned: [0, 0], lost: [0, 0], battles: 0 };
@@ -755,6 +757,7 @@ function checkWinCondition() {
     if (!m) {
       STATE.winner = 1 - p.id;
       STATE.screen = "gameover";
+      startTransition("fade", 45);   // dissolve into the victory screen
       pushLog(PLAYERS[STATE.winner].name + " is victorious!");
       beep(440, 0.2, "triangle", 0.25);
       setTimeout(() => beep(660, 0.3, "triangle", 0.25), 200);
@@ -1942,23 +1945,50 @@ function render() {
   ctx.fillStyle = PAL.bg;
   ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
 
-  if (STATE.screen === "title") { renderTitle(); return; }
-  if (STATE.screen === "gameover") { renderGameOver(); return; }
-  if (STATE.screen === "battle") {
+  if (STATE.screen === "title") {
+    renderTitle();
+  } else if (STATE.screen === "gameover") {
+    renderGameOver();
+  } else if (STATE.screen === "battle") {
     updateBattle();
     renderBattle();
-    return;
+  } else {
+    updateCamera();
+    renderMap();
+    renderOverlays();
+    renderUnits();
+    renderAnimationsMap();
+    renderTopBar();
+    renderSidebar();
+    renderMenu();
+    renderBanner();
   }
+  renderTransition();
+}
 
-  updateCamera();
-  renderMap();
-  renderOverlays();
-  renderUnits();
-  renderAnimationsMap();
-  renderTopBar();
-  renderSidebar();
-  renderMenu();
-  renderBanner();
+// Full-screen scene transition drawn over everything (2.4). 'wipe' uncovers
+// left→right; 'fade' dissolves from black. ttl counts down to 0.
+function startTransition(kind, dur) { STATE.transition = { kind, dur, ttl: dur }; }
+
+function renderTransition() {
+  const tr = STATE.transition;
+  if (!tr) return;
+  tr.ttl--;
+  if (tr.ttl <= 0) { STATE.transition = null; return; }
+  const a = tr.ttl / tr.dur; // 1 → 0
+  ctx.save();
+  if (tr.kind === "wipe") {
+    const w = Math.ceil(CANVAS_W * easeInCubic(a));
+    ctx.fillStyle = "#04030a";
+    ctx.fillRect(CANVAS_W - w, 0, w, CANVAS_H);
+    // bright leading edge
+    ctx.fillStyle = `rgba(240, 198, 116, ${a})`;
+    ctx.fillRect(CANVAS_W - w, 0, 3, CANVAS_H);
+  } else {
+    ctx.fillStyle = `rgba(4, 3, 10, ${a})`;
+    ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+  }
+  ctx.restore();
 }
 
 function renderMap() {
@@ -2362,16 +2392,32 @@ function renderMenu() {
 }
 
 function renderBanner() {
-  if (!STATE.banner) return;
-  STATE.banner.ttl--;
-  if (STATE.banner.ttl <= 0) { STATE.banner = null; return; }
-  const alpha = Math.min(1, STATE.banner.ttl / 30, (90 - STATE.banner.ttl) / 15 + 0.1);
-  ctx.fillStyle = `rgba(8, 6, 14, ${0.7 * alpha})`;
-  ctx.fillRect(0, CANVAS_H / 2 - 36, CANVAS_W, 72);
+  const b = STATE.banner;
+  if (!b) return;
+  if (b.max === undefined) b.max = b.ttl;
+  b.ttl--;
+  if (b.ttl <= 0) { STATE.banner = null; return; }
+  const inT = Math.min(1, (b.max - b.ttl) / 12);   // entry progress
+  const outT = Math.min(1, b.ttl / 16);            // exit fade
+  const alpha = Math.min(inT, outT);
+  const slide = (1 - easeOutCubic(inT)) * 70;       // text eases in from the left
+  const col = b.color || PAL.gold;
+  const cy = CANVAS_H / 2;
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  // band with player-tinted accent rules top & bottom
+  ctx.fillStyle = "rgba(8, 6, 14, 0.74)";
+  ctx.fillRect(0, cy - 34, CANVAS_W, 68);
+  ctx.fillStyle = col;
+  ctx.fillRect(0, cy - 34, CANVAS_W, 2);
+  ctx.fillRect(0, cy + 32, CANVAS_W, 2);
   ctx.font = "bold 32px 'Courier New', monospace";
   ctx.textAlign = "center";
-  ctx.fillStyle = `rgba(240, 198, 116, ${alpha})`;
-  ctx.fillText(STATE.banner.text, CANVAS_W / 2, CANVAS_H / 2 + 10);
+  ctx.fillStyle = "#000";
+  ctx.fillText(b.text, CANVAS_W / 2 - slide + 2, cy + 12);
+  ctx.fillStyle = col;
+  ctx.fillText(b.text, CANVAS_W / 2 - slide, cy + 10);
+  ctx.restore();
 }
 
 // =========================================================================
@@ -2655,7 +2701,7 @@ function endTurn() {
   STATE.selected = null;
   STATE.reachable = null;
   STATE.attackTargets = null;
-  STATE.banner = { text: PLAYERS[STATE.currentPlayer].name + " — TURN " + STATE.turn, ttl: 80 };
+  STATE.banner = { text: PLAYERS[STATE.currentPlayer].name + " — TURN " + STATE.turn, ttl: 80, color: PLAYERS[STATE.currentPlayer].color };
   checkWinCondition();
   if (STATE.screen !== "play") return;
   centerCameraOn(masterOf(STATE.currentPlayer));
