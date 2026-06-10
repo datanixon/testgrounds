@@ -128,7 +128,7 @@ Check off with a one-line note when done. Mark `BLOCKED:`/`PARKED:` per rules.
   →cursor. Old arrow camera-pan removed; help text updated.
   [claude-sonnet-4-6 | medium]
 
-### Phase 4 — AI opponents
+### Phase 4 — AI opponents  ✅ COMPLETE (S4)
 
 - [x] 4.1 AI v2 core (S4): buildThreatMap (per-enemy reach × attack range,
   stacked dmg per tile, built once/turn); aiActUnit rewritten as scored
@@ -146,9 +146,13 @@ Check off with a one-line note when done. Mark `BLOCKED:`/`PARKED:` per rules.
   >1.25×) → bank MP for cost≥12 units unless regen would overflow the cap;
   enemy within move+range of master → cheap-half flood to wall off. Verified:
   vs pyro-heavy player army AI fields hydro counters. [claude-opus-4-8 | high]
-- [ ] 4.3 Difficulty levels: Easy (current random-ish), Normal (4.1+4.2),
-  Hard (Normal + aggression tuning + perfect focus fire); title-screen
-  selector. [claude-sonnet-4-6 | medium]
+- [x] 4.3 Difficulty levels (S4): AI_W → AI_PROFILES {easy, normal, hard} +
+  aiW() getter keyed off STATE.difficulty. Easy = threat-blind, no retreat,
+  ±6 score jitter, random summons (v1 feel); Hard = bigger kill/master/focus
+  bonuses, cheap trades (counterRisk .45), approach 1.7, earlier retreat.
+  Title-screen EASY/NORMAL/HARD boxes (titleDiffRects shared render/click),
+  ←/→ keys cycle, choice persisted in the settings blob.
+  [claude-sonnet-4-6 | medium]
 
 ### Phase 5 — Content
 

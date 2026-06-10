@@ -473,6 +473,7 @@ const STATE = {
   settings: { musicVol: 1, sfxVol: 1, battleScene: true }, // 3.3
   settingsOpen: false,  // 3.3 gear overlay
   helpOpen: false,      // 3.3 ? overlay
+  difficulty: "normal", // 4.3 AI profile key; chosen on the title screen
 };
 
 // ---- Settings persistence (3.3) ----
@@ -493,6 +494,7 @@ function loadSettings() {
         saved.trackIndex >= 0 && saved.trackIndex < TRACKS.length) {
       STATE.music.trackIndex = saved.trackIndex;
     }
+    if (DIFFICULTIES.includes(saved.difficulty)) STATE.difficulty = saved.difficulty;
   } catch (_) { /* localStorage can throw on file:// in some browsers */ }
 }
 
@@ -503,6 +505,7 @@ function saveSettings() {
       sfxVol:      STATE.settings.sfxVol,
       battleScene: STATE.settings.battleScene,
       trackIndex:  STATE.music.trackIndex,
+      difficulty:  STATE.difficulty,
     };
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(blob));
   } catch (_) { /* ignore write failures */ }
@@ -840,22 +843,45 @@ function checkWinCondition() {
 // ---- AI v2 (4.1) -----------------------------------------------------------
 // Decisions are scored against a per-turn threat map (how much damage the
 // enemy could land on each tile next turn) plus exact damage forecasts from
-// forecastBattle. Tuning lives in AI_W so difficulty levels (4.3) can swap
-// weight profiles without touching the logic.
-const AI_W = {
-  killBonus: 30,       // a confirmed kill (worst roll still lethal)
-  masterBonus: 18,     // hitting the enemy archon
-  focusFire: 10,       // × target's missing-hp fraction — finish wounded units
-  counterRisk: 0.8,    // × counter damage we'd eat if the target survives
-  counterDeath: 25,    // extra penalty when the counter could kill us
-  terrainDef: 2.0,     // per defense point of the tile we end on
-  threatSafe: 0.35,    // threat weight on end tile while healthy
-  threatHurt: 1.1,     // threat weight while wounded
-  approach: 1.2,       // per-hex pull toward the enemy master (move-only)
-  captureBonus: 26,    // value of flipping a spire
-  retreatHpFrac: 0.35, // below this hp fraction a unit looks for heal tiles
-  atkFloor: 0,         // minimum attack score worth taking
+// forecastBattle. Tuning lives in AI_PROFILES (4.3): the difficulty selected
+// on the title screen swaps the weight profile without touching the logic.
+//   easy   — threat-blind, no retreat, jittered scores, random summons (v1 feel)
+//   normal — the 4.1/4.2 brain as tuned
+//   hard   — accepts trades, hunts kills and the archon, retreats earlier
+const AI_PROFILES = {
+  easy: {
+    killBonus: 18, masterBonus: 10, focusFire: 3,
+    counterRisk: 0.3, counterDeath: 5, terrainDef: 0.5,
+    threatSafe: 0, threatHurt: 0, approach: 1.0,
+    captureBonus: 18, retreatHpFrac: 0, atkFloor: 0,
+    scoreJitter: 6, randomSummons: true,
+  },
+  normal: {
+    killBonus: 30,       // a confirmed kill (worst roll still lethal)
+    masterBonus: 18,     // hitting the enemy archon
+    focusFire: 10,       // × target's missing-hp fraction — finish wounded units
+    counterRisk: 0.8,    // × counter damage we'd eat if the target survives
+    counterDeath: 25,    // extra penalty when the counter could kill us
+    terrainDef: 2.0,     // per defense point of the tile we end on
+    threatSafe: 0.35,    // threat weight on end tile while healthy
+    threatHurt: 1.1,     // threat weight while wounded
+    approach: 1.2,       // per-hex pull toward the enemy master (move-only)
+    captureBonus: 26,    // value of flipping a spire
+    retreatHpFrac: 0.35, // below this hp fraction a unit looks for heal tiles
+    atkFloor: 0,         // minimum attack score worth taking
+    scoreJitter: 0, randomSummons: false,
+  },
+  hard: {
+    killBonus: 40, masterBonus: 26, focusFire: 16,
+    counterRisk: 0.45, counterDeath: 12, terrainDef: 2.0,
+    threatSafe: 0.3, threatHurt: 0.9, approach: 1.7,
+    captureBonus: 26, retreatHpFrac: 0.28, atkFloor: -3,
+    scoreJitter: 0, randomSummons: false,
+  },
 };
+const DIFFICULTIES = ["easy", "normal", "hard"];
+
+function aiW() { return AI_PROFILES[STATE.difficulty] || AI_PROFILES.normal; }
 
 // Sum of potential enemy damage onto every tile: each enemy's reachable
 // nodes are expanded by its attack range. One enemy contributes at most once
@@ -935,9 +961,10 @@ function aiTakeTurn() {
 }
 
 function aiActUnit(u, enemyMaster, done, threat) {
+  const W = aiW();
   const reach = computeReachable(u);
   const threatAt = (q, r) => threat.get(hexKey(q, r)) || 0;
-  const lowHp = u.hp < u.maxHp * AI_W.retreatHpFrac;
+  const lowHp = u.hp < u.maxHp * W.retreatHpFrac;
   const finish = () => { u.acted = true; setTimeout(done, 260); };
 
   // ---- Score every (end tile, target) attack pair with exact damage math.
@@ -956,15 +983,16 @@ function aiActUnit(u, enemyMaster, done, threat) {
       const f = forecastBattle(u, enemy);
       const kills = enemy.hp <= f.lo; // worst roll still lethal → no counter
       let score = (f.lo + f.hi) / 2;
-      if (kills) score += AI_W.killBonus;
-      if (enemy.isMaster) score += AI_W.masterBonus;
-      score += AI_W.focusFire * (1 - enemy.hp / enemy.maxHp); // focus fire
+      if (kills) score += W.killBonus;
+      if (enemy.isMaster) score += W.masterBonus;
+      score += W.focusFire * (1 - enemy.hp / enemy.maxHp); // focus fire
       if (!kills && f.canCounter) {
-        score -= f.cHi * AI_W.counterRisk;
-        if (u.hp <= f.cHi) score -= AI_W.counterDeath;
+        score -= f.cHi * W.counterRisk;
+        if (u.hp <= f.cHi) score -= W.counterDeath;
       }
-      score += tdef * AI_W.terrainDef * 0.5;
-      score -= threatAt(node.q, node.r) * (lowHp ? AI_W.threatHurt : AI_W.threatSafe) * 0.5;
+      score += tdef * W.terrainDef * 0.5;
+      score -= threatAt(node.q, node.r) * (lowHp ? W.threatHurt : W.threatSafe) * 0.5;
+      if (W.scoreJitter) score += (Math.random() * 2 - 1) * W.scoreJitter; // easy: sloppy picks
       if (!bestAtk || score > bestAtk.score) bestAtk = { score, node, enemy, kills };
     }
   }
@@ -997,7 +1025,7 @@ function aiActUnit(u, enemyMaster, done, threat) {
     if (!node) continue;
     const heat = threatAt(t.q, t.r);
     if (heat >= u.hp) continue; // don't capture into certain death
-    const capScore = AI_W.captureBonus - heat * 0.5 - node.cost;
+    const capScore = W.captureBonus - heat * 0.5 - node.cost;
     if (!bestCap || capScore > bestCap.score) bestCap = { score: capScore, node, cell: cellAt(t) };
   }
   if (bestCap && (!bestAtk || bestCap.score > bestAtk.score)) {
@@ -1010,7 +1038,7 @@ function aiActUnit(u, enemyMaster, done, threat) {
 
   // ---- 4. Plain attacks need to clear the floor; the master is choosier
   // (it never trades into tiles where the standing threat outweighs it).
-  if (bestAtk && bestAtk.score > AI_W.atkFloor &&
+  if (bestAtk && bestAtk.score > W.atkFloor &&
       !(u.isMaster && (bestAtk.score < 8 || threatAt(bestAtk.node.q, bestAtk.node.r) > u.hp * 0.6))) {
     attack();
     return;
@@ -1024,14 +1052,14 @@ function aiActUnit(u, enemyMaster, done, threat) {
   const unownedTowers = MAP.towers.filter(t => t.owner !== u.owner);
   for (const [, node] of reach) {
     const tdef = TERRAIN[cellAt(node).terrain].def;
-    let s = tdef * AI_W.terrainDef - threatAt(node.q, node.r) * (u.isMaster ? AI_W.threatHurt : AI_W.threatSafe);
+    let s = tdef * W.terrainDef - threatAt(node.q, node.r) * (u.isMaster ? W.threatHurt : W.threatSafe);
     if (u.isMaster) {
       if (unownedTowers.length) {
         const dTower = Math.min(...unownedTowers.map(t => hexDistance(node, t)));
         s -= dTower * 0.8;
       }
     } else {
-      s -= hexDistance(node, enemyMaster) * AI_W.approach;
+      s -= hexDistance(node, enemyMaster) * W.approach;
     }
     if (s > bestScore) { bestScore = s; bestStep = node; }
   }
@@ -1052,6 +1080,7 @@ function aiTrySummons(master) {
   const owner = master.owner;
   const enemies = aliveUnits(1 - owner);
   const myArmy = aliveUnits(owner).filter(u => !u.isMaster);
+  const randomSummons = aiW().randomSummons; // easy: v1's random picks
 
   // Fraction of the map that empowers each element (+20% terrain).
   const terrFrac = {};
@@ -1083,7 +1112,9 @@ function aiTrySummons(master) {
   while (attempts-- > 0 && master.mp >= 6) {
     let pool = SUMMON_LIST.filter(k => UNIT_TYPES[k].cost <= master.mp);
     if (!pool.length) break;
-    if (emergency) {
+    if (randomSummons) {
+      pool = [pool[Math.floor(Math.random() * pool.length)]];
+    } else if (emergency) {
       // Wall off the master: cheap half of the affordable pool, best-scored.
       pool.sort((a, b) => UNIT_TYPES[a].cost - UNIT_TYPES[b].cost);
       pool = pool.slice(0, Math.max(1, Math.ceil(pool.length / 2)));
@@ -3304,7 +3335,20 @@ function menuRect(m) {
 
 function onClick(ev) {
   startMusicOnGesture();
-  if (STATE.screen === "title") { startNewGame(); return; }
+  if (STATE.screen === "title") {
+    // Clicking a difficulty box selects it; clicking anywhere else starts.
+    const p = clientToCanvas(ev);
+    for (const r of titleDiffRects()) {
+      if (p.x >= r.x && p.x <= r.x + r.w && p.y >= r.y && p.y <= r.y + r.h) {
+        STATE.difficulty = r.key;
+        saveSettings();
+        beep(520, 0.06, "triangle", 0.15);
+        return;
+      }
+    }
+    startNewGame();
+    return;
+  }
   if (STATE.screen === "gameover") { STATE.screen = "title"; return; }
   if (STATE.screen === "battle") return;
   if (STATE.moveAnim) return;
@@ -3398,6 +3442,14 @@ function onKey(ev) {
   if (ev.key === "n" || ev.key === "N") { cycleTrack(); return; }
   if (STATE.screen === "title") {
     if (ev.key === "Enter" || ev.key === " ") startNewGame();
+    // ←/→ cycle the AI difficulty (4.3)
+    if (ev.key === "ArrowLeft" || ev.key === "ArrowRight") {
+      const dir = ev.key === "ArrowLeft" ? -1 : 1;
+      const i = DIFFICULTIES.indexOf(STATE.difficulty);
+      STATE.difficulty = DIFFICULTIES[(i + dir + DIFFICULTIES.length) % DIFFICULTIES.length];
+      saveSettings();
+      beep(520, 0.06, "triangle", 0.15);
+    }
     return;
   }
   if (STATE.screen === "gameover") {
@@ -3772,6 +3824,21 @@ function renderTitle() {
     ctx.fillText(lore[i], CANVAS_W / 2, CANVAS_H * 0.84 + i * 18);
   }
 
+  // Difficulty selector (4.3) — boxes drawn from the same rects onClick tests.
+  const diffRects = titleDiffRects();
+  ctx.font = "bold 12px 'Courier New', monospace";
+  ctx.textAlign = "center";
+  for (const r of diffRects) {
+    const sel = r.key === STATE.difficulty;
+    ctx.fillStyle = sel ? PAL.gold : "rgba(31, 28, 48, 0.85)";
+    ctx.fillRect(r.x, r.y, r.w, r.h);
+    ctx.strokeStyle = sel ? PAL.gold : PAL.inkFaint;
+    ctx.lineWidth = 1;
+    ctx.strokeRect(r.x + 0.5, r.y + 0.5, r.w - 1, r.h - 1);
+    ctx.fillStyle = sel ? PAL.bg : PAL.inkDim;
+    ctx.fillText(r.key.toUpperCase(), r.x + r.w / 2, r.y + 16);
+  }
+
   const blink = Math.floor(frame / 30) % 2 === 0;
   if (blink) {
     ctx.font = "bold 16px 'Courier New', monospace";
@@ -3781,6 +3848,15 @@ function renderTitle() {
   ctx.font = "10px 'Courier New', monospace";
   ctx.fillStyle = PAL.inkFaint;
   ctx.fillText("v1.1 — press M to toggle music", CANVAS_W / 2, CANVAS_H - 12);
+}
+
+// Clickable difficulty boxes on the title screen (4.3); shared by render+click.
+function titleDiffRects() {
+  const w = 92, h = 24, gap = 14;
+  const total = DIFFICULTIES.length * w + (DIFFICULTIES.length - 1) * gap;
+  const x0 = (CANVAS_W - total) / 2;
+  const y = Math.round(CANVAS_H * 0.905) - h / 2;
+  return DIFFICULTIES.map((key, i) => ({ key, x: x0 + i * (w + gap), y, w, h }));
 }
 
 function renderGameOver() {
