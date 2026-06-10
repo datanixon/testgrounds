@@ -1208,6 +1208,10 @@ function aiActUnit(u, enemyMaster, done, threat) {
   // ---- Score every (end tile, target) attack pair with exact damage math.
   // u.q/u.r are temporarily set to the candidate tile so computeDamage sees
   // the right attacker terrain/affinity; restored right after the loop.
+  const atkAb = (() => {
+    const ab = abilityFor(u);
+    return ab && ab.target === "enemy" && u.cd <= 0 ? ab : null;
+  })();
   let bestAtk = null;
   const oq = u.q, oRr = u.r;
   for (const [, node] of reach) {
@@ -1231,14 +1235,22 @@ function aiActUnit(u, enemyMaster, done, threat) {
       score += tdef * W.terrainDef * 0.5;
       score -= threatAt(node.q, node.r) * (lowHp ? W.threatHurt : W.threatSafe) * 0.5;
       if (W.scoreJitter) score += (Math.random() * 2 - 1) * W.scoreJitter; // easy: sloppy picks
-      if (!bestAtk || score > bestAtk.score) bestAtk = { score, node, enemy, kills };
+      if (atkAb) score += 6;
+      if (!bestAtk || score > bestAtk.score) bestAtk = { score, node, enemy, kills, useAbility: !!atkAb };
     }
   }
   u.q = oq; u.r = oRr;
 
   const attack = () => startMove(u, bestAtk.node.q, bestAtk.node.r, reach, () => {
     u.acted = true;
-    beginBattle(u, bestAtk.enemy, () => setTimeout(done, 400));
+    // Don't burn the cooldown statusing a corpse — confirmed kills take the
+    // plain attack and keep the ability ready.
+    if (bestAtk.useAbility && atkAb && !bestAtk.kills) {
+      u.cd = atkAb.cd;
+      beginBattle(u, bestAtk.enemy, () => setTimeout(done, 400), { applyStatus: atkAb.status, statusTurns: atkAb.statusTurns });
+    } else {
+      beginBattle(u, bestAtk.enemy, () => setTimeout(done, 400));
+    }
   });
 
   // ---- 1. Confirmed kills are always worth taking (no counter comes back).
@@ -1252,6 +1264,18 @@ function aiActUnit(u, enemyMaster, done, threat) {
   if (lowHp) {
     const node = aiRetreatNode(u, reach, threatAt);
     if (node) { startMove(u, node.q, node.r, reach, finish); return; }
+  }
+
+  // ---- Instant abilities (1.4): fire from where we stand when the heuristic
+  // beats the best attack on offer.
+  const bestInst = aiScoreInstantAbility(u);
+  if (bestInst && (!bestAtk || bestInst.score > bestAtk.score)) {
+    const ab = abilityFor(u);
+    resolveInstantAbility(u, ab);
+    u.cd = ab.cd;
+    u.secondMove = false; // AI takes no second legs (v1 simplification)
+    finish();
+    return;
   }
 
   // ---- 3. Capture: any unit can flip a spire now. Score it against the
@@ -5752,4 +5776,38 @@ function resolveInstantAbility(unit, ab) {
     return true;
   }
   return false;
+}
+
+// Score firing the unit's instant ability from its CURRENT hex (v2 1.4).
+// Returns {score} or null. Tuned against aiActUnit's attack scores
+// (confirmed kill ≈ 30+, decent attack ≈ 8-15). Evaluated where the unit
+// stands — a documented simplification; repositioning-then-casting is not
+// searched.
+function aiScoreInstantAbility(u) {
+  const ab = abilityFor(u);
+  if (!ab || u.cd > 0 || ab.target !== "none") return null;
+  let s = 0;
+  if (ab.key === "healPulse") {
+    for (const n of hexNeighbors(u.q, u.r)) {
+      const a = unitAt(n.q, n.r);
+      if (a && a.owner === u.owner && a.hp < a.maxHp * 0.6) s += 12;
+    }
+  } else if (ab.key === "quake") {
+    for (const n of hexNeighbors(u.q, u.r)) {
+      const e = unitAt(n.q, n.r);
+      if (e && e.owner !== u.owner) s += e.hp <= 4 ? 20 : 9;
+    }
+    if (s < 18) s = 0; // not worth the action for a single soft hit
+  } else if (ab.key === "bulwark" || ab.key === "ward") {
+    if (hasStatus(u, ab.key)) return null; // never refresh an active aura
+    let allies = 0;
+    for (const n of hexNeighbors(u.q, u.r)) {
+      const a = unitAt(n.q, n.r);
+      if (a && a.owner === u.owner) allies++;
+    }
+    s = allies * 5 + 4;
+    if (s < 12) s = 0; // needs at least a small cluster to be worth a turn
+  }
+  // skitter/galeRush: movement value — out of scope for AI v1 (documented)
+  return s > 0 ? { score: s } : null;
 }

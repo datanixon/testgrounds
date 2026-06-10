@@ -44,8 +44,15 @@ Tag legend: `[model | effort]` routing hints, same rubric as v1.
   through the arm pattern (ab:null = plain attack, no cd). Spec-reviewed ✅
   (live behavioral tests incl. ward/counter phases), quality clean.
   [claude-opus-4-8 | high]
-- [ ] 1.4 Ability AI: per-key heuristics scored as candidates in aiActUnit
-  beside attack/capture/move. [claude-fable-5 | high]
+- [x] 1.4 Ability AI (S1): aiScoreInstantAbility — healPulse +12/wounded-adj-
+  ally, quake 20/9 per adj enemy (floor 18), bulwark/ward allies×5+4 (floor
+  12, never refreshes active aura), current-hex evaluation (documented
+  simplification; skitter/galeRush excluded). Attack-flavored abilities ride
+  the pair loop (+6, useAbility flag) — but confirmed kills take the plain
+  attack and keep the cooldown. Decision tree: kill → retreat → instant
+  ability → capture → attack → move. Live-verified: AI casts Heal Pulse when
+  no kill on offer; prefers kills when available; zero errors over full AI
+  turns. [claude-fable-5 | high]
 - [ ] 1.5 Weather: STATE.weather, per-map tables, reroll ~5 turns,
   computeDamage/computeReachable hooks (AI + forecast free), topbar icon +
   change banner. [claude-sonnet-4-6 | medium]
