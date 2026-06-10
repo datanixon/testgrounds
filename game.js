@@ -697,9 +697,25 @@ function computeDamage(attacker, defender) {
   const affMul = aff ? AFFINITY_MULT : 1.0;
   const raw = attacker.power * (attacker.hp / attacker.maxHp * 0.5 + 0.5);
   const mit = defender.def + dTDef * 0.5;
-  let dmg = Math.max(1, Math.round(raw * elemMul * affMul - mit * 0.6));
-  dmg = Math.max(1, dmg + Math.floor(Math.random() * 3) - 1);
-  return { dmg, elemMul, affMul, hasAffinity: !!aff, aTDef, dTDef };
+  const base = Math.max(1, Math.round(raw * elemMul * affMul - mit * 0.6));
+  const dmg = Math.max(1, base + Math.floor(Math.random() * 3) - 1);
+  return { dmg, base, elemMul, affMul, hasAffinity: !!aff, aTDef, dTDef };
+}
+
+// Two-way battle forecast for the sidebar card (3.1). Mirrors beginBattle's
+// counter rule (defender in range → 0.8× swing) but reports the pre-jitter
+// `base` so the UI shows a stable X–Y range instead of a live roll.
+function forecastBattle(attacker, defender) {
+  const a = computeDamage(attacker, defender);
+  const dist = hexDistance({ q: attacker.q, r: attacker.r }, { q: defender.q, r: defender.r });
+  const canCounter = dist >= 1 && dist <= defender.range;
+  const cBase = canCounter ? Math.max(1, Math.round(computeDamage(defender, attacker).base * 0.8)) : 0;
+  return {
+    lo: Math.max(1, a.base - 1), hi: a.base + 1,
+    elemMul: a.elemMul, hasAffinity: a.hasAffinity,
+    canCounter, cLo: canCounter ? Math.max(1, cBase - 1) : 0, cHi: canCounter ? cBase + 1 : 0,
+    sureKill: defender.hp <= Math.max(1, a.base - 1),
+  };
 }
 
 // Begins an attack: computes both swings up front, then opens the battle
@@ -2249,6 +2265,7 @@ function renderSidebar() {
   y += 8;
 
   ctx.font = "11px 'Courier New', monospace";
+  let cardUnit = null;
   if (STATE.hover && inBounds(STATE.hover.q, STATE.hover.r)) {
     const cell = cellAt(STATE.hover);
     const t = TERRAIN[cell.terrain];
@@ -2280,27 +2297,11 @@ function renderSidebar() {
       ctx.fillText("held by: " + owner, SIDEBAR_X + 14, y);
       y += 16;
     }
-    const u = unitAt(STATE.hover.q, STATE.hover.r);
-    if (u) {
-      const el = ELEMENT[u.element];
-      ctx.fillStyle = el.color;
-      ctx.font = "bold 12px 'Courier New', monospace";
-      ctx.fillText(u.name.toUpperCase() + "  [" + el.short + "]", SIDEBAR_X + 14, y + 14);
-      ctx.fillStyle = PAL.ink;
-      ctx.font = "11px 'Courier New', monospace";
-      ctx.fillText("HP " + u.hp + "/" + u.maxHp + "    ATK " + u.power, SIDEBAR_X + 14, y + 28);
-      ctx.fillText("DEF " + u.def + "    RNG " + u.range + "    MOV " + u.move, SIDEBAR_X + 14, y + 42);
-      ctx.fillStyle = u.acted ? PAL.inkDim : PAL.green;
-      ctx.fillText(u.acted ? "spent this turn" : "ready", SIDEBAR_X + 14, y + 56);
-      y += 70;
-      const ua = affinityFor(u.element, cell.terrain);
-      if (ua) {
-        ctx.fillStyle = PAL.gold;
-        ctx.fillText("* empowered: " + ua.label + " (+20% atk)", SIDEBAR_X + 14, y);
-        y += 16;
-      }
-    }
+    cardUnit = unitAt(STATE.hover.q, STATE.hover.r);
   }
+  // Card falls back to the selected unit so clicking a unit pins its info (3.1).
+  if (!cardUnit && STATE.selected && STATE.selected.hp > 0) cardUnit = STATE.selected;
+  if (cardUnit) y = drawUnitCard(cardUnit, y + 6);
 
   ctx.fillStyle = PAL.inkFaint;
   ctx.fillRect(SIDEBAR_X + 12, CANVAS_H - 170, SIDEBAR_W - 24, 1);
@@ -2314,6 +2315,108 @@ function renderSidebar() {
     ctx.fillStyle = i === 0 ? PAL.ink : PAL.inkDim;
     wrapText(line, SIDEBAR_X + 14, CANVAS_H - 138 + i * 13, SIDEBAR_W - 26, 12);
   }
+}
+
+// 3.1 — full unit info card: portrait, element, HP/MP/XP bars, stats, the
+// bonus from the tile the unit stands on, and (when hovering an enemy with a
+// friendly unit selected) a damage forecast for the would-be exchange.
+function drawUnitCard(u, y) {
+  const x = SIDEBAR_X + 10, w = SIDEBAR_W - 20;
+  const sel = STATE.selected;
+  const showForecast = sel && sel !== u && sel.hp > 0 && sel.owner !== u.owner;
+  const h = 112 + (showForecast ? 44 : 0);
+  // never collide with the battle log strip at the sidebar bottom
+  if (y + h > CANVAS_H - 178) y = CANVAS_H - 178 - h;
+
+  const pl = PLAYERS[u.owner];
+  const el = ELEMENT[u.element];
+  ctx.fillStyle = PAL.panelLight;
+  ctx.fillRect(x, y, w, h);
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = pl.dark;
+  ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
+
+  // portrait: the map sprite blown up 1.5× in a clipped, element-rimmed box
+  const pbx = x + 8, pby = y + 8;
+  ctx.fillStyle = "#0b0916";
+  ctx.fillRect(pbx, pby, 64, 64);
+  ctx.save();
+  ctx.beginPath(); ctx.rect(pbx, pby, 64, 64); ctx.clip();
+  ctx.translate(pbx + 32, pby + 36);
+  ctx.scale(1.5, 1.5);
+  drawMapSprite(ctx, u, 0, 3, frame);
+  ctx.restore();
+  ctx.strokeStyle = el.color;
+  ctx.strokeRect(pbx + 0.5, pby + 0.5, 63, 63);
+
+  const tx = x + 82, barW = x + w - 8 - tx;
+  ctx.textAlign = "left";
+  ctx.font = "bold 12px 'Courier New', monospace";
+  ctx.fillStyle = el.color;
+  ctx.fillText(u.name.toUpperCase(), tx, y + 18);
+  ctx.font = "10px 'Courier New', monospace";
+  ctx.fillStyle = pl.color;
+  ctx.fillText(pl.name, tx, y + 31);
+  ctx.fillStyle = PAL.gold;
+  ctx.fillText("Lv " + (u.level || 1) + "  [" + el.short + "]" + (u.evolved ? "  EVOLVED" : ""), tx + 64, y + 31);
+  ctx.fillStyle = u.acted ? PAL.inkDim : PAL.green;
+  ctx.textAlign = "right";
+  ctx.fillText(u.acted ? "spent" : "ready", x + w - 8, y + 18);
+  ctx.textAlign = "left";
+
+  drawStatBar(tx, y + 38, barW, 9, u.hp, u.maxHp, "#5fd06a", "HP");
+  let by = y + 50;
+  if (u.isMaster) { drawStatBar(tx, by, barW, 9, u.mp, u.maxMp, "#7aa8e0", "MP"); by += 12; }
+  const lvl = u.level || 1;
+  if (lvl >= MAX_LEVEL) drawStatBar(tx, by, barW, 8, 1, 1, "#b89a50", "XP MAX");
+  else drawStatBar(tx, by, barW, 8, u.xp || 0, xpToNext(lvl), "#b89a50", "XP");
+
+  ctx.font = "11px 'Courier New', monospace";
+  ctx.fillStyle = PAL.ink;
+  ctx.fillText("ATK " + u.power + "   DEF " + u.def + "   RNG " + u.range + "   MOV " + u.move, x + 8, y + 86);
+
+  // bonus from the tile the unit is standing on (not the hovered tile)
+  const cell = cellAt({ q: u.q, r: u.r });
+  if (cell) {
+    const t = TERRAIN[cell.terrain];
+    ctx.fillStyle = PAL.inkDim;
+    const onLabel = "on " + t.name.toUpperCase();
+    ctx.fillText(onLabel, x + 8, y + 102);
+    drawDefStars(x + 8 + ctx.measureText(onLabel).width + 14, y + 98, t.def);
+    if (affinityFor(u.element, cell.terrain)) {
+      ctx.fillStyle = PAL.gold;
+      ctx.textAlign = "right";
+      ctx.fillText("empowered +20%", x + w - 8, y + 102);
+      ctx.textAlign = "left";
+    }
+  }
+
+  if (showForecast) {
+    const f = forecastBattle(sel, u);
+    const fy = y + 112;
+    ctx.fillStyle = "#0e0c1a";
+    ctx.fillRect(x + 4, fy, w - 8, 36);
+    ctx.font = "bold 10px 'Courier New', monospace";
+    ctx.fillStyle = PAL.gold;
+    ctx.fillText("FORECAST — " + sel.name.toUpperCase() + " ATTACKS", x + 10, fy + 12);
+    ctx.font = "11px 'Courier New', monospace";
+    ctx.fillStyle = PAL.green;
+    let line = "deal " + f.lo + "-" + f.hi;
+    if (f.elemMul !== 1) line += "  elem x" + f.elemMul.toFixed(1);
+    if (f.hasAffinity) line += "  +aff";
+    if (f.sureKill) line += "  KO!";
+    ctx.fillText(line, x + 10, fy + 27);
+    ctx.textAlign = "right";
+    if (f.canCounter) {
+      ctx.fillStyle = PAL.red;
+      ctx.fillText("counter " + f.cLo + "-" + f.cHi, x + w - 10, fy + 27);
+    } else {
+      ctx.fillStyle = PAL.inkDim;
+      ctx.fillText("no counter", x + w - 10, fy + 27);
+    }
+    ctx.textAlign = "left";
+  }
+  return y + h + 6;
 }
 
 // Defense rating as a row of gold diamonds (filled = terrain def points).

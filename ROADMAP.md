@@ -100,10 +100,12 @@ Check off with a one-line note when done. Mark `BLOCKED:`/`PARKED:` per rules.
 
 ### Phase 3 — UI/UX
 
-- [ ] 3.1 Unit info panel: click/hover unit → sidebar card (portrait, element,
-  HP/MP bars, stats, XP bar, terrain bonus on current tile); hover enemy →
-  damage forecast vs selected unit (use pure `computeDamage`).
-  [claude-opus-4-8 | high]
+- [x] 3.1 Unit info panel (S4): drawUnitCard in sidebar — portrait (map sprite
+  1.5× in element-rimmed clipped box), owner/Lv/element, HP/MP/XP bars, stat
+  row, standing-tile DEF diamonds + empowered note; hover enemy w/ friendly
+  selected → FORECAST block (deal X–Y, elem mult, KO!, counter X–Y / none).
+  computeDamage now also returns pre-jitter `base`; forecastBattle mirrors
+  beginBattle's counter rule for stable UI ranges. [claude-opus-4-8 | high]
 - [ ] 3.2 Terrain tooltip + summon menu upgrade: hover tile shows terrain
   name/cost/defense; summon menu shows portrait, stats, element vs enemy
   composition hint. [claude-sonnet-4-6 | medium]
