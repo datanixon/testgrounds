@@ -278,3 +278,43 @@ virtual clock → rAF starves). `const STATE`/top-level functions are NOT on
 `window.STATE`. For 3.1: computeDamage is pure and already returns
 affMul/hasAffinity/aTDef/dTDef — reuse it for the hover forecast. Save/load
 (6.1) must still serialize the per-instance level/xp/evolved + STATE.stats.
+
+## Session 4 — 2026-06-10 (interactive; overnight script retired)
+Done: Phases 3, 4, 5, 6 ALL COMPLETE — 3.1 unit info card + damage forecast,
+3.2 terrain tooltip + summon preview panel, 3.3 settings/help overlays +
+battle-scene toggle (applySwing extraction + instant resolver), 3.4 keyboard
+layer (interactAt extraction, hex cursor, Tab cycle), 4.1 AI v2 (threat map,
+retreat, focus fire, universal capture via shared captureTower), 4.2 summon
+economy (element counters, MP banking, emergency walls), 4.3 difficulty
+profiles + title selector, 5.1 roster wave (12 new sprite sets, SUMMON_LIST
+=12), 5.2 map system (MAPS[] defs, parameterized generateMap, title select),
+5.3 campaign (4 missions, story screens, unlock progress), 6.1 save/load
+(autosave each endTurn, title CONTINUE), 6.2 undo move + colored scrollable
+log. One commit per milestone, smoke test green throughout.
+State: GREEN — last green commit: d0288b0
+Next: 7.1 Render perf (then 7.2 README + final pass — roadmap is then done).
+NEXT_MODEL: claude-opus-4-8
+NEXT_EFFORT: high
+Risks/notes — read before 7.1:
+- 7.1 scouting already done: drawTerrainDetail + drawHex are fully static (no
+  frame/random deps) → safe to cache the whole map terrain layer to an
+  offscreen canvas. Invalidate on: generateMap, loadGame, and captureTower
+  (ALL owner-flip paths now route through captureTower — player menu + both
+  AI paths). drawArenaBackground twinkles via `frame` — do NOT cache it.
+- axialToPixel offsets by +HEX_W/2+6; rows start at q=-floor(r/2) so world
+  x can go slightly negative — pad the offscreen canvas (~40px) and draw it
+  back at the same offset.
+- aiW() reads STATE.matchDifficulty (campaign) falling back to
+  STATE.difficulty (skirmish pref). Never saveSettings mid-campaign with a
+  scenario difficulty — that bug was caught and fixed in 5.3.
+- Settings blob v1 ("wraithspire.settings.v1"): musicVol, sfxVol, battleScene,
+  trackIndex, difficulty, mapIndex, campaignProgress. Save blob v1
+  ("wraithspire.save.v1"): cells serialized raw (owners mutate), units,
+  stats, campaign, matchDifficulty, nextUnitId, log head. Log entries are
+  {text,color} — renderer tolerates legacy plain strings.
+- interactAt(q,r) is the shared mouse/keyboard action core; STATE.undo is
+  cleared at every commit point (attack/capture/summon/wait/Esc/endTurn).
+- Playwright verification: python -m http.server 8765 (file:// blocked in
+  the MCP), bare lexical names (no window.*), cache-bust with ?v=N on every
+  reload or you test stale game.js.
+- Stray verification PNGs in repo root are gitignored — safe to delete.
