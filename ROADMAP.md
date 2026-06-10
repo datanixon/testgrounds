@@ -202,7 +202,7 @@ Check off with a one-line note when done. Mark `BLOCKED:`/`PARKED:` per rules.
   summons, winner-tinted victory), wheel scrollback over the log strip w/
   ▲/▼ hints, snaps to newest on push. [claude-sonnet-4-6 | medium]
 
-### Phase 7 — Performance & health
+### Phase 7 — Performance & health  ✅ COMPLETE (S5)
 
 - [x] 7.1 Render perf (S5): terrain layer cached to offscreen canvas
   (terrainCache; drawHex/drawTerrainDetail verified frame/random-free) and
@@ -211,9 +211,13 @@ Check off with a one-line note when done. Mark `BLOCKED:`/`PARKED:` per rules.
   generateMap, loadGame, captureTower (all owner-flip paths) — capture
   invalidation verified live. Battle scene profiled at 0.10ms/frame — no
   work needed. [claude-opus-4-8 | high]
-- [ ] 7.2 README + final integration pass: rewrite README (screenshot, one
-  command quickstart, controls, credits), full-match playtest checklist, fix
-  anything found. [claude-fable-5 | high]
+- [x] 7.2 README + final pass (S5): README rewritten — screenshot
+  (docs/screenshot.png, force-added past the *.png ignore), quickstart,
+  feature list, controls table, turn guide w/ element wheel + affinity,
+  dev section (smoke test, hash hooks). Full-match playtest via Playwright:
+  complete game to AI victory (19 turns, 28 battles), ZERO console errors,
+  stats table correct, autosave cleared at game end. Battle scene re-verified
+  post-terrain-cache. [claude-fable-5 | high]
 
 ## Handoff log
 
@@ -322,3 +326,19 @@ Risks/notes — read before 7.1:
   the MCP), bare lexical names (no window.*), cache-bust with ?v=N on every
   reload or you test stale game.js.
 - Stray verification PNGs in repo root are gitignored — safe to delete.
+
+## Session 5 — 2026-06-10 (interactive)
+Done: Phase 7 COMPLETE — 7.1 offscreen terrain cache (1.09ms → 0.002ms/frame
+on the map layer, invalidation via captureTower/generateMap/loadGame, battle
+scene profiled at 0.10ms/frame — left alone), 7.2 README rewrite (screenshot,
+features, controls, dev hooks) + full-match integration playtest (complete
+game to AI win, zero console errors, autosave lifecycle correct).
+State: GREEN — every milestone in every phase is checked off.
+Next: nothing — see below.
+Risks/notes: docs/screenshot.png is force-added (-f) past the *.png
+gitignore. Terrain cache rebuilds by temporarily pointing the global `ctx`
+at the offscreen canvas — any new code that draws terrain must go through
+drawHex/drawTerrainDetail and call invalidateTerrainCache() after mutating
+cell terrain/owner.
+
+ROADMAP COMPLETE

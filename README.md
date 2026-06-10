@@ -1,10 +1,12 @@
 # Wraithspire — Summoner's War
 
-A 16-bit-styled, turn-based hex strategy game with cinematic battle cutaways and a procedural 80s synth fantasy score. Two summoning archons fight over a frontier of spires and citadels. Original work inspired by Genesis-era summoner strategy.
+A 16-bit-styled, turn-based hex strategy game with cinematic battle cutaways and a procedural 80s synth-fantasy score. Two summoning archons fight over a frontier of spires and citadels. Original work inspired by Genesis-era summoner strategy.
 
-## Play locally
+![Wraithspire mid-match](docs/screenshot.png)
 
-Just open `index.html` in any modern browser — no build step, no dependencies.
+## Play
+
+Open `index.html` in any modern browser. No build step, no dependencies, no server.
 
 ```
 start index.html      # Windows
@@ -12,45 +14,58 @@ open  index.html      # macOS
 xdg-open index.html   # Linux
 ```
 
-The canvas scales to fit your viewport while preserving 16:10 aspect ratio, so it works well on anything from a small laptop screen up to large 4K monitors.
+The canvas scales to fit your viewport at a fixed 16:10 ratio, crisp from laptop screens to 4K.
+
+**Goal:** reduce the enemy Archon to 0 HP. The match ends the moment a master falls.
+
+## What's in the box
+
+- **12 summonable monsters** across 5 elements, each with **8 evolved terminal forms** — units earn XP in combat, level 1–5 with stat growth, and a level-4+ unit that starts its turn on one of your spires **evolves**.
+- **Cinematic battle cutaways** — side-view arenas themed by the defender's terrain, per-unit attack animations, screen shake, counterattacks. Can be toggled off in settings for fast play.
+- **4 skirmish maps** (size, terrain mix, and spire count all differ) plus a **4-mission campaign** with escalating difficulty and narrative interstitials.
+- **3 AI difficulties** — Hard plays a threat-map: it focus-fires wounded units, retreats to heal, holds high ground, captures with everything, and counter-picks summons against your army's elements.
+- **Autosave every turn** — CONTINUE on the title screen resumes mid-match; campaign progress persists.
+- **Undo move** — until you attack, capture, or summon, a move can be taken back from the action menu.
+- **Fully keyboard-playable**, procedural synth score (5 tracks), settings menu, in-game help with an element wheel.
 
 ## Controls
 
-- **Mouse hover** — inspect a hex (terrain stats, unit stats in sidebar).
-- **Click your unit** — selects it; blue tiles are movable, red rings are attackable.
-- **Click a blue tile** — moves there and opens an action menu (Attack / Capture / Summon / Wait).
-- **Click a red ring** — attacks directly (only when in range without moving).
-- **Arrow keys / WASD in menus** — navigate. **Enter** confirms. **Esc** cancels.
-- **E** — end your turn.
-- **M** — toggle the music on/off.
-- **Arrow keys (no menu open)** — pan the map.
+| Input | Action |
+|---|---|
+| Mouse hover / click | Inspect hex · select unit · move · attack |
+| Arrows / WASD | Move the hex cursor (camera follows) |
+| Enter | Select / act at cursor |
+| Tab | Jump to your next ready unit |
+| E | End turn |
+| Esc | Cancel menu / deselect / close overlays |
+| ? or H | Help overlay (controls + element wheel) |
+| ⚙ (top-right) | Settings: volumes, music track, battle scenes on/off |
+| Space | Center camera on selected unit |
+| Mouse wheel over log | Scroll battle log history |
+| M / N | Toggle music / next track |
 
-## Battle scenes
+The sidebar shows a full info card for the hovered unit. Hover an enemy while one of your units is selected to see a **damage forecast** for the exchange (damage range, element multiplier, counter risk, guaranteed-KO flag).
 
-When any combat happens — your monster vs. an enemy, your archon clashing with theirs — the camera cuts away to a side-view cinematic arena. Combatants charge, attacks land with screen shake and impact bursts, counterattacks fire, then the camera returns to the map. The arena background reflects the terrain the defender was standing on. Each unit gets a unique attack animation flavor (melee swing, breath cone, water spray, arcane bolt, dive bomb, etc.).
+## How a turn works
 
-## Goal
-
-Reduce the enemy Archon to 0 HP. The game ends immediately when a master falls.
-
-## Game flow
-
-1. Each turn your Archon regenerates MP. Captured spires add +2 MP/turn each.
-2. Move your master onto a Spire hex and choose **Capture** to claim it.
-3. With enough MP, move and choose **Summon** to spawn a creature in an adjacent hex (summoned units cannot act on their summon turn).
-4. Elemental matchups: **Pyro ▶ Zephyr ▶ Terra ▶ Hydro ▶ Pyro**. Off-element attacks do 70% damage; strong matchups do 130%.
-5. Standing on your own Spire heals +2 HP/turn; on your Citadel, +4 HP/turn.
-6. Press **E** to end your turn; the AI takes over.
+1. Your Archon regenerates MP each turn; every captured spire adds +2.
+2. Move any unit onto a neutral or enemy spire and **Capture** it — every unit can capture, not just the Archon.
+3. **Summon** (Archon only) spends MP to place a monster on an adjacent hex; it can't act the turn it appears.
+4. Units standing on your spire heal +2/turn; on your citadel +4/turn.
+5. Element wheel: **Pyro ▶ Zephyr ▶ Terra ▶ Hydro ▶ Pyro** (130% / 70%); **Arcane** chips 110% against everything. Attacking *from* terrain your element resonates with (e.g. Pyro on hills, Arcane on spires) adds **+20%** — resonant tiles glint gold when you select a unit.
+6. Terrain also sets move cost and defense; mountains are flyer-only, water blocks ground units outright.
 
 ## Audio
 
-The score is generated live with Web Audio — a four-chord minor-key progression (A minor → F → C → G) with a square-wave bass pluck, triangle arp, sawtooth pad, and occasional lead. Auto-starts on first click/keypress (browser autoplay policy). Press **M** any time to toggle.
+The score is generated live with Web Audio — drums, filter-swept bass, pads, and lead over a minor progression, five selectable tracks. Auto-starts on the first click/keypress (browser autoplay policy). M toggles it any time.
 
-## Test hooks
+## Development
 
-URL hash modes used for verification:
+```
+node --check game.js   # syntax gate
+bash smoke-test.sh     # headless boot + one full turn (needs Chrome)
+```
 
-- `index.html#autostart` — skip the title screen and drop straight into a new game.
-- `index.html#demo` — start a game, summon two creatures, and hand the turn to the AI immediately.
-- `index.html#battle` — start a game and immediately trigger a battle cutaway between the two archons.
-- `index.html#gameover` — jump to the victory screen.
+Everything lives in two files: `index.html` + `game.js` (banner-numbered sections; see `CLAUDE.md` for the architecture map and content-addition recipes). All art and audio are procedural — there are no asset files.
+
+URL hash hooks for verification: `#autostart` (skip title), `#demo` (AI plays), `#battle` (instant cutaway), `#gameover` (victory screen), `#smoke` (headless smoke test marker).
