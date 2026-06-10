@@ -73,7 +73,7 @@ Check off with a one-line note when done. Mark `BLOCKED:`/`PARKED:` per rules.
   screen shows turns, battles, and an AZURE/CRIMSON summoned/lost/spires table.
   [claude-sonnet-4-6 | medium]
 
-### Phase 2 — Game feel & polish
+### Phase 2 — Game feel & polish  ✅ COMPLETE (S3)
 
 - [x] 2.1 Animated unit movement (S3): units slide hex-to-hex along the
   Dijkstra path (~85ms/hex smoothstep), camera eases to follow; input + AI step
@@ -195,3 +195,33 @@ milestone 5.1; the gold halo is the only current visual tell. Verified hover/
 glint via Playwright over a local `python -m http.server` (file:// is blocked
 in the Playwright MCP). A stray `python -m http.server 8765` may still be
 running in the background from this session — harmless, dies with the shell.
+
+## Session 3 — 2026-06-09
+Done: Phase 2 COMPLETE — 2.1 Animated movement (reconstructPath +
+startMove/tickMove; setTimeout-driven NOT rAF so it survives headless
+virtual-time; renderUnits interpolates; input + AI gated; extracted
+openPostMoveMenu dedup), 2.2 Map-layer feedback (battle damage/xp/LEVEL-UP
+floats emitted post-cutaway via b.floats; heal floats; capture/summon ring
+bursts at player+AI sites; pushAnim gained `ring`/`dy`), 2.3 Smooth camera
+(STATE.camTarget + updateCamera lerp; RTS edge-pan from STATE.mouse; Space
+centers; arrows/follow/handoff all drive the target), 2.4 Transitions
+(STATE.transition wipe/fade overlay over every screen; title→play gold wipe;
+gameover fade; restyled slide+fade turn banner with player-tinted rules).
+State: GREEN — last green commit: cb1c849
+Next: 3.1 Unit info panel (click/hover unit → sidebar card: portrait, element,
+HP/MP bars, stats, XP bar, current-tile terrain bonus; hover enemy → damage
+forecast vs selected unit via pure computeDamage).
+NEXT_MODEL: claude-opus-4-8
+NEXT_EFFORT: high
+Risks/notes: render() is now if/else-if (not early-return) so renderTransition
+draws last over all screens — keep that shape if adding screens. Animation
+ticks: map anims (STATE.animations) decrement ttl in BOTH renderAnimationsMap
+AND renderBattleAnims — anything pushed during a battle gets double/early-aged,
+which is why 2.2 defers battle floats to endBattleAndResume. The slide ticker
+(tickMove) MUST stay setTimeout-driven, not folded into the rAF render loop, or
+the smoke test deadlocks under virtual-time (empty timer queue halts the
+virtual clock → rAF starves). `const STATE`/top-level functions are NOT on
+`window` (lexical globals) — Playwright probes must reference bare names, not
+`window.STATE`. For 3.1: computeDamage is pure and already returns
+affMul/hasAffinity/aTDef/dTDef — reuse it for the hover forecast. Save/load
+(6.1) must still serialize the per-instance level/xp/evolved + STATE.stats.
