@@ -39,8 +39,10 @@ const HEX_H = 2 * HEX_SIZE;
 const HEX_STEP_X = HEX_W;
 const HEX_STEP_Y = HEX_SIZE * 1.5;
 
-const COLS = 14;
-const ROWS = 12;
+// Map dimensions are per-map since 5.2 — generateMap sets them from the
+// selected MAPS[] definition. These are the classic defaults.
+let COLS = 14;
+let ROWS = 12;
 
 const PAL = {
   bg: "#050409",
@@ -156,8 +158,30 @@ const MAP = {
   castles: [],
 };
 
-function generateMap(seed) {
+// Named map definitions (5.2). Each is the procedural generator's parameter
+// set — size, terrain mix, tower count — plus optional handcrafted overrides
+// (fixed `seed` for a repeatable layout, explicit `castles` start positions).
+// `seed: null` rolls a fresh layout every match.
+const MAPS = [
+  { key: "frontier", name: "Wraithspire Frontier", desc: "The classic borderland.",
+    cols: 14, rows: 12, seed: null,
+    mountains: 4, lakes: 3, forests: 22, hills: 14, towers: 5 },
+  { key: "tides", name: "Shattered Tides", desc: "Drowned field — flyers rule.",
+    cols: 14, rows: 12, seed: null,
+    mountains: 1, lakes: 8, forests: 12, hills: 6, towers: 5 },
+  { key: "crags", name: "Emberfall Crags", desc: "Walls of stone, tight passes.",
+    cols: 15, rows: 11, seed: null,
+    mountains: 9, lakes: 1, forests: 8, hills: 22, towers: 4,
+    castles: [{ q: 0, r: 5 }, { q: 9, r: 5 }] },   // handcrafted: east-west standoff
+  { key: "verdant", name: "Verdant Expanse", desc: "Wide greens, six spires.",
+    cols: 16, rows: 13, seed: null,
+    mountains: 2, lakes: 2, forests: 30, hills: 10, towers: 6 },
+];
+
+function generateMap(seed, def = MAPS[0]) {
   let rng = mulberry32(seed);
+  COLS = def.cols;
+  ROWS = def.rows;
   MAP.cells.clear();
   MAP.towers.length = 0;
   MAP.castles.length = 0;
@@ -173,14 +197,15 @@ function generateMap(seed) {
   const pick = () => cells[Math.floor(rng() * cells.length)];
 
   const scatter = (kind, count) => {
-    for (let i = 0; i < count; i++) {
+    let guard = 0;
+    for (let i = 0; i < count && guard++ < 1000; i++) {
       const c = pick();
       if (c.terrain !== "plain") { i--; continue; }
       c.terrain = kind;
     }
   };
 
-  for (let i = 0; i < 4; i++) {
+  for (let i = 0; i < def.mountains; i++) {
     let c = pick();
     const len = 2 + Math.floor(rng() * 3);
     for (let j = 0; j < len; j++) {
@@ -191,7 +216,7 @@ function generateMap(seed) {
     }
   }
 
-  for (let i = 0; i < 3; i++) {
+  for (let i = 0; i < def.lakes; i++) {
     let c = pick();
     if (!c) continue;
     const lake = [c];
@@ -207,11 +232,15 @@ function generateMap(seed) {
     for (const c2 of lake) c2.terrain = "water";
   }
 
-  scatter("forest", 22);
-  scatter("hill", 14);
+  scatter("forest", def.forests);
+  scatter("hill", def.hills);
 
-  const castleA = cellAt({ q: 0, r: 1 }) || cellAt({ q: 1, r: 1 });
-  const castleB = cellAt({ q: COLS - 3 - Math.floor((ROWS - 2) / 2), r: ROWS - 2 });
+  // Start positions: handcrafted override or the default opposite corners.
+  const startA = def.castles ? def.castles[0] : { q: 0, r: 1 };
+  const startB = def.castles ? def.castles[1]
+    : { q: COLS - 3 - Math.floor((ROWS - 2) / 2), r: ROWS - 2 };
+  const castleA = cellAt(startA) || cellAt({ q: 1, r: 1 });
+  const castleB = cellAt(startB);
   if (castleA) {
     clearAround(castleA);
     castleA.terrain = "castle";
@@ -225,9 +254,8 @@ function generateMap(seed) {
     MAP.castles.push(castleB);
   }
 
-  const towerCount = 5;
   let placed = 0, guard = 0;
-  while (placed < towerCount && guard++ < 500) {
+  while (placed < def.towers && guard++ < 500) {
     const c = pick();
     if (!c || c.terrain !== "plain") continue;
     if (hexDistance(c, castleA) < 3 || hexDistance(c, castleB) < 3) continue;
@@ -480,6 +508,7 @@ const STATE = {
   settingsOpen: false,  // 3.3 gear overlay
   helpOpen: false,      // 3.3 ? overlay
   difficulty: "normal", // 4.3 AI profile key; chosen on the title screen
+  mapIndex: 0,          // 5.2 index into MAPS; chosen on the title screen
 };
 
 // ---- Settings persistence (3.3) ----
@@ -501,6 +530,9 @@ function loadSettings() {
       STATE.music.trackIndex = saved.trackIndex;
     }
     if (DIFFICULTIES.includes(saved.difficulty)) STATE.difficulty = saved.difficulty;
+    if (typeof saved.mapIndex === "number" && saved.mapIndex >= 0 && saved.mapIndex < MAPS.length) {
+      STATE.mapIndex = saved.mapIndex;
+    }
   } catch (_) { /* localStorage can throw on file:// in some browsers */ }
 }
 
@@ -512,6 +544,7 @@ function saveSettings() {
       battleScene: STATE.settings.battleScene,
       trackIndex:  STATE.music.trackIndex,
       difficulty:  STATE.difficulty,
+      mapIndex:    STATE.mapIndex,
     };
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(blob));
   } catch (_) { /* ignore write failures */ }
@@ -519,7 +552,8 @@ function saveSettings() {
 
 function startNewGame() {
   nextUnitId = 1;
-  generateMap(Math.floor(Math.random() * 1e9));
+  const def = MAPS[STATE.mapIndex] || MAPS[0];
+  generateMap(def.seed != null ? def.seed : Math.floor(Math.random() * 1e9), def);
   STATE.units = [];
   const cA = MAP.castles[0];
   const cB = MAP.castles[1];
@@ -3771,10 +3805,19 @@ function menuRect(m) {
 function onClick(ev) {
   startMusicOnGesture();
   if (STATE.screen === "title") {
-    // Clicking a difficulty box selects it; clicking anywhere else starts.
+    // Clicking a map/difficulty box selects it; clicking anywhere else starts.
     const p = clientToCanvas(ev);
+    const hit = (r) => p.x >= r.x && p.x <= r.x + r.w && p.y >= r.y && p.y <= r.y + r.h;
+    for (const r of titleMapRects()) {
+      if (hit(r)) {
+        STATE.mapIndex = r.index;
+        saveSettings();
+        beep(620, 0.06, "triangle", 0.15);
+        return;
+      }
+    }
     for (const r of titleDiffRects()) {
-      if (p.x >= r.x && p.x <= r.x + r.w && p.y >= r.y && p.y <= r.y + r.h) {
+      if (hit(r)) {
         STATE.difficulty = r.key;
         saveSettings();
         beep(520, 0.06, "triangle", 0.15);
@@ -3877,13 +3920,19 @@ function onKey(ev) {
   if (ev.key === "n" || ev.key === "N") { cycleTrack(); return; }
   if (STATE.screen === "title") {
     if (ev.key === "Enter" || ev.key === " ") startNewGame();
-    // ←/→ cycle the AI difficulty (4.3)
+    // ←/→ cycle the AI difficulty (4.3); ↑/↓ cycle the map (5.2)
     if (ev.key === "ArrowLeft" || ev.key === "ArrowRight") {
       const dir = ev.key === "ArrowLeft" ? -1 : 1;
       const i = DIFFICULTIES.indexOf(STATE.difficulty);
       STATE.difficulty = DIFFICULTIES[(i + dir + DIFFICULTIES.length) % DIFFICULTIES.length];
       saveSettings();
       beep(520, 0.06, "triangle", 0.15);
+    }
+    if (ev.key === "ArrowUp" || ev.key === "ArrowDown") {
+      const dir = ev.key === "ArrowUp" ? -1 : 1;
+      STATE.mapIndex = (STATE.mapIndex + dir + MAPS.length) % MAPS.length;
+      saveSettings();
+      beep(620, 0.06, "triangle", 0.15);
     }
     return;
   }
@@ -4253,11 +4302,31 @@ function renderTitle() {
   const lore = [
     "Two summoning archons command the frontier.",
     "Bind elemental beasts. Seize the spires.",
-    "Cast the rival Archon down. Inherit the realm.",
   ];
   for (let i = 0; i < lore.length; i++) {
-    ctx.fillText(lore[i], CANVAS_W / 2, CANVAS_H * 0.84 + i * 18);
+    ctx.fillText(lore[i], CANVAS_W / 2, CANVAS_H * 0.835 + i * 17);
   }
+
+  // Map selector (5.2) — a row of named battlefields; ↑/↓ also cycles.
+  const mapRects = titleMapRects();
+  ctx.font = "bold 11px 'Courier New', monospace";
+  ctx.textAlign = "center";
+  for (const r of mapRects) {
+    const sel = r.index === STATE.mapIndex;
+    ctx.fillStyle = sel ? PAL.purple : "rgba(31, 28, 48, 0.85)";
+    ctx.fillRect(r.x, r.y, r.w, r.h);
+    ctx.strokeStyle = sel ? PAL.purple : PAL.inkFaint;
+    ctx.lineWidth = 1;
+    ctx.strokeRect(r.x + 0.5, r.y + 0.5, r.w - 1, r.h - 1);
+    ctx.fillStyle = sel ? PAL.bg : PAL.inkDim;
+    ctx.fillText(MAPS[r.index].name.toUpperCase(), r.x + r.w / 2, r.y + 15);
+  }
+  // Selected map blurb under the row.
+  ctx.font = "10px 'Courier New', monospace";
+  ctx.fillStyle = PAL.inkDim;
+  const selMap = MAPS[STATE.mapIndex] || MAPS[0];
+  ctx.fillText(selMap.desc + "  (" + selMap.cols + "x" + selMap.rows + ", " + selMap.towers + " spires)",
+    CANVAS_W / 2, mapRects[0].y + mapRects[0].h + 13);
 
   // Difficulty selector (4.3) — boxes drawn from the same rects onClick tests.
   const diffRects = titleDiffRects();
@@ -4276,13 +4345,15 @@ function renderTitle() {
 
   const blink = Math.floor(frame / 30) % 2 === 0;
   if (blink) {
-    ctx.font = "bold 16px 'Courier New', monospace";
+    ctx.font = "bold 15px 'Courier New', monospace";
     ctx.fillStyle = PAL.gold;
-    ctx.fillText("CLICK OR PRESS ENTER TO BEGIN", CANVAS_W / 2, CANVAS_H * 0.95);
+    ctx.fillText("CLICK OR PRESS ENTER TO BEGIN", CANVAS_W / 2, CANVAS_H * 0.973);
   }
   ctx.font = "10px 'Courier New', monospace";
   ctx.fillStyle = PAL.inkFaint;
-  ctx.fillText("v1.1 — press M to toggle music", CANVAS_W / 2, CANVAS_H - 12);
+  ctx.textAlign = "right";
+  ctx.fillText("v1.2 — M music", CANVAS_W - 10, CANVAS_H - 10);
+  ctx.textAlign = "center";
 }
 
 // Clickable difficulty boxes on the title screen (4.3); shared by render+click.
@@ -4290,8 +4361,17 @@ function titleDiffRects() {
   const w = 92, h = 24, gap = 14;
   const total = DIFFICULTIES.length * w + (DIFFICULTIES.length - 1) * gap;
   const x0 = (CANVAS_W - total) / 2;
-  const y = Math.round(CANVAS_H * 0.905) - h / 2;
+  const y = 742;
   return DIFFICULTIES.map((key, i) => ({ key, x: x0 + i * (w + gap), y, w, h }));
+}
+
+// Clickable map boxes on the title screen (5.2); shared by render+click.
+function titleMapRects() {
+  const w = 150, h = 22, gap = 8;
+  const total = MAPS.length * w + (MAPS.length - 1) * gap;
+  const x0 = (CANVAS_W - total) / 2;
+  const y = 698;
+  return MAPS.map((m, i) => ({ index: i, x: x0 + i * (w + gap), y, w, h }));
 }
 
 function renderGameOver() {

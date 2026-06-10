@@ -162,9 +162,14 @@ Check off with a one-line note when done. Mark `BLOCKED:`/`PARKED:` per rules.
   tank c15), frostmaw (hydro bruiser c18), duneskink (terra runner c6) —
   SUMMON_LIST now 12. No evolvesTo on the new four (future). Stale index.html
   hint bar refreshed for the 3.4 keyboard layer. [claude-sonnet-4-6 | medium]
-- [ ] 5.2 Map system: named map definitions (seed + params + handcrafted
-  overrides: size, terrain mix, tower count, start positions); 4 distinct
-  maps; map select on title screen. [claude-opus-4-8 | high]
+- [x] 5.2 Map system (S4): MAPS[] named defs (cols/rows, terrain mix counts,
+  towers, optional fixed seed + handcrafted castle starts) consumed by
+  parameterized generateMap(seed, def); COLS/ROWS now per-map lets. 4 maps:
+  Frontier (classic), Shattered Tides (8 lakes), Emberfall Crags (15×11,
+  9 ridges, handcrafted E-W standoff starts), Verdant Expanse (16×13, 6
+  spires). Title map row (titleMapRects, ↑/↓ cycles, blurb w/ size+spires),
+  choice persisted. Camera clamps auto-adapt via mapPixelWidth/Height.
+  [claude-opus-4-8 | high]
 - [ ] 5.3 Campaign arc: 4-scenario escalation (tutorial-ish skirmish → final
   showdown) with brief narrative interstitials (text panels in existing art
   style), campaign progress kept in memory (persisted in 6.1).
