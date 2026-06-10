@@ -183,8 +183,15 @@ Check off with a one-line note when done. Mark `BLOCKED:`/`PARKED:` per rules.
 
 ### Phase 6 — Systems
 
-- [ ] 6.1 Save/load: serialize STATE+MAP to localStorage (versioned),
-  continue button on title, autosave each turn, campaign progress persisted.
+- [x] 6.1 Save/load (S4): one autosave slot "wraithspire.save.v1" (versioned
+  blob: cells serialized directly since tower owners mutate, units incl.
+  level/xp/evolved, stats, campaign tag, matchDifficulty, nextUnitId, log
+  head). saveGame at every endTurn; deleteSave when a match ends; loadGame
+  rebuilds MAP.towers/castles as refs into the cell map, resets transients,
+  re-kicks AI if saved on its turn. Title CONTINUE button (green, beside
+  CAMPAIGN) when probeSave finds a slot; corrupt save → cleared. Round-trip
+  verified exact via Playwright (units/towers/stats identical after wreck +
+  load). Campaign progress was already persisted (5.3).
   [claude-opus-4-8 | high]
 - [ ] 6.2 Undo move: snapshot before move, "Undo" in action menu until attack/
   capture/summon committed; battle log panel upgrade (scrollback, colors).

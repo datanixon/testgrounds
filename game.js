@@ -614,6 +614,84 @@ function saveSettings() {
   } catch (_) { /* ignore write failures */ }
 }
 
+// ---- Save / load (6.1) ----
+// One autosave slot, written at every end-of-turn and cleared when a match
+// ends. Cells are serialized directly (tower owners mutate, so a seed isn't
+// enough); MAP.towers/castles are rebuilt as references into the cell map.
+const SAVE_KEY = "wraithspire.save.v1";
+
+function saveGame() {
+  if (STATE.screen !== "play") return;
+  try {
+    const blob = {
+      v: 1,
+      turn: STATE.turn,
+      currentPlayer: STATE.currentPlayer,
+      cols: COLS, rows: ROWS,
+      cells: [...MAP.cells.values()].map(c => ({ q: c.q, r: c.r, terrain: c.terrain, owner: c.owner })),
+      units: STATE.units.filter(u => u.hp > 0),
+      stats: STATE.stats,
+      nextUnitId,
+      campaign: STATE.campaign,
+      matchDifficulty: STATE.matchDifficulty,
+      log: STATE.log.slice(0, 12),
+    };
+    localStorage.setItem(SAVE_KEY, JSON.stringify(blob));
+    STATE.hasSave = true;
+  } catch (_) { /* storage full / unavailable — autosave is best-effort */ }
+}
+
+function deleteSave() {
+  try { localStorage.removeItem(SAVE_KEY); } catch (_) {}
+  STATE.hasSave = false;
+}
+
+function probeSave() {
+  try { STATE.hasSave = !!localStorage.getItem(SAVE_KEY); } catch (_) { STATE.hasSave = false; }
+}
+
+function loadGame() {
+  let blob;
+  try { blob = JSON.parse(localStorage.getItem(SAVE_KEY)); } catch (_) { return false; }
+  if (!blob || blob.v !== 1 || !Array.isArray(blob.cells) || !Array.isArray(blob.units)) return false;
+
+  COLS = blob.cols; ROWS = blob.rows;
+  MAP.cells.clear();
+  MAP.towers.length = 0;
+  MAP.castles.length = 0;
+  for (const c of blob.cells) {
+    const cell = { q: c.q, r: c.r, terrain: c.terrain, owner: c.owner };
+    MAP.cells.set(hexKey(c.q, c.r), cell);
+    if (cell.terrain === "tower") MAP.towers.push(cell);
+    if (cell.terrain === "castle") MAP.castles.push(cell);
+  }
+
+  nextUnitId = blob.nextUnitId || 1000;
+  STATE.units = blob.units;
+  STATE.turn = blob.turn;
+  STATE.currentPlayer = blob.currentPlayer;
+  STATE.stats = blob.stats || { summoned: [0, 0], lost: [0, 0], battles: 0 };
+  STATE.campaign = blob.campaign || null;
+  STATE.matchDifficulty = blob.matchDifficulty || STATE.difficulty;
+  STATE.log = Array.isArray(blob.log) ? blob.log : [];
+
+  // Transient state resets — mirror startNewGame.
+  STATE.selected = null; STATE.reachable = null; STATE.attackTargets = null;
+  STATE.cursor = null; STATE.menu = null; STATE.battle = null; STATE.moveAnim = null;
+  STATE.animations = []; STATE.winner = null; STATE.pendingAI = false;
+  STATE.screen = "play";
+  startTransition("wipe", 30);
+  STATE.banner = { text: "RESUMED — TURN " + STATE.turn, ttl: 80, color: PLAYERS[STATE.currentPlayer].color };
+  pushLog("The battle resumes.");
+  centerCameraOn(masterOf(STATE.currentPlayer), true);
+  // If we saved mid-AI-turn somehow, hand control back cleanly.
+  if (PLAYERS[STATE.currentPlayer].isAI) {
+    STATE.pendingAI = true;
+    setTimeout(() => { STATE.pendingAI = false; aiTakeTurn(); }, 800);
+  }
+  return true;
+}
+
 // Starts a match. With no argument it's a free skirmish on the title-screen
 // map/difficulty; with a CAMPAIGN scenario it uses the scenario's map, sets
 // its difficulty for the match (without persisting over skirmish prefs), and
@@ -958,6 +1036,7 @@ function checkWinCondition() {
           Math.max(STATE.campaignProgress, STATE.campaign.index + 1));
         saveSettings();
       }
+      deleteSave(); // finished matches don't leave a stale CONTINUE (6.1)
       beep(440, 0.2, "triangle", 0.25);
       setTimeout(() => beep(660, 0.3, "triangle", 0.25), 200);
       return;
@@ -3929,6 +4008,11 @@ function onClick(ev) {
       beep(620, 0.08, "triangle", 0.18);
       return;
     }
+    if (STATE.hasSave && hit(titleContinueRect())) {
+      if (loadGame()) beep(660, 0.1, "triangle", 0.2);
+      else { deleteSave(); beep(180, 0.15, "square", 0.2); } // corrupt save: clear it
+      return;
+    }
     for (const r of titleMapRects()) {
       if (hit(r)) {
         STATE.mapIndex = r.index;
@@ -4344,6 +4428,7 @@ function endTurn() {
   STATE.banner = { text: PLAYERS[STATE.currentPlayer].name + " — TURN " + STATE.turn, ttl: 80, color: PLAYERS[STATE.currentPlayer].color };
   checkWinCondition();
   if (STATE.screen !== "play") return;
+  saveGame(); // autosave each turn (6.1)
   centerCameraOn(masterOf(STATE.currentPlayer));
   if (PLAYERS[STATE.currentPlayer].isAI) {
     STATE.pendingAI = true;
@@ -4431,20 +4516,27 @@ function renderTitle() {
   ctx.fillStyle = PAL.p1;
   ctx.fillText("CRIMSON", CANVAS_W / 2 + 180, CANVAS_H * 0.78);
 
-  // Campaign entry (5.3) — sits between the two archons.
-  const cb = titleCampaignRect();
-  const cleared = STATE.campaignProgress >= CAMPAIGN.length - 1 ? null : CAMPAIGN[STATE.campaignProgress];
-  ctx.fillStyle = "rgba(31, 28, 48, 0.9)";
-  ctx.fillRect(cb.x, cb.y, cb.w, cb.h);
-  ctx.strokeStyle = PAL.gold;
-  ctx.lineWidth = 1;
-  ctx.strokeRect(cb.x + 0.5, cb.y + 0.5, cb.w - 1, cb.h - 1);
-  ctx.font = "bold 13px 'Courier New', monospace";
-  ctx.fillStyle = PAL.gold;
-  ctx.fillText("CAMPAIGN", cb.x + cb.w / 2, cb.y + 17);
-  ctx.font = "9px 'Courier New', monospace";
-  ctx.fillStyle = PAL.inkDim;
-  ctx.fillText(cleared ? "next: " + cleared.name : "all missions open", cb.x + cb.w / 2, cb.y + 30);
+  // Campaign entry (5.3) — sits between the two archons; CONTINUE (6.1)
+  // appears beside it when an autosave exists.
+  const drawTitleBtn = (r, label, sub, accent) => {
+    ctx.fillStyle = "rgba(31, 28, 48, 0.9)";
+    ctx.fillRect(r.x, r.y, r.w, r.h);
+    ctx.strokeStyle = accent;
+    ctx.lineWidth = 1;
+    ctx.strokeRect(r.x + 0.5, r.y + 0.5, r.w - 1, r.h - 1);
+    ctx.font = "bold 13px 'Courier New', monospace";
+    ctx.fillStyle = accent;
+    ctx.fillText(label, r.x + r.w / 2, r.y + 17);
+    ctx.font = "9px 'Courier New', monospace";
+    ctx.fillStyle = PAL.inkDim;
+    ctx.fillText(sub, r.x + r.w / 2, r.y + 30);
+  };
+  const nextMission = STATE.campaignProgress >= CAMPAIGN.length - 1 ? null : CAMPAIGN[STATE.campaignProgress];
+  drawTitleBtn(titleCampaignRect(), "CAMPAIGN",
+    nextMission ? "next: " + nextMission.name : "all missions open", PAL.gold);
+  if (STATE.hasSave) {
+    drawTitleBtn(titleContinueRect(), "CONTINUE", "resume the saved battle", PAL.green);
+  }
 
   ctx.font = "13px 'Courier New', monospace";
   ctx.fillStyle = PAL.inkDim;
@@ -4524,8 +4616,17 @@ function titleMapRects() {
 }
 
 // Campaign button between the title archons (5.3); shared by render+click.
+// When a save exists the two buttons sit side by side.
 function titleCampaignRect() {
-  return { x: CANVAS_W / 2 - 90, y: CANVAS_H * 0.60, w: 180, h: 38 };
+  const y = CANVAS_H * 0.60;
+  return STATE.hasSave
+    ? { x: CANVAS_W / 2 - 188, y, w: 180, h: 38 }
+    : { x: CANVAS_W / 2 - 90, y, w: 180, h: 38 };
+}
+
+// Continue (load autosave) button on the title screen (6.1).
+function titleContinueRect() {
+  return { x: CANVAS_W / 2 + 8, y: CANVAS_H * 0.60, w: 180, h: 38 };
 }
 
 // Leave a finished match: back to title, drop the campaign tag, and restore
@@ -5110,6 +5211,7 @@ function boot() {
 
   // Load persisted settings before any music starts (3.3).
   loadSettings();
+  probeSave(); // does a CONTINUE autosave exist? (6.1)
 
   generateMap(123);
 
