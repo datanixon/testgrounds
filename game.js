@@ -280,14 +280,26 @@ const ELEM_MATRIX = {
 };
 
 const UNIT_TYPES = {
-  cinderling:  { name: "Cinderling",  element: "pyro",   maxHp: 12, move: 4, range: 1, power: 5, def: 1, cost: 6,  flying: false, sprite: "imp",      attack: "melee" },
-  pyrowyrm:    { name: "Pyrowyrm",    element: "pyro",   maxHp: 18, move: 3, range: 2, power: 7, def: 2, cost: 12, flying: false, sprite: "wyrm",     attack: "breath" },
-  tidekin:     { name: "Tidekin",     element: "hydro",  maxHp: 14, move: 4, range: 1, power: 5, def: 2, cost: 7,  flying: false, sprite: "merfolk",  attack: "melee" },
-  mistleviath: { name: "Mistlevy",    element: "hydro",  maxHp: 20, move: 3, range: 2, power: 6, def: 3, cost: 14, flying: false, sprite: "serpent",  attack: "spray" },
-  stoneward:   { name: "Stoneward",   element: "terra",  maxHp: 22, move: 2, range: 1, power: 5, def: 4, cost: 8,  flying: false, sprite: "golem",    attack: "melee" },
-  geomaul:     { name: "Geomaul",     element: "terra",  maxHp: 26, move: 2, range: 1, power: 9, def: 4, cost: 16, flying: false, sprite: "ogre",     attack: "melee" },
-  galewisp:    { name: "Galewisp",    element: "zephyr", maxHp: 10, move: 5, range: 2, power: 4, def: 1, cost: 7,  flying: true,  sprite: "wisp",     attack: "spark" },
-  skyharrow:   { name: "Skyharrow",   element: "zephyr", maxHp: 16, move: 4, range: 2, power: 7, def: 2, cost: 13, flying: true,  sprite: "raptor",   attack: "dive" },
+  cinderling:  { name: "Cinderling",  element: "pyro",   maxHp: 12, move: 4, range: 1, power: 5, def: 1, cost: 6,  flying: false, sprite: "imp",      attack: "melee",  evolvesTo: "infernite" },
+  pyrowyrm:    { name: "Pyrowyrm",    element: "pyro",   maxHp: 18, move: 3, range: 2, power: 7, def: 2, cost: 12, flying: false, sprite: "wyrm",     attack: "breath", evolvesTo: "emberdrake" },
+  tidekin:     { name: "Tidekin",     element: "hydro",  maxHp: 14, move: 4, range: 1, power: 5, def: 2, cost: 7,  flying: false, sprite: "merfolk",  attack: "melee",  evolvesTo: "tidelord" },
+  mistleviath: { name: "Mistlevy",    element: "hydro",  maxHp: 20, move: 3, range: 2, power: 6, def: 3, cost: 14, flying: false, sprite: "serpent",  attack: "spray",  evolvesTo: "leviathan" },
+  stoneward:   { name: "Stoneward",   element: "terra",  maxHp: 22, move: 2, range: 1, power: 5, def: 4, cost: 8,  flying: false, sprite: "golem",    attack: "melee",  evolvesTo: "colossus" },
+  geomaul:     { name: "Geomaul",     element: "terra",  maxHp: 26, move: 2, range: 1, power: 9, def: 4, cost: 16, flying: false, sprite: "ogre",     attack: "melee",  evolvesTo: "earthbreaker" },
+  galewisp:    { name: "Galewisp",    element: "zephyr", maxHp: 10, move: 5, range: 2, power: 4, def: 1, cost: 7,  flying: true,  sprite: "wisp",     attack: "spark",  evolvesTo: "stormwisp" },
+  skyharrow:   { name: "Skyharrow",   element: "zephyr", maxHp: 16, move: 4, range: 2, power: 7, def: 2, cost: 13, flying: true,  sprite: "raptor",   attack: "dive",   evolvesTo: "skytyrant" },
+
+  // Evolved forms (terminal tier; not directly summonable). Reached when a
+  // level-4+ unit starts its turn on an owned tower/castle. Sprites are stubs
+  // that reuse the base form's sprite id (real art lands in milestone 5.1).
+  infernite:    { name: "Infernite",    element: "pyro",   maxHp: 22, move: 4, range: 1, power: 9,  def: 3, cost: 18, flying: false, sprite: "imp",     attack: "melee",  evolved: true },
+  emberdrake:   { name: "Emberdrake",   element: "pyro",   maxHp: 30, move: 3, range: 2, power: 11, def: 4, cost: 26, flying: false, sprite: "wyrm",    attack: "breath", evolved: true },
+  tidelord:     { name: "Tidelord",     element: "hydro",  maxHp: 24, move: 4, range: 1, power: 9,  def: 4, cost: 18, flying: false, sprite: "merfolk", attack: "melee",  evolved: true },
+  leviathan:    { name: "Leviathan",    element: "hydro",  maxHp: 32, move: 3, range: 2, power: 10, def: 5, cost: 28, flying: false, sprite: "serpent", attack: "spray",  evolved: true },
+  colossus:     { name: "Colossus",     element: "terra",  maxHp: 36, move: 2, range: 1, power: 9,  def: 6, cost: 20, flying: false, sprite: "golem",   attack: "melee",  evolved: true },
+  earthbreaker: { name: "Earthbreaker", element: "terra",  maxHp: 42, move: 2, range: 1, power: 14, def: 6, cost: 30, flying: false, sprite: "ogre",    attack: "melee",  evolved: true },
+  stormwisp:    { name: "Stormwisp",    element: "zephyr", maxHp: 18, move: 5, range: 2, power: 8,  def: 2, cost: 18, flying: true,  sprite: "wisp",    attack: "spark",  evolved: true },
+  skytyrant:    { name: "Skytyrant",    element: "zephyr", maxHp: 26, move: 4, range: 2, power: 11, def: 3, cost: 24, flying: true,  sprite: "raptor",  attack: "dive",   evolved: true },
 };
 
 const SUMMON_LIST = ["cinderling", "tidekin", "stoneward", "galewisp", "pyrowyrm", "mistleviath", "geomaul", "skyharrow"];
@@ -364,6 +376,50 @@ function gainXp(unit, amount) {
   }
   if (unit.level >= MAX_LEVEL) unit.xp = 0;
   return gained;
+}
+
+// ---- Evolution ----
+// A level-4+ unit that starts its turn on an owned tower/castle evolves into
+// its terminal form. Evolved base stats absorb the unit's accumulated level
+// growth so leveling is never wasted, and the unit is fully restored.
+const EVOLVE_LEVEL = 4;
+
+function evolveUnit(unit) {
+  const base = UNIT_TYPES[unit.typeKey];
+  if (!base || !base.evolvesTo) return false;
+  const evo = UNIT_TYPES[base.evolvesTo];
+  if (!evo) return false;
+  const lvlBonus = (unit.level || 1) - 1;
+  unit.typeKey = base.evolvesTo;
+  unit.name = evo.name;
+  unit.element = evo.element;
+  unit.move = evo.move;
+  unit.range = evo.range;
+  unit.flying = evo.flying;
+  unit.sprite = evo.sprite;
+  unit.attack = evo.attack;
+  unit.maxHp = evo.maxHp + lvlBonus * 4;
+  unit.power = evo.power + lvlBonus;
+  unit.def = evo.def + lvlBonus;
+  unit.hp = unit.maxHp; // full restore on evolution
+  unit.evolved = true;
+  return true;
+}
+
+function tryEvolve(unit, cell) {
+  if (unit.isMaster || unit.evolved) return false;
+  if ((unit.level || 1) < EVOLVE_LEVEL) return false;
+  if (!cell || cell.owner !== unit.owner) return false;
+  if (cell.terrain !== "tower" && cell.terrain !== "castle") return false;
+  if (!UNIT_TYPES[unit.typeKey] || !UNIT_TYPES[unit.typeKey].evolvesTo) return false;
+  const oldName = unit.name;
+  if (!evolveUnit(unit)) return false;
+  pushLog(oldName + " evolves into " + unit.name + "!");
+  pushAnim("evolve", unit.q, unit.r, "EVOLVED!", PAL.gold);
+  beep(523, 0.09, "triangle", 0.22);
+  setTimeout(() => beep(659, 0.09, "triangle", 0.22), 100);
+  setTimeout(() => beep(880, 0.16, "triangle", 0.22), 200);
+  return true;
 }
 
 // =========================================================================
@@ -1396,6 +1452,15 @@ function drawCombatant(unit, x, y, facing, pose) {
   ctx.beginPath();
   ctx.ellipse(x, y + 16, 60, 8, 0, 0, Math.PI * 2);
   ctx.fill();
+  // evolved combatants stand in a pulsing gold halo
+  if (unit.evolved) {
+    const pulse = 0.3 + 0.18 * Math.sin(frame / 10 + unit.id);
+    ctx.strokeStyle = `rgba(240, 198, 116, ${pulse})`;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.ellipse(x, y + 14, 64, 12, 0, 0, Math.PI * 2);
+    ctx.stroke();
+  }
   drawBattleSprite(ctx, unit, x, y - 30, facing, pose, frame);
 }
 
@@ -1841,6 +1906,16 @@ function renderUnits() {
     ctx.ellipse(p.x, p.y + 16, 18, 6, 0, 0, Math.PI * 2);
     ctx.fill();
 
+    // evolved units get a faint pulsing gold aura ring (stub visual until 5.1)
+    if (u.evolved) {
+      const pulse = 0.35 + 0.2 * Math.sin(frame / 12 + u.id);
+      ctx.strokeStyle = `rgba(240, 198, 116, ${pulse})`;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.ellipse(p.x, p.y + 14, 20, 8, 0, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
     drawMapSprite(ctx, u, p.x, p.y, frame + u.id * 7);
 
     const barW = 32, barH = 4;
@@ -1891,6 +1966,21 @@ function renderAnimationsMap() {
     a.y += a.vy;
     a.ttl--;
     if (a.ttl <= 0) { STATE.animations.splice(i, 1); continue; }
+    if (a.kind === "evolve") {
+      // expanding gold ring burst behind the rising text
+      const prog = (50 - a.ttl) / 50;
+      const rad = 8 + prog * 34;
+      ctx.strokeStyle = `rgba(240, 198, 116, ${1 - prog})`;
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(a.x, a.y + 6, rad, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.strokeStyle = `rgba(255, 248, 220, ${(1 - prog) * 0.6})`;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.arc(a.x, a.y + 6, rad * 0.6, 0, Math.PI * 2);
+      ctx.stroke();
+    }
     ctx.font = "bold 14px 'Courier New', monospace";
     ctx.textAlign = "center";
     ctx.fillStyle = "#000";
@@ -2363,6 +2453,7 @@ function endTurn() {
     const c = cellAt({ q: u.q, r: u.r });
     if (c && c.terrain === "tower" && c.owner === u.owner) u.hp = Math.min(u.maxHp, u.hp + 2);
     if (c && c.terrain === "castle" && c.owner === u.owner) u.hp = Math.min(u.maxHp, u.hp + 4);
+    tryEvolve(u, c); // level-4+ on owned tower/castle → terminal form
   }
   STATE.selected = null;
   STATE.reachable = null;
