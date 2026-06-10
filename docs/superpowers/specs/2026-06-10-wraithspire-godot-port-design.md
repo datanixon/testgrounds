@@ -205,7 +205,7 @@ designed. Known accepted gaps in the reference, carried into the Godot design:
 ## Testing
 
 `/tests/run_tests.gd` is a `SceneTree` script run via `godot --headless -s
-tests/run_tests.gd`, with assert helpers. Coverage targets the pure core:
+tests/run_tests.gd`, with assert helpers. **Windows / M1 note:** the harness runs through `godot/tests/run_tests.ps1`, which invokes the sibling `*_console.exe` — the WinGet `godot` shim is the GUI exe and swallows stdout + the exit code. `main_scene` is not required for a `--script` run. A .NET 9 SDK was installed during M1 but proved unnecessary for GDScript-only headless runs (the console-exe was the real fix; the harness passes with `dotnet` not even on PATH); it stays installed, keeping C# latent for the hotspot. Coverage targets the pure core:
 - combat damage parity (element matrix, affinity, level, weather, ability mods)
 - pathfinding / reachable (move cost, slow, flyers, weather)
 - AI decision outputs on constructed boards (kill > retreat > ability > capture

@@ -4,4 +4,4 @@ config_version=5
 
 config/name="Wraithspire (Godot port)"
 config/features=PackedStringArray("4.6")
-run/main_scene="res://scenes/main.tscn"
+run/main_scene=""

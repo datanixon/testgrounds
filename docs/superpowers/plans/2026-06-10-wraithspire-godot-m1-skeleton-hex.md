@@ -34,7 +34,7 @@ The Godot project root is `godot/`. All `res://` paths are relative to it (e.g. 
 
 ## Task 1: Install the Godot 4 .NET build
 
-**Who runs it:** the **user** runs the install (download/elevation is interactive). The agent verifies afterward. The .NET SDK is intentionally NOT installed — the Mono editor runs GDScript without it; the SDK is deferred until a real C# hotspot.
+**Who runs it:** the **user** runs the install (download/elevation is interactive). The agent verifies afterward. **(M1 finding:** a .NET SDK is NOT needed to run GDScript headless. During M1 a .NET 9 SDK was installed on a false premise but proved unnecessary — the real Windows gotcha is the console-exe in `run_tests.ps1` below. The SDK stays installed and harmless, keeping C# latent for the hotspot.)
 
 **Files:** none.
 
@@ -209,12 +209,27 @@ func _test_harness_smoke() -> void:
 #requires -version 5
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot   # godot/tests -> godot
-$godot = (Get-Command godot -ErrorAction SilentlyContinue).Source
-if (-not $godot) { $godot = $env:GODOT }
-if (-not $godot -or -not (Test-Path $godot)) {
-  throw "Godot not found. Put 'godot' on PATH or set `$env:GODOT to the Godot .NET exe."
+$gargs = @('--headless','--path',$root,'--script','res://tests/run_tests.gd')
+
+# On Windows the WinGet 'godot' shim is the GUI exe: it does not write to
+# stdout/stderr and doesn't propagate the exit code. Prefer the sibling
+# *_console.exe in the same install folder.
+function Find-GodotConsole {
+  $shim = Get-Command godot -ErrorAction SilentlyContinue
+  if ($shim) {
+    $guiExe = (Get-Item $shim.Source -ErrorAction SilentlyContinue)?.Target
+    if (-not $guiExe) { $guiExe = $shim.Source }
+    $dir = Split-Path -Parent $guiExe
+    $console = Join-Path $dir ($([System.IO.Path]::GetFileNameWithoutExtension($guiExe)) + '_console.exe')
+    if (Test-Path $console) { return $console }
+    return $shim.Source
+  }
+  if ($env:GODOT -and (Test-Path $env:GODOT)) { return $env:GODOT }
+  throw "Godot not found. Put 'godot' on PATH or set `$env:GODOT to the Godot executable."
 }
-& $godot --headless --path $root --script "res://tests/run_tests.gd"
+
+$godot = Find-GodotConsole
+& $godot @gargs
 exit $LASTEXITCODE
 ```
 
@@ -393,5 +408,5 @@ git commit -m "[godot] M1: hex math core (axial coords, neighbors, distance, pix
 - **`--script` + `SceneTree`**: if a Godot version rejects `_initialize()` or the `--script` invocation differs, Task 3's smoke step is where it surfaces — fix the harness there before Task 4. The fallback invocation is `& $godot --headless --path godot res://tests/run_tests.gd` (positional script) if `--script` misbehaves.
 - **`preload` vs `class_name`**: tests `preload` the lib under the name `HexLib` to avoid depending on global-class registration timing in `--script` runs (and to avoid shadowing the `class_name Hex` global). `hex.gd` keeps `class_name Hex` for editor/other-script ergonomics.
 - **Array equality**: Godot 4 compares `Array` by value (size + elements), so `neighbors(...) == [Vector2i(...), ...]` works.
-- **`.NET` SDK absent on purpose**: the Mono editor runs GDScript without it. Installing the .NET SDK + creating a `.csproj` happens only when a C# hotspot is approved (the AI scorer seam).
+- **`.NET` SDK not required for GDScript headless**: the real Windows gotcha is that the WinGet `godot` shim is the GUI exe (swallows stdout + exit code) — `run_tests.ps1` invokes the sibling `*_console.exe`. A .NET 9 SDK was installed during M1 but proved unnecessary (the harness runs green with `dotnet` not even on PATH); it stays installed, keeping C# latent. A `.csproj` is created only when a C# hotspot is approved (the AI scorer seam).
 ```
