@@ -321,6 +321,7 @@ function generateMap(seed, def = MAPS[0]) {
     MAP.towers.push(c);
     placed++;
   }
+  invalidateTerrainCache(); // 7.1 — function declaration, hoisted, safe here
 }
 
 function cellAt(qr) { return MAP.cells.get(hexKey(qr.q, qr.r)); }
@@ -676,6 +677,8 @@ function loadGame() {
   STATE.campaign = blob.campaign || null;
   STATE.matchDifficulty = blob.matchDifficulty || STATE.difficulty;
   STATE.log = Array.isArray(blob.log) ? blob.log : [];
+
+  invalidateTerrainCache(); // 7.1 — rebuilt cells need a fresh terrain layer
 
   // Transient state resets — mirror startNewGame.
   STATE.selected = null; STATE.reachable = null; STATE.attackTargets = null;
@@ -1132,6 +1135,7 @@ function buildThreatMap(owner) {
 // and both AI capture paths all route through here.
 function captureTower(unit, cell) {
   cell.owner = unit.owner;
+  invalidateTerrainCache(); // tower cap + flag tint live in the cached layer (7.1)
   pushLog(unit.name + " captures a spire.", PAL.gold);
   pushAnim("capture", cell.q, cell.r, "CAPTURED", PAL.gold, "120, 220, 240");
   beep(520, 0.12, "triangle", 0.18);
@@ -2897,16 +2901,45 @@ function renderTransition() {
   ctx.restore();
 }
 
+// 7.1 — static terrain layer cache. drawHex/drawTerrainDetail have no frame
+// or random dependence, so the whole layer is drawn once into an offscreen
+// canvas and blitted per frame. invalidateTerrainCache() must be called by
+// anything that changes terrain or a cell owner: generateMap, loadGame, and
+// captureTower (every owner-flip path routes through it).
+const terrainCache = { canvas: null, dirty: true };
+
+function invalidateTerrainCache() { terrainCache.dirty = true; }
+
 function renderMap() {
+  const w = Math.ceil(mapPixelWidth()) + 8;
+  const h = Math.ceil(mapPixelHeight()) + 8;
+  if (!terrainCache.canvas || terrainCache.canvas.width !== w || terrainCache.canvas.height !== h) {
+    terrainCache.canvas = document.createElement("canvas");
+    terrainCache.canvas.width = w;
+    terrainCache.canvas.height = h;
+    terrainCache.dirty = true;
+  }
+  if (terrainCache.dirty) {
+    const tctx = terrainCache.canvas.getContext("2d");
+    tctx.imageSmoothingEnabled = false;
+    tctx.clearRect(0, 0, w, h);
+    // drawHex and friends draw through the global ctx — point it at the
+    // offscreen layer for the rebuild, then restore. Synchronous, so safe.
+    const main = ctx;
+    ctx = tctx;
+    for (const cell of MAP.cells.values()) {
+      const p = axialToPixel(cell.q, cell.r);
+      drawHex(cell, p.x, p.y);
+    }
+    ctx = main;
+    terrainCache.dirty = false;
+  }
   ctx.save();
   ctx.beginPath();
   ctx.rect(0, TOPBAR_H, MAP_W, MAP_H);
   ctx.clip();
   ctx.translate(STATE.cam.x, STATE.cam.y + TOPBAR_H);
-  for (const cell of MAP.cells.values()) {
-    const p = axialToPixel(cell.q, cell.r);
-    drawHex(cell, p.x, p.y);
-  }
+  ctx.drawImage(terrainCache.canvas, 0, 0);
   ctx.restore();
 }
 

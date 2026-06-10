@@ -204,9 +204,13 @@ Check off with a one-line note when done. Mark `BLOCKED:`/`PARKED:` per rules.
 
 ### Phase 7 — Performance & health
 
-- [ ] 7.1 Render perf: cache static terrain layer to offscreen canvas
-  (invalidate on capture), profile battle scene, fix any GC churn in
-  per-frame allocations. [claude-opus-4-8 | high]
+- [x] 7.1 Render perf (S5): terrain layer cached to offscreen canvas
+  (terrainCache; drawHex/drawTerrainDetail verified frame/random-free) and
+  blitted per frame — measured 1.09ms → 0.002ms/frame (~650×); also kills the
+  168×7 hexCorner allocations/frame (main GC churn). Invalidated in
+  generateMap, loadGame, captureTower (all owner-flip paths) — capture
+  invalidation verified live. Battle scene profiled at 0.10ms/frame — no
+  work needed. [claude-opus-4-8 | high]
 - [ ] 7.2 README + final integration pass: rewrite README (screenshot, one
   command quickstart, controls, credits), full-match playtest checklist, fix
   anything found. [claude-fable-5 | high]
