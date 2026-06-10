@@ -75,12 +75,17 @@ Check off with a one-line note when done. Mark `BLOCKED:`/`PARKED:` per rules.
 
 ### Phase 2 — Game feel & polish
 
-- [ ] 2.1 Animated unit movement: units slide hex-to-hex along the Dijkstra
-  path (~80ms/hex, eased), camera follows; input + AI step blocked during
-  slide (same pattern as battle blocking). [claude-opus-4-8 | high]
-- [ ] 2.2 Map-layer feedback: floating damage/heal/XP numbers after battles,
-  capture sparkle, summon ring burst, level-up flash (extend
-  `STATE.animations`). [claude-sonnet-4-6 | medium]
+- [x] 2.1 Animated unit movement (S3): units slide hex-to-hex along the
+  Dijkstra path (~85ms/hex smoothstep), camera eases to follow; input + AI step
+  blocked during slide. reconstructPath walks reach prev-links; startMove/
+  tickMove driven by a setTimeout ticker (NOT rAF — survives headless virtual-
+  time); renderUnits interpolates the slider. Extracted openPostMoveMenu (deps
+  3 copies). [claude-opus-4-8 | high]
+- [x] 2.2 Map-layer feedback (S3): battle records damage/xp/LEVEL-UP floats in
+  `b.floats`, emitted on the map in endBattleAndResume (after the cutaway);
+  heal "+N" floats in endTurn; capture sparkle + summon ring burst at both
+  player & AI sites. Generalised pushAnim with `ring` ("r,g,b" burst) + `dy`
+  (stack offset); renderAnimationsMap rings key off `a.ring`. [claude-sonnet-4-6 | medium]
 - [ ] 2.3 Smooth camera: lerp `STATE.cam` toward targets instead of snapping;
   edge-pan with mouse near map edge; spacebar to center on active unit.
   [claude-sonnet-4-6 | medium]

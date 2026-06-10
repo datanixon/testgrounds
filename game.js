@@ -436,7 +436,7 @@ function tryEvolve(unit, cell) {
   const oldName = unit.name;
   if (!evolveUnit(unit)) return false;
   pushLog(oldName + " evolves into " + unit.name + "!");
-  pushAnim("evolve", unit.q, unit.r, "EVOLVED!", PAL.gold);
+  pushAnim("evolve", unit.q, unit.r, "EVOLVED!", PAL.gold, "240, 198, 116");
   beep(523, 0.09, "triangle", 0.22);
   setTimeout(() => beep(659, 0.09, "triangle", 0.22), 100);
   setTimeout(() => beep(880, 0.16, "triangle", 0.22), 200);
@@ -705,6 +705,7 @@ function beginBattle(attacker, defender, afterDone) {
     flash: 0,
     applied1: false,
     applied2: false,
+    floats: [],   // map-layer damage/xp/level floats, emitted on resume (2.2)
     afterDone,
     arenaSeed: Math.floor(Math.random() * 1e6),
   };
@@ -718,6 +719,8 @@ function endBattleAndResume() {
   STATE.battle = null;
   STATE.screen = "play";
   musicDuck(1);
+  // Emit the combat's map-layer floats now that the cutaway is gone (2.2).
+  if (b && b.floats) for (const f of b.floats) pushAnim("float", f.q, f.r, f.text, f.color, null, f.dy || 0);
   checkWinCondition();
   if (b && b.afterDone) b.afterDone();
 }
@@ -785,6 +788,7 @@ function aiActUnit(u, enemyMaster, done) {
         if (cell && cell.terrain === "tower" && cell.owner !== u.owner) {
           cell.owner = u.owner;
           pushLog(u.name + " claims a spire.");
+          pushAnim("capture", bestTower.q, bestTower.r, "CAPTURED", PAL.gold, "120, 220, 240");
           beep(520, 0.12, "triangle", 0.18);
         }
         u.acted = true;
@@ -855,6 +859,7 @@ function aiTrySummons(master) {
     STATE.units.push(u);
     if (STATE.stats) STATE.stats.summoned[master.owner]++;
     pushLog(master.name + " summons " + u.name + ".");
+    pushAnim("summon", slot.q, slot.r, "", PAL.gold, "190, 150, 230");
     beep(660, 0.08, "triangle", 0.18);
   }
 }
@@ -1394,7 +1399,13 @@ function updateBattle() {
         b.applied1 = true;
         if (b.defender.hp <= 0) { pushLog(b.defender.name + " is destroyed."); if (STATE.stats) STATE.stats.lost[b.defender.owner]++; }
         const killed = b.defender.hp <= 0;
-        if (gainXp(b.attacker, b.aDmg + (killed ? KILL_XP_BONUS : 0)) > 0) onBattleLevelUp(b.attacker, "a");
+        const xpAmt = b.aDmg + (killed ? KILL_XP_BONUS : 0);
+        if (gainXp(b.attacker, xpAmt) > 0) {
+          onBattleLevelUp(b.attacker, "a");
+          b.floats.push({ q: b.attacker.q, r: b.attacker.r, text: "LEVEL UP!", color: PAL.gold, dy: -22 });
+        }
+        b.floats.push({ q: b.defender.q, r: b.defender.r, text: "-" + b.aDmg, color: PAL.red, dy: 0 });
+        if (xpAmt > 0) b.floats.push({ q: b.attacker.q, r: b.attacker.r, text: "+" + xpAmt + " xp", color: PAL.gold, dy: -10 });
       }
       if (b.phaseFrame >= B.impact) advance("aRecover");
       break;
@@ -1422,7 +1433,13 @@ function updateBattle() {
         b.applied2 = true;
         if (b.attacker.hp <= 0) { pushLog(b.attacker.name + " is destroyed."); if (STATE.stats) STATE.stats.lost[b.attacker.owner]++; }
         const killed = b.attacker.hp <= 0;
-        if (gainXp(b.defender, b.cDmg + (killed ? KILL_XP_BONUS : 0)) > 0) onBattleLevelUp(b.defender, "c");
+        const xpAmt = b.cDmg + (killed ? KILL_XP_BONUS : 0);
+        if (gainXp(b.defender, xpAmt) > 0) {
+          onBattleLevelUp(b.defender, "c");
+          b.floats.push({ q: b.defender.q, r: b.defender.r, text: "LEVEL UP!", color: PAL.gold, dy: -22 });
+        }
+        b.floats.push({ q: b.attacker.q, r: b.attacker.r, text: "-" + b.cDmg, color: PAL.red, dy: 0 });
+        if (xpAmt > 0) b.floats.push({ q: b.defender.q, r: b.defender.r, text: "+" + xpAmt + " xp", color: PAL.gold, dy: -10 });
       }
       if (b.phaseFrame >= B.impact) advance("cRecover");
       break;
@@ -1876,9 +1893,12 @@ function renderBattleAnims() {
   }
 }
 
-function pushAnim(kind, q, r, text, color) {
+// kind: free label. ring: "r, g, b" to draw an expanding burst behind the
+// text (capture/summon/evolve/level flashes). dy: initial vertical offset so
+// stacked floats over one tile don't overlap.
+function pushAnim(kind, q, r, text, color, ring, dy) {
   const p = axialToPixel(q, r);
-  STATE.animations.push({ kind, q, r, x: p.x, y: p.y, text, color, ttl: 50, vy: -0.4 });
+  STATE.animations.push({ kind, q, r, x: p.x, y: p.y + (dy || 0), text, color, ring: ring || null, ttl: 50, vy: -0.4 });
 }
 
 // =========================================================================
@@ -2085,11 +2105,11 @@ function renderAnimationsMap() {
     a.y += a.vy;
     a.ttl--;
     if (a.ttl <= 0) { STATE.animations.splice(i, 1); continue; }
-    if (a.kind === "evolve") {
-      // expanding gold ring burst behind the rising text
+    if (a.ring) {
+      // expanding ring burst behind the rising text
       const prog = (50 - a.ttl) / 50;
       const rad = 8 + prog * 34;
-      ctx.strokeStyle = `rgba(240, 198, 116, ${1 - prog})`;
+      ctx.strokeStyle = `rgba(${a.ring}, ${1 - prog})`;
       ctx.lineWidth = 3;
       ctx.beginPath();
       ctx.arc(a.x, a.y + 6, rad, 0, Math.PI * 2);
@@ -2516,6 +2536,7 @@ function selectMenuItem(item) {
     if (cell && cell.terrain === "tower") {
       cell.owner = unit.owner;
       pushLog(unit.name + " captures a spire.");
+      pushAnim("capture", unit.q, unit.r, "CAPTURED", PAL.gold, "120, 220, 240");
       beep(520, 0.12, "triangle", 0.18);
     }
     unit.acted = true; closeMenu();
@@ -2545,6 +2566,7 @@ function selectMenuItem(item) {
     STATE.units.push(u);
     if (STATE.stats) STATE.stats.summoned[unit.owner]++;
     pushLog(unit.name + " summons " + u.name + ".");
+    pushAnim("summon", slot.q, slot.r, "", PAL.gold, "190, 150, 230");
     beep(660, 0.08, "triangle", 0.18);
     unit.acted = true; closeMenu();
   } else if (item.kind === "back") {
@@ -2593,8 +2615,10 @@ function endTurn() {
   for (const u of aliveUnits(STATE.currentPlayer)) {
     u.acted = false;
     const c = cellAt({ q: u.q, r: u.r });
+    const hpBefore = u.hp;
     if (c && c.terrain === "tower" && c.owner === u.owner) u.hp = Math.min(u.maxHp, u.hp + 2);
     if (c && c.terrain === "castle" && c.owner === u.owner) u.hp = Math.min(u.maxHp, u.hp + 4);
+    if (u.hp > hpBefore) pushAnim("float", u.q, u.r, "+" + (u.hp - hpBefore), "#5fd06a");
     tryEvolve(u, c); // level-4+ on owned tower/castle → terminal form
   }
   STATE.selected = null;
