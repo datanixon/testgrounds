@@ -525,7 +525,7 @@ function tryEvolve(unit, cell) {
   if (!UNIT_TYPES[unit.typeKey] || !UNIT_TYPES[unit.typeKey].evolvesTo) return false;
   const oldName = unit.name;
   if (!evolveUnit(unit)) return false;
-  pushLog(oldName + " evolves into " + unit.name + "!");
+  pushLog(oldName + " evolves into " + unit.name + "!", PAL.gold);
   pushAnim("evolve", unit.q, unit.r, "EVOLVED!", PAL.gold, "240, 198, 116");
   beep(523, 0.09, "triangle", 0.22);
   setTimeout(() => beep(659, 0.09, "triangle", 0.22), 100);
@@ -568,6 +568,8 @@ const STATE = {
   campaign: null,       // 5.3 {index} while a campaign mission is live
   campaignProgress: 0,  // 5.3 highest unlocked mission index
   story: null,          // 5.3 {index} for the interstitial screen
+  undo: null,           // 6.2 {unit, q, r} pre-move snapshot; cleared on commit
+  logScroll: 0,         // 6.2 entries scrolled back from newest (0 = live tail)
 };
 
 // ---- Settings persistence (3.3) ----
@@ -679,6 +681,7 @@ function loadGame() {
   STATE.selected = null; STATE.reachable = null; STATE.attackTargets = null;
   STATE.cursor = null; STATE.menu = null; STATE.battle = null; STATE.moveAnim = null;
   STATE.animations = []; STATE.winner = null; STATE.pendingAI = false;
+  STATE.undo = null; STATE.logScroll = 0; // 6.2
   STATE.screen = "play";
   startTransition("wipe", 30);
   STATE.banner = { text: "RESUMED — TURN " + STATE.turn, ttl: 80, color: PLAYERS[STATE.currentPlayer].color };
@@ -715,6 +718,7 @@ function startNewGame(scenario) {
   STATE.menu = null;
   STATE.banner = { text: PLAYERS[0].name + " — TURN " + STATE.turn, ttl: 90, color: PLAYERS[0].color };
   STATE.log = [];
+  STATE.logScroll = 0;  // 6.2 reset scrollback on new game
   STATE.winner = null;
   STATE.screen = "play";
   startTransition("wipe", 30);   // title → play uncover
@@ -752,9 +756,13 @@ function masterOf(owner) {
   return STATE.units.find(u => u.isMaster && u.owner === owner && u.hp > 0);
 }
 
-function pushLog(line) {
-  STATE.log.unshift(line);
+// 6.2: entries are stored as {text, color} objects. color may be null (use
+// renderer default). Old saves hold plain strings; the renderer handles both
+// shapes via `typeof entry === "string" ? {text: entry} : entry`.
+function pushLog(line, color) {
+  STATE.log.unshift({ text: line, color: color || null });
   if (STATE.log.length > 40) STATE.log.length = 40;
+  STATE.logScroll = 0;   // snap view to newest on every new entry
 }
 
 function clampCamX(x) { return Math.max(MAP_W - mapPixelWidth(), Math.min(0, x)); }
@@ -1029,7 +1037,7 @@ function checkWinCondition() {
       STATE.winner = 1 - p.id;
       STATE.screen = "gameover";
       startTransition("fade", 45);   // dissolve into the victory screen
-      pushLog(PLAYERS[STATE.winner].name + " is victorious!");
+      pushLog(PLAYERS[STATE.winner].name + " is victorious!", PLAYERS[STATE.winner].color);
       // Campaign (5.3): a mission win unlocks the next scenario.
       if (STATE.campaign && STATE.winner === 0) {
         STATE.campaignProgress = Math.min(CAMPAIGN.length - 1,
@@ -1124,7 +1132,7 @@ function buildThreatMap(owner) {
 // and both AI capture paths all route through here.
 function captureTower(unit, cell) {
   cell.owner = unit.owner;
-  pushLog(unit.name + " captures a spire.");
+  pushLog(unit.name + " captures a spire.", PAL.gold);
   pushAnim("capture", cell.q, cell.r, "CAPTURED", PAL.gold, "120, 220, 240");
   beep(520, 0.12, "triangle", 0.18);
 }
@@ -1348,7 +1356,7 @@ function aiTrySummons(master) {
     STATE.units.push(u);
     myArmy.push(u); // keep the variety penalty honest across this loop
     if (STATE.stats) STATE.stats.summoned[owner]++;
-    pushLog(master.name + " summons " + u.name + ".");
+    pushLog(master.name + " summons " + u.name + ".", PAL.purple);
     pushAnim("summon", slot.q, slot.r, "", PAL.gold, "190, 150, 230");
     beep(660, 0.08, "triangle", 0.18);
   }
@@ -2277,7 +2285,7 @@ const B = {
 // Fired when a combatant levels up mid-battle: log line, fanfare, and a
 // "LEVEL UP!" banner over that side of the arena.
 function onBattleLevelUp(unit, side) {
-  pushLog(unit.name + " reached Level " + unit.level + "!");
+  pushLog(unit.name + " reached Level " + unit.level + "!", PAL.gold);
   if (STATE.battle) {
     STATE.battle.flash = Math.max(STATE.battle.flash, 0.85);
     STATE.battle.levelUp = { side, ttl: 64 };
@@ -2299,8 +2307,8 @@ function applySwing(b, counter) {
   if (STATE.screen === "battle") pushAnim("dmgB", dst.q, dst.r, "-" + dmg, PAL.red);
   pushLog(counter
     ? src.name + " counters for " + dmg + "."
-    : src.name + " strikes " + dst.name + " for " + dmg + ".");
-  if (dst.hp <= 0) { pushLog(dst.name + " is destroyed."); if (STATE.stats) STATE.stats.lost[dst.owner]++; }
+    : src.name + " strikes " + dst.name + " for " + dmg + ".", PAL.red);
+  if (dst.hp <= 0) { pushLog(dst.name + " is destroyed.", "#ff8888"); if (STATE.stats) STATE.stats.lost[dst.owner]++; }
   const killed = dst.hp <= 0;
   const xpAmt = dmg + (killed ? KILL_XP_BONUS : 0);
   if (gainXp(src, xpAmt) > 0) {
@@ -3231,13 +3239,33 @@ function renderSidebar() {
   ctx.fillStyle = PAL.gold;
   ctx.font = "bold 10px 'Courier New', monospace";
   ctx.fillText("BATTLE LOG", SIDEBAR_X + 14, CANVAS_H - 154);
+  // 6.2 — scrollback hint: "▼ newer" when scrolled back, "▲" when more above.
+  const logMax = Math.max(0, STATE.log.length - 10);
+  if (STATE.logScroll > 0) {
+    ctx.textAlign = "right";
+    ctx.fillStyle = PAL.gold;
+    ctx.fillText("▼ newer (wheel)", SIDEBAR_X + SIDEBAR_W - 14, CANVAS_H - 154);
+    ctx.textAlign = "left";
+  }
   ctx.font = "10px 'Courier New', monospace";
   for (let i = 0; i < 10; i++) {
-    const line = STATE.log[i];
-    if (!line) break;
-    ctx.fillStyle = i === 0 ? PAL.ink : PAL.inkDim;
-    wrapText(line, SIDEBAR_X + 14, CANVAS_H - 138 + i * 13, SIDEBAR_W - 26, 12);
+    const entry = STATE.log[STATE.logScroll + i];
+    if (!entry) break;
+    // 6.2 — tolerate both old string entries (from saves) and new {text,color} objects.
+    const { text, color } = typeof entry === "string" ? { text: entry, color: null } : entry;
+    if (i === 0 && STATE.logScroll === 0) {
+      ctx.fillStyle = color || PAL.ink; // newest line: entry color or bright default
+    } else {
+      ctx.fillStyle = color || PAL.inkDim; // older lines: entry color or dim default
+    }
+    wrapText(text, SIDEBAR_X + 14, CANVAS_H - 138 + i * 13, SIDEBAR_W - 26, 12);
   }
+  if (STATE.logScroll < logMax) {
+    ctx.fillStyle = PAL.inkDim;
+    ctx.font = "10px 'Courier New', monospace";
+    ctx.fillText("▲ older", SIDEBAR_X + 14, CANVAS_H - 5);
+  }
+  ctx.textAlign = "left";
 }
 
 // 3.1 — full unit info card: portrait, element, HP/MP/XP bars, stats, the
@@ -4076,6 +4104,17 @@ function onClick(ev) {
   interactAt(local.q, local.r);
 }
 
+// 6.2 — log scrollback: wheel inside the BATTLE LOG strip scrolls older/newer.
+function onWheel(ev) {
+  if (STATE.screen !== "play") return;
+  const p = clientToCanvas(ev);
+  // Log strip occupies x >= SIDEBAR_X, y >= CANVAS_H - 170.
+  if (p.x < SIDEBAR_X || p.y < CANVAS_H - 170) return;
+  ev.preventDefault();
+  const logMax = Math.max(0, STATE.log.length - 10);
+  STATE.logScroll = Math.max(0, Math.min(logMax, STATE.logScroll + Math.sign(ev.deltaY)));
+}
+
 // Map-interaction core: select a unit, move into a reachable hex, fire an
 // attack, or deselect. Shared by mouse clicks and the keyboard cursor (3.4).
 function interactAt(q, r) {
@@ -4091,6 +4130,7 @@ function interactAt(q, r) {
       STATE.selected = null;
       STATE.reachable = null;
       STATE.attackTargets = null;
+      STATE.undo = { unit, q: unit.q, r: unit.r }; // 6.2 snapshot pre-move position
       startMove(unit, q, r, reach, () => openPostMoveMenu(unit));
       return;
     } else if (STATE.attackTargets && STATE.attackTargets.has(hexKey(q, r))) {
@@ -4099,6 +4139,7 @@ function interactAt(q, r) {
         const atk = STATE.selected;
         atk.acted = true;
         STATE.selected = null; STATE.reachable = null; STATE.attackTargets = null;
+        STATE.undo = null; // 6.2 attack committed
         beginBattle(atk, target);
         return;
       }
@@ -4319,6 +4360,7 @@ function openPostMoveMenu(unit) {
   if (targets.size > 0) items.push({ label: "Attack", kind: "attackMode" });
   if (canCapture(unit, cellHere)) items.push({ label: "Capture", kind: "capture" });
   if (unit.isMaster && unit.mp >= 6) items.push({ label: "Summon", kind: "summon" });
+  if (STATE.undo && STATE.undo.unit === unit) items.push({ label: "Undo", kind: "undo" }); // 6.2
   items.push({ label: "Wait", kind: "wait" });
   const px = axialToPixel(unit.q, unit.r);
   STATE.menu = {
@@ -4331,16 +4373,27 @@ function selectMenuItem(item) {
   if (item.disabled) return;
   const unit = STATE.menu.unit;
   if (item.kind === "wait") {
-    unit.acted = true; closeMenu();
+    STATE.undo = null; unit.acted = true; closeMenu(); // 6.2 commit clears undo
   } else if (item.kind === "attackMode") {
     STATE.selected = unit;
     STATE.attackTargets = computeAttackTargets(unit, unit.q, unit.r);
     STATE.reachable = null;
     STATE.menu = null;
+    // NOTE: STATE.undo stays live until the actual attack is confirmed in
+    // interactAt — at that point STATE.undo is set to null.
   } else if (item.kind === "capture") {
     const cell = cellAt({ q: unit.q, r: unit.r });
     if (cell && cell.terrain === "tower") captureTower(unit, cell);
-    unit.acted = true; closeMenu();
+    STATE.undo = null; unit.acted = true; closeMenu(); // 6.2 commit clears undo
+  } else if (item.kind === "undo") {
+    // 6.2 — teleport the unit back to its pre-move hex, reset acted flag,
+    // clear the snapshot, close the menu, then re-select the unit so that
+    // reachable/attack overlays come back (mirrors a fresh click on the unit).
+    moveUnitTo(unit, STATE.undo.q, STATE.undo.r);
+    unit.acted = false;
+    STATE.undo = null;
+    closeMenu();
+    interactAt(unit.q, unit.r);
   } else if (item.kind === "summon") {
     const items = SUMMON_LIST.map(k => {
       const t = UNIT_TYPES[k];
@@ -4366,10 +4419,10 @@ function selectMenuItem(item) {
     u.acted = true;
     STATE.units.push(u);
     if (STATE.stats) STATE.stats.summoned[unit.owner]++;
-    pushLog(unit.name + " summons " + u.name + ".");
+    pushLog(unit.name + " summons " + u.name + ".", PAL.purple);
     pushAnim("summon", slot.q, slot.r, "", PAL.gold, "190, 150, 230");
     beep(660, 0.08, "triangle", 0.18);
-    unit.acted = true; closeMenu();
+    STATE.undo = null; unit.acted = true; closeMenu();
   } else if (item.kind === "back") {
     openPostMoveMenu(unit);
   }
@@ -4394,6 +4447,7 @@ function cancelMenu() {
   // is equivalent to Wait). Without this, the unit becomes reselectable
   // and the player can repeatedly move it.
   if (STATE.menu.unit && !STATE.menu.unit.acted) STATE.menu.unit.acted = true;
+  STATE.undo = null; // 6.2 escape-to-cancel commits, so undo is no longer valid
   closeMenu();
 }
 
@@ -4403,6 +4457,7 @@ function cancelMenu() {
 
 function endTurn() {
   if (STATE.menu) closeMenu();
+  STATE.undo = null; // 6.2 turn ends — any in-flight undo snapshot is void
   for (const u of aliveUnits(STATE.currentPlayer)) u.acted = true;
   STATE.currentPlayer = 1 - STATE.currentPlayer;
   if (STATE.currentPlayer === 0) STATE.turn++;
@@ -4411,7 +4466,7 @@ function endTurn() {
     const towerBonus = MAP.towers.filter(t => t.owner === STATE.currentPlayer).length * 2;
     const regen = m.mpRegen + towerBonus;
     m.mp = Math.min(m.maxMp, m.mp + regen);
-    pushLog(PLAYERS[STATE.currentPlayer].name + " gains " + regen + " MP (towers +" + towerBonus + ").");
+    pushLog(PLAYERS[STATE.currentPlayer].name + " gains " + regen + " MP (towers +" + towerBonus + ").", PAL.inkDim);
   }
   for (const u of aliveUnits(STATE.currentPlayer)) {
     u.acted = false;
@@ -5218,6 +5273,7 @@ function boot() {
   canvas.addEventListener("mousemove", onMouseMove);
   canvas.addEventListener("mouseleave", () => { STATE.mouse = null; });
   canvas.addEventListener("click", onClick);
+  canvas.addEventListener("wheel", onWheel);  // 6.2 log scrollback
   window.addEventListener("keydown", onKey);
   window.addEventListener("resize", resizeCanvasCSS);
 

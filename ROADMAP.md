@@ -181,7 +181,7 @@ Check off with a one-line note when done. Mark `BLOCKED:`/`PARKED:` per rules.
   Playwright test — saveSettings mid-campaign had clobbered the pref).
   [claude-opus-4-8 | high]
 
-### Phase 6 — Systems
+### Phase 6 — Systems  ✅ COMPLETE (S4)
 
 - [x] 6.1 Save/load (S4): one autosave slot "wraithspire.save.v1" (versioned
   blob: cells serialized directly since tower owners mutate, units incl.
@@ -193,9 +193,14 @@ Check off with a one-line note when done. Mark `BLOCKED:`/`PARKED:` per rules.
   verified exact via Playwright (units/towers/stats identical after wreck +
   load). Campaign progress was already persisted (5.3).
   [claude-opus-4-8 | high]
-- [ ] 6.2 Undo move: snapshot before move, "Undo" in action menu until attack/
-  capture/summon committed; battle log panel upgrade (scrollback, colors).
-  [claude-sonnet-4-6 | medium]
+- [x] 6.2 Undo move + log upgrade (S4): STATE.undo {unit,q,r} snapshot set
+  before player startMove; "Undo" item in post-move menu (before Wait) —
+  teleports back, un-acts, re-selects via interactAt; cleared at every commit
+  point (attack target, capture, summonChoice, wait, Esc-cancel, endTurn).
+  Log: pushLog(line, color), entries {text,color} (renderer tolerates legacy
+  string saves), colorized call sites (red hits, gold captures/levels, purple
+  summons, winner-tinted victory), wheel scrollback over the log strip w/
+  ▲/▼ hints, snaps to newest on push. [claude-sonnet-4-6 | medium]
 
 ### Phase 7 — Performance & health
 
