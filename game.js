@@ -2820,6 +2820,7 @@ function boot() {
   if (window.location.hash === "#demo") runDemo();
   if (window.location.hash === "#battle") runBattleDemo();
   if (window.location.hash === "#gameover") runGameOverDemo();
+  if (window.location.hash === "#smoke") runSmokeTest();
 
   requestAnimationFrame(loop);
 }
@@ -2885,4 +2886,47 @@ function runGameOverDemo() {
   startNewGame();
   masterOf(1).hp = 0;
   checkWinCondition();
+}
+
+// #smoke — plays a full first turn (player summons + ends turn, AI plays its
+// whole turn) and writes a DOM marker the headless runner greps for.
+// Success: no JS errors, AI turn completed, control back with player 0 on
+// turn 2 (or a legitimate gameover). Run via smoke-test.sh.
+function runSmokeTest() {
+  const errors = [];
+  window.addEventListener("error", e => errors.push(e.message || String(e.error)));
+  window.addEventListener("unhandledrejection", e => errors.push("rejection: " + e.reason));
+
+  function report(text) {
+    let el = document.getElementById("smoke-result");
+    if (!el) {
+      el = document.createElement("div");
+      el.id = "smoke-result";
+      document.body.appendChild(el);
+    }
+    el.textContent = text;
+    document.title = text.slice(0, 60);
+  }
+
+  runDemo(); // start game, summon two units, end turn → AI plays
+
+  const startedAt = Date.now();
+  function poll() {
+    if (errors.length) {
+      report("SMOKE_FAIL " + errors.join(" | "));
+      return;
+    }
+    const aiDone = STATE.screen === "play" && STATE.currentPlayer === 0 && STATE.turn >= 2;
+    const legitimateEnd = STATE.screen === "gameover";
+    if (aiDone || legitimateEnd) {
+      report("SMOKE_OK turn=" + STATE.turn + " units=" + STATE.units.filter(u => u.hp > 0).length);
+      return;
+    }
+    if (Date.now() - startedAt > 25000) {
+      report("SMOKE_TIMEOUT screen=" + STATE.screen + " player=" + STATE.currentPlayer + " turn=" + STATE.turn);
+      return;
+    }
+    setTimeout(poll, 300);
+  }
+  setTimeout(poll, 500);
 }
