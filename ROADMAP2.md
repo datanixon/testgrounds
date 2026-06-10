@@ -33,9 +33,17 @@ Tag legend: `[model | effort]` routing hints, same rubric as v1.
   flag clear in endTurn; card ability line (+12 h). Spec-reviewed ✅ twice
   (leak fixed: attack-during-leg), quality-reviewed (5 fragility notes,
   none reachable — accepted). [claude-opus-4-8 | high]
-- [ ] 1.3 Remaining 8 abilities: Ignite, Cinder Breath, Undertow, Dive Mark
-  (attack-flavored via battle applyStatus), Bulwark, Ward (flag auras),
-  Blink (teleport targeting), Gale Rush (move-again). [claude-opus-4-8 | high]
+- [x] 1.3 Remaining 8 abilities (S1): mark ×1.2 / bulwark +2 DEF in
+  computeDamage (forecast+AI inherit), ward consume-one-hit in applySwing,
+  beginBattle opts {applyStatus, statusTurns} (non-counter swing only);
+  bulwark/ward self+adjacent auras; enemy-target arming (STATE.abilityArm) +
+  Blink tile-targeting (STATE.blinkArm, purple overlay) routed at top of
+  interactAt; arm clears at cancel/Esc/mis-click/endTurn + state resets.
+  All 12 lines wired. BONUS: fixed pre-existing v1 dead button — post-move
+  "Attack" never fired (reachable nulled → branch unreachable); now unified
+  through the arm pattern (ab:null = plain attack, no cd). Spec-reviewed ✅
+  (live behavioral tests incl. ward/counter phases), quality clean.
+  [claude-opus-4-8 | high]
 - [ ] 1.4 Ability AI: per-key heuristics scored as candidates in aiActUnit
   beside attack/capture/move. [claude-fable-5 | high]
 - [ ] 1.5 Weather: STATE.weather, per-map tables, reroll ~5 turns,

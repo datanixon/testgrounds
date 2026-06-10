@@ -388,31 +388,31 @@ function elementsEmpoweredBy(terrain) {
 }
 
 const UNIT_TYPES = {
-  cinderling:  { name: "Cinderling",  element: "pyro",   maxHp: 12, move: 4, range: 1, power: 5, def: 1, cost: 6,  flying: false, sprite: "imp",      attack: "melee",  evolvesTo: "infernite" },
-  pyrowyrm:    { name: "Pyrowyrm",    element: "pyro",   maxHp: 18, move: 3, range: 2, power: 7, def: 2, cost: 12, flying: false, sprite: "wyrm",     attack: "breath", evolvesTo: "emberdrake" },
-  tidekin:     { name: "Tidekin",     element: "hydro",  maxHp: 14, move: 4, range: 1, power: 5, def: 2, cost: 7,  flying: false, sprite: "merfolk",  attack: "melee",  evolvesTo: "tidelord", ability: "healPulse" },
-  mistleviath: { name: "Mistlevy",    element: "hydro",  maxHp: 20, move: 3, range: 2, power: 6, def: 3, cost: 14, flying: false, sprite: "serpent",  attack: "spray",  evolvesTo: "leviathan" },
-  stoneward:   { name: "Stoneward",   element: "terra",  maxHp: 22, move: 2, range: 1, power: 5, def: 4, cost: 8,  flying: false, sprite: "golem",    attack: "melee",  evolvesTo: "colossus" },
+  cinderling:  { name: "Cinderling",  element: "pyro",   maxHp: 12, move: 4, range: 1, power: 5, def: 1, cost: 6,  flying: false, sprite: "imp",      attack: "melee",  evolvesTo: "infernite",   ability: "ignite" },
+  pyrowyrm:    { name: "Pyrowyrm",    element: "pyro",   maxHp: 18, move: 3, range: 2, power: 7, def: 2, cost: 12, flying: false, sprite: "wyrm",     attack: "breath", evolvesTo: "emberdrake",  ability: "cinderBreath" },
+  tidekin:     { name: "Tidekin",     element: "hydro",  maxHp: 14, move: 4, range: 1, power: 5, def: 2, cost: 7,  flying: false, sprite: "merfolk",  attack: "melee",  evolvesTo: "tidelord",    ability: "healPulse" },
+  mistleviath: { name: "Mistlevy",    element: "hydro",  maxHp: 20, move: 3, range: 2, power: 6, def: 3, cost: 14, flying: false, sprite: "serpent",  attack: "spray",  evolvesTo: "leviathan",   ability: "undertow" },
+  stoneward:   { name: "Stoneward",   element: "terra",  maxHp: 22, move: 2, range: 1, power: 5, def: 4, cost: 8,  flying: false, sprite: "golem",    attack: "melee",  evolvesTo: "colossus",    ability: "bulwark" },
   geomaul:     { name: "Geomaul",     element: "terra",  maxHp: 26, move: 2, range: 1, power: 9, def: 4, cost: 16, flying: false, sprite: "ogre",     attack: "melee",  evolvesTo: "earthbreaker", ability: "quake" },
-  galewisp:    { name: "Galewisp",    element: "zephyr", maxHp: 10, move: 5, range: 2, power: 4, def: 1, cost: 7,  flying: true,  sprite: "wisp",     attack: "spark",  evolvesTo: "stormwisp", ability: "galeRush" },
-  skyharrow:   { name: "Skyharrow",   element: "zephyr", maxHp: 16, move: 4, range: 2, power: 7, def: 2, cost: 13, flying: true,  sprite: "raptor",   attack: "dive",   evolvesTo: "skytyrant" },
+  galewisp:    { name: "Galewisp",    element: "zephyr", maxHp: 10, move: 5, range: 2, power: 4, def: 1, cost: 7,  flying: true,  sprite: "wisp",     attack: "spark",  evolvesTo: "stormwisp",   ability: "galeRush" },
+  skyharrow:   { name: "Skyharrow",   element: "zephyr", maxHp: 16, move: 4, range: 2, power: 7, def: 2, cost: 13, flying: true,  sprite: "raptor",   attack: "dive",   evolvesTo: "skytyrant",   ability: "diveMark" },
 
   // Evolved forms (terminal tier; not directly summonable). Reached when a
   // level-4+ unit starts its turn on an owned tower/castle. Real sprites added
   // in milestone 5.1 — each evolved form now has its own unique sprite id.
-  infernite:    { name: "Infernite",    element: "pyro",   maxHp: 22, move: 4, range: 1, power: 9,  def: 3, cost: 18, flying: false, sprite: "infernite",    attack: "melee",  evolved: true },
-  emberdrake:   { name: "Emberdrake",   element: "pyro",   maxHp: 30, move: 3, range: 2, power: 11, def: 4, cost: 26, flying: false, sprite: "emberdrake",   attack: "breath", evolved: true },
+  infernite:    { name: "Infernite",    element: "pyro",   maxHp: 22, move: 4, range: 1, power: 9,  def: 3, cost: 18, flying: false, sprite: "infernite",    attack: "melee",  evolved: true, ability: "ignite" },
+  emberdrake:   { name: "Emberdrake",   element: "pyro",   maxHp: 30, move: 3, range: 2, power: 11, def: 4, cost: 26, flying: false, sprite: "emberdrake",   attack: "breath", evolved: true, ability: "cinderBreath" },
   tidelord:     { name: "Tidelord",     element: "hydro",  maxHp: 24, move: 4, range: 1, power: 9,  def: 4, cost: 18, flying: false, sprite: "tidelord",     attack: "melee",  evolved: true, ability: "healPulse" },
-  leviathan:    { name: "Leviathan",    element: "hydro",  maxHp: 32, move: 3, range: 2, power: 10, def: 5, cost: 28, flying: false, sprite: "leviathan",    attack: "spray",  evolved: true },
-  colossus:     { name: "Colossus",     element: "terra",  maxHp: 36, move: 2, range: 1, power: 9,  def: 6, cost: 20, flying: false, sprite: "colossus",     attack: "melee",  evolved: true },
+  leviathan:    { name: "Leviathan",    element: "hydro",  maxHp: 32, move: 3, range: 2, power: 10, def: 5, cost: 28, flying: false, sprite: "leviathan",    attack: "spray",  evolved: true, ability: "undertow" },
+  colossus:     { name: "Colossus",     element: "terra",  maxHp: 36, move: 2, range: 1, power: 9,  def: 6, cost: 20, flying: false, sprite: "colossus",     attack: "melee",  evolved: true, ability: "bulwark" },
   earthbreaker: { name: "Earthbreaker", element: "terra",  maxHp: 42, move: 2, range: 1, power: 14, def: 6, cost: 30, flying: false, sprite: "earthbreaker", attack: "melee",  evolved: true, ability: "quake" },
   stormwisp:    { name: "Stormwisp",    element: "zephyr", maxHp: 18, move: 5, range: 2, power: 8,  def: 2, cost: 18, flying: true,  sprite: "stormwisp",    attack: "spark",  evolved: true, ability: "galeRush" },
-  skytyrant:    { name: "Skytyrant",    element: "zephyr", maxHp: 26, move: 4, range: 2, power: 11, def: 3, cost: 24, flying: true,  sprite: "skytyrant",    attack: "dive",   evolved: true },
+  skytyrant:    { name: "Skytyrant",    element: "zephyr", maxHp: 26, move: 4, range: 2, power: 11, def: 3, cost: 24, flying: true,  sprite: "skytyrant",    attack: "dive",   evolved: true, ability: "diveMark" },
 
   // New base monsters (milestone 5.1 — arcane element coverage + roster depth)
-  hexwisp:   { name: "Hexwisp",   element: "arcane", maxHp: 11, move: 5, range: 2, power: 5,  def: 1, cost: 8,  flying: true,  sprite: "hexwisp",   attack: "bolt" },
-  runeward:  { name: "Runeward",  element: "arcane", maxHp: 24, move: 2, range: 1, power: 7,  def: 5, cost: 15, flying: false, sprite: "runeward",  attack: "melee" },
-  frostmaw:  { name: "Frostmaw",  element: "hydro",  maxHp: 28, move: 3, range: 1, power: 10, def: 3, cost: 18, flying: false, sprite: "frostmaw",  attack: "melee" },
+  hexwisp:   { name: "Hexwisp",   element: "arcane", maxHp: 11, move: 5, range: 2, power: 5,  def: 1, cost: 8,  flying: true,  sprite: "hexwisp",   attack: "bolt",  ability: "blink" },
+  runeward:  { name: "Runeward",  element: "arcane", maxHp: 24, move: 2, range: 1, power: 7,  def: 5, cost: 15, flying: false, sprite: "runeward",  attack: "melee", ability: "ward" },
+  frostmaw:  { name: "Frostmaw",  element: "hydro",  maxHp: 28, move: 3, range: 1, power: 10, def: 3, cost: 18, flying: false, sprite: "frostmaw",  attack: "melee", ability: "frostBite" },
   duneskink: { name: "Duneskink", element: "terra",  maxHp: 13, move: 5, range: 1, power: 6,  def: 1, cost: 6,  flying: false, sprite: "duneskink", attack: "melee", ability: "skitter" },
 };
 
@@ -575,6 +575,8 @@ const STATE = {
   story: null,          // 5.3 {index} for the interstitial screen
   undo: null,           // 6.2 {unit, q, r} pre-move snapshot; cleared on commit
   logScroll: 0,         // 6.2 entries scrolled back from newest (0 = live tail)
+  abilityArm: null,     // 1.3 armed enemy-target ability waiting for click
+  blinkArm: null,       // 1.3 armed blink (tile-target) waiting for click
 };
 
 // ---- Settings persistence (3.3) ----
@@ -689,6 +691,7 @@ function loadGame() {
   STATE.cursor = null; STATE.menu = null; STATE.battle = null; STATE.moveAnim = null;
   STATE.animations = []; STATE.winner = null; STATE.pendingAI = false;
   STATE.undo = null; STATE.logScroll = 0; // 6.2
+  STATE.abilityArm = null; STATE.blinkArm = null; // 1.3
   STATE.screen = "play";
   startTransition("wipe", 30);
   STATE.banner = { text: "RESUMED — TURN " + STATE.turn, ttl: 80, color: PLAYERS[STATE.currentPlayer].color };
@@ -723,6 +726,8 @@ function startNewGame(scenario) {
   STATE.attackTargets = null;
   STATE.cursor = null;
   STATE.menu = null;
+  STATE.abilityArm = null;
+  STATE.blinkArm = null;
   STATE.banner = { text: PLAYERS[0].name + " — TURN " + STATE.turn, ttl: 90, color: PLAYERS[0].color };
   STATE.log = [];
   STATE.logScroll = 0;  // 6.2 reset scrollback on new game
@@ -953,9 +958,12 @@ function computeDamage(attacker, defender) {
   const elemMul = ELEM_MATRIX[attacker.element][defender.element];
   const aff = affinityFor(attacker.element, aCell.terrain);
   const affMul = aff ? AFFINITY_MULT : 1.0;
+  // v2 combat flags (1.3)
+  const markMul = hasStatus(defender, "mark") ? 1.2 : 1.0;
+  const bulwarkDef = hasStatus(defender, "bulwark") ? 2 : 0;
   const raw = attacker.power * (attacker.hp / attacker.maxHp * 0.5 + 0.5);
-  const mit = defender.def + dTDef * 0.5;
-  const base = Math.max(1, Math.round(raw * elemMul * affMul - mit * 0.6));
+  const mit = defender.def + bulwarkDef + dTDef * 0.5;
+  const base = Math.max(1, Math.round(raw * elemMul * affMul * markMul - mit * 0.6));
   const dmg = Math.max(1, base + Math.floor(Math.random() * 3) - 1);
   return { dmg, base, elemMul, affMul, hasAffinity: !!aff, aTDef, dTDef };
 }
@@ -978,7 +986,7 @@ function forecastBattle(attacker, defender) {
 
 // Begins an attack: computes both swings up front, then opens the battle
 // scene which will apply damage at impact frames and resume play on outro.
-function beginBattle(attacker, defender, afterDone) {
+function beginBattle(attacker, defender, afterDone, opts) {
   const a1 = computeDamage(attacker, defender);
   const willDie1 = defender.hp - a1.dmg <= 0;
 
@@ -1008,6 +1016,8 @@ function beginBattle(attacker, defender, afterDone) {
     floats: [],   // map-layer damage/xp/level floats, emitted on resume (2.2)
     afterDone,
     arenaSeed: Math.floor(Math.random() * 1e6),
+    applyStatus: opts && opts.applyStatus ? opts.applyStatus : null,
+    statusTurns: opts && opts.statusTurns ? opts.statusTurns : 0,
   };
   if (STATE.stats) STATE.stats.battles++;
 
@@ -2311,6 +2321,13 @@ function applySwing(b, counter) {
   const src = counter ? b.defender : b.attacker;
   const dst = counter ? b.attacker : b.defender;
   const dmg = counter ? b.cDmg : b.aDmg;
+  if (hasStatus(dst, "ward")) {
+    delete dst.status.ward; // consumed by this hit
+    if (STATE.screen === "battle") pushAnim("dmgB", dst.q, dst.r, "WARDED", PAL.purple);
+    b.floats.push({ q: dst.q, r: dst.r, text: "WARDED", color: PAL.purple, dy: 0 });
+    pushLog(dst.name + "'s ward absorbs the blow.", PAL.purple);
+    return; // negated: no damage, no XP from this swing
+  }
   dst.hp -= dmg;
   if (STATE.screen === "battle") pushAnim("dmgB", dst.q, dst.r, "-" + dmg, PAL.red);
   pushLog(counter
@@ -2325,6 +2342,7 @@ function applySwing(b, counter) {
   }
   b.floats.push({ q: dst.q, r: dst.r, text: "-" + dmg, color: PAL.red, dy: 0 });
   if (xpAmt > 0) b.floats.push({ q: src.q, r: src.r, text: "+" + xpAmt + " xp", color: PAL.gold, dy: -10 });
+  if (!counter && b.applyStatus && dst.hp > 0) addStatus(dst, b.applyStatus, b.statusTurns);
 }
 
 function updateBattle() {
@@ -2996,6 +3014,17 @@ function renderOverlays() {
       hexPath(p.x, p.y); ctx.fill();
       ctx.strokeStyle = "rgba(255, 120, 120, 0.85)";
       ctx.lineWidth = 2;
+      hexPath(p.x, p.y); ctx.stroke();
+    }
+  }
+  if (STATE.blinkArm) {
+    for (const k of STATE.blinkArm.tiles) {
+      const [bq, br] = k.split(",").map(Number);
+      const p = axialToPixel(bq, br);
+      ctx.fillStyle = "rgba(176,120,200,0.28)";
+      hexPath(p.x, p.y); ctx.fill();
+      ctx.strokeStyle = "rgba(176,120,200,0.70)";
+      ctx.lineWidth = 1.5;
       hexPath(p.x, p.y); ctx.stroke();
     }
   }
@@ -4191,6 +4220,54 @@ function onWheel(ev) {
 function interactAt(q, r) {
   if (!inBounds(q, r)) return;
 
+  // 1.3: blink arm — tile-target; must be checked first (blinkArm may be set
+  // without STATE.selected/reachable, so the normal umbrella won't catch it).
+  if (STATE.blinkArm) {
+    const arm = STATE.blinkArm;
+    const unit = arm.unit;
+    const ab = arm.ab;
+    if (arm.tiles.has(hexKey(q, r))) {
+      STATE.blinkArm = null;
+      STATE.selected = null; STATE.reachable = null; STATE.attackTargets = null;
+      moveUnitTo(unit, q, r);
+      pushAnim("summon", q, r, "", PAL.purple, "176, 120, 200");
+      beep(700, 0.1, "triangle", 0.2);
+      unit.acted = true; unit.cd = ab.cd; STATE.undo = null;
+    } else {
+      // mis-click: cancel arm, deselect — unit is un-acted and cd unspent
+      STATE.blinkArm = null;
+      STATE.selected = null; STATE.reachable = null; STATE.attackTargets = null;
+    }
+    return;
+  }
+
+  // 1.3: enemy-target ability arm (and plain-attack arm when ab===null) —
+  // STATE.reachable is null in the post-move context, so this must live before
+  // the selected+reachable umbrella which would otherwise be skipped entirely.
+  if (STATE.abilityArm && STATE.attackTargets && STATE.attackTargets.has(hexKey(q, r))) {
+    const target = unitAt(q, r);
+    const arm = STATE.abilityArm;
+    if (target) {
+      STATE.abilityArm = null;
+      STATE.selected = null; STATE.reachable = null; STATE.attackTargets = null;
+      arm.unit.acted = true;
+      if (arm.ab) arm.unit.cd = arm.ab.cd; // plain attack (ab=null) has no cooldown
+      STATE.undo = null;
+      if (arm.ab) {
+        beginBattle(arm.unit, target, null, { applyStatus: arm.ab.status, statusTurns: arm.ab.statusTurns });
+      } else {
+        beginBattle(arm.unit, target, null); // plain attack — no opts
+      }
+    }
+    return;
+  }
+  if (STATE.abilityArm) {
+    // mis-click outside targets: cancel arm, deselect — unit is un-acted and cd unspent
+    STATE.abilityArm = null;
+    STATE.selected = null; STATE.reachable = null; STATE.attackTargets = null;
+    return;
+  }
+
   const onUnit = unitAt(q, r);
 
   if (STATE.selected && STATE.reachable) {
@@ -4313,6 +4390,7 @@ function onKey(ev) {
   }
   if (ev.key === "Escape") {
     STATE.selected = null; STATE.reachable = null; STATE.attackTargets = null;
+    STATE.abilityArm = null; STATE.blinkArm = null; // 1.3
     // If cursor was active but nothing was selected, clear it too.
     if (!STATE.selected) STATE.cursor = null;
     return;
@@ -4462,9 +4540,13 @@ function selectMenuItem(item) {
   if (item.kind === "wait") {
     STATE.undo = null; unit.acted = true; closeMenu(); // 6.2 commit clears undo
   } else if (item.kind === "attackMode") {
-    STATE.selected = unit;
-    STATE.attackTargets = computeAttackTargets(unit, unit.q, unit.r);
-    STATE.reachable = null;
+    // Fix A (1.3): arm a plain attack via the abilityArm pattern so interactAt
+    // can route it — the old path set reachable=null which made the attack branch
+    // inside the selected+reachable umbrella unreachable, silently dead-buttoning.
+    const targets = computeAttackTargets(unit, unit.q, unit.r);
+    if (!targets.size) { pushLog("No target in range."); return; } // menu stays open
+    STATE.attackTargets = targets;
+    STATE.abilityArm = { unit, ab: null }; // ab=null → plain attack, no cd
     STATE.menu = null;
     // NOTE: STATE.undo stays live until the actual attack is confirmed in
     // interactAt — at that point STATE.undo is set to null.
@@ -4527,10 +4609,27 @@ function selectMenuItem(item) {
       }
       return;
     }
-    // "enemy"/"tile" targeting modes are milestone 1.3 — none of THIS
-    // milestone's wired units have them, so just close defensively.
-    closeMenu();
-    return;
+    if (ab.target === "enemy") {
+      const targets = computeAttackTargets(unit, unit.q, unit.r);
+      if (!targets.size) { pushLog("No target in range."); return; } // menu stays open
+      STATE.attackTargets = targets;
+      STATE.abilityArm = { unit, ab };
+      STATE.menu = null; // keep selection; next target click routes via interactAt
+      return;
+    }
+    if (ab.target === "tile") {
+      const tiles = new Set();
+      for (const cell of MAP.cells.values()) {
+        if (hexDistance(cell, unit) <= 4 && !unitAt(cell.q, cell.r) &&
+            !TERRAIN[cell.terrain].blocks && !(TERRAIN[cell.terrain].flyersOnly && !unit.flying)) {
+          tiles.add(hexKey(cell.q, cell.r));
+        }
+      }
+      if (!tiles.size) { pushLog("Nowhere to blink."); return; }
+      STATE.blinkArm = { unit, ab, tiles };
+      STATE.menu = null;
+      return;
+    }
   } else if (item.kind === "back") {
     openPostMoveMenu(unit);
   }
@@ -4556,6 +4655,7 @@ function cancelMenu() {
   // and the player can repeatedly move it.
   if (STATE.menu.unit && !STATE.menu.unit.acted) STATE.menu.unit.acted = true;
   STATE.undo = null; // 6.2 escape-to-cancel commits, so undo is no longer valid
+  STATE.abilityArm = null; STATE.blinkArm = null; // 1.3
   closeMenu();
 }
 
@@ -4592,6 +4692,7 @@ function endTurn() {
   STATE.selected = null;
   STATE.reachable = null;
   STATE.attackTargets = null;
+  STATE.abilityArm = null; STATE.blinkArm = null; // 1.3 stale arms cleared on turn change
   STATE.banner = { text: PLAYERS[STATE.currentPlayer].name + " — TURN " + STATE.turn, ttl: 80, color: PLAYERS[STATE.currentPlayer].color };
   checkWinCondition();
   if (STATE.screen !== "play") return;
@@ -5640,5 +5741,15 @@ function resolveInstantAbility(unit, ab) {
     beep(880, 0.08, "triangle", 0.18);
     return true;
   }
-  return false; // bulwark/ward land in 1.3
+  if (ab.key === "bulwark" || ab.key === "ward") {
+    addStatus(unit, ab.key, 2); // expires at the owner's next turn tick
+    for (const n of hexNeighbors(unit.q, unit.r)) {
+      const a = unitAt(n.q, n.r);
+      if (a && a.owner === unit.owner) addStatus(a, ab.key, 2);
+    }
+    pushLog(unit.name + " raises a " + ab.name.toLowerCase() + ".", PAL.purple);
+    beep(560, 0.1, "triangle", 0.2);
+    return true;
+  }
+  return false;
 }
