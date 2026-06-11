@@ -111,7 +111,10 @@ static func ability_for(unit: Dictionary) -> Variant:
 		return null
 	var out := base.duplicate()
 	out["key"] = t["ability"]
-	out["cd"] = maxi(1, base["cd"] - (1 if unit.get("evolved", false) else 0))
+	# JS reads t.evolved (the TYPE's flag), not unit.evolved — so a freshly-made
+	# evolved unit (make_unit("infernite")) gets the cd reduction even though its
+	# record has no `evolved` key. (game.js:5754)
+	out["cd"] = maxi(1, base["cd"] - (1 if t.get("evolved", false) else 0))
 	return out
 ```
 
@@ -322,7 +325,6 @@ extends RefCounted
 const Hex = preload("res://core/hex.gd")
 const Status = preload("res://core/status.gd")
 const Units = preload("res://core/units.gd")
-const Terrain = preload("res://data/terrain.gd")
 
 ## resolve_instant — fire a target:"none" ability at the unit's current hex. Returns
 ## true if it fired. Does NOT set cd/acted (caller owns those).
@@ -424,7 +426,11 @@ pwsh -ExecutionPolicy Bypass -File godot/tests/run_tests.ps1; "EXIT=$LASTEXITCOD
 ```
 Expected: error about `AbilityResolve.blink_targets`, non-zero EXIT.
 
-- [ ] **Step 3: Append to `godot/core/ability_resolve.gd`, verbatim** (port of game.js Blink targeting 4673–4680 + teleport 4272):
+- [ ] **Step 3: Add the `Terrain` preload + append the Blink functions to `godot/core/ability_resolve.gd`.** First add this preload line under the existing `const Units = ...` line (Blink reads `Terrain.TERRAIN` for landability):
+```gdscript
+const Terrain = preload("res://data/terrain.gd")
+```
+Then append, verbatim (port of game.js Blink targeting 4673–4680 + teleport 4272):
 ```gdscript
 
 ## blink_targets — set of "q,r" within 4 hexes of `unit` that are empty and landable:
