@@ -83,6 +83,11 @@ static func resolve_attack(state, attacker: Dictionary, defender: Dictionary, ap
 		"def_hp_before": def_hp_before, "def_max_hp": def_max,
 		"primary": primary, "counter": counter, "status": status_rec, "terrain": terrain,
 	})
+	state.stats["battles"] += 1
+	if primary.get("killed", false):
+		state.stats["lost"][defender["owner"]] += 1
+	if counter.get("killed", false):
+		state.stats["lost"][attacker["owner"]] += 1
 	state.check_win_condition()
 
 ## _combatant_view — the presentation-facing slice of a unit for a battle record (no live refs).

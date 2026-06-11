@@ -10,6 +10,7 @@ const MapGen = preload("res://core/map_gen.gd")
 const Rng = preload("res://core/rng.gd")
 const Weather = preload("res://core/weather.gd")
 const Status = preload("res://core/status.gd")
+const AILib = preload("res://core/ai.gd")  # M9: new_campaign AI opener; ai.gd does NOT preload game_state.gd — no cycle
 
 var map: Dictionary = {}              # the generate() result: cols, rows, cells, castles, towers
 var units: Array[Dictionary] = []
@@ -22,6 +23,10 @@ var map_def: Dictionary = {}  # the active map def (for its weather_table)
 var winner: int = -1          # -1 none; else the winning owner
 var difficulty := "normal"    # AI weight profile (easy/normal/hard); difficulty-select UI is M9
 var battle_log: Array = []   # M8: per-battle snapshots appended by Combat.resolve_attack, drained by the presentation cutaway
+var is_ai: Array[bool] = [false, true]   # M9: per-player AI flag (replaces the current_player==1 hardcode)
+var campaign_index: int = -1             # M9: -1 skirmish; else CAMPAIGN index
+var match_difficulty: String = "normal"  # M9: difficulty in force THIS match (campaign sets its own w/o touching prefs)
+var stats: Dictionary = {"summoned": [0, 0], "lost": [0, 0], "battles": 0}  # M9: gameover summary
 
 func _new_id() -> int:
 	var n := _next_id
@@ -60,6 +65,8 @@ func master_of(owner: int) -> Variant:
 func spawn_unit(type_key: String, owner: int, q: int, r: int) -> Dictionary:
 	var u := Units.make_unit(_new_id(), type_key, owner, q, r)
 	units.append(u)
+	if owner >= 0 and owner < 2:
+		stats["summoned"][owner] += 1
 	return u
 
 func spawn_master(owner: int, q: int, r: int) -> Dictionary:
@@ -137,4 +144,29 @@ static func new_skirmish(def: Dictionary, seed: int) -> GameState:
 	gs.spawn_master(1, castles[1].x, castles[1].y)
 	gs.current_player = 0
 	gs.turn = 1
+	gs.stats = {"summoned": [0, 0], "lost": [0, 0], "battles": 0}
+	return gs
+
+## new_campaign — like new_skirmish but for a CAMPAIGN scenario: generates the
+## scenario map, sets match_difficulty/difficulty from the scenario (without
+## touching the persisted skirmish pref, which lives on Session), applies the
+## AI opening modifiers (ai_mp_bonus clamped to [4, max_mp]; ai_summons pre-placed
+## near the AI master), and tags campaign_index. Mirrors JS startNewGame(scenario).
+## Uses the global `AI` class (ai.gd has class_name AI, does not preload GameState,
+## so no preload const here — avoids a circular preload).
+static func new_campaign(scenario: Dictionary, index: int) -> GameState:
+	var def: Dictionary = scenario["map"]
+	var gs := new_skirmish(def, def.get("seed", 0))
+	gs.campaign_index = index
+	gs.match_difficulty = scenario["difficulty"]
+	gs.difficulty = scenario["difficulty"]
+	var m1 = gs.master_of(1)
+	if m1 != null:
+		var bonus: int = scenario.get("ai_mp_bonus", 0)
+		m1["mp"] = clampi(m1["mp"] + bonus, mini(4, m1["max_mp"]), m1["max_mp"])
+		for k in scenario.get("ai_summons", []):
+			var slot = AILib.find_summon_slot(gs, m1)
+			if slot == null:
+				break
+			gs.spawn_unit(k, 1, slot.x, slot.y)
 	return gs

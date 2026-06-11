@@ -59,6 +59,8 @@ func _initialize() -> void:
 	_test_ui_queries()
 	_test_battle_record()
 	_test_battle_phases()
+	_test_stats()
+	_test_new_campaign()
 	print("\n== %d passed, %d failed ==" % [_passed, _failed])
 	quit(1 if _failed > 0 else 0)
 
@@ -1092,3 +1094,37 @@ func _test_battle_phases() -> void:
 	_eq(BS.next_phase("aRecover", false), "outro", "phases: aRecover->outro without counter")
 	_eq(BS.next_phase("aRecover", true), "cPause", "phases: aRecover->cPause with counter")
 	_eq(BS.next_phase("outro", true), "done", "phases: outro->done")
+
+func _test_stats() -> void:
+	var gs := GameState.new_skirmish(Maps.MAPS[0], 7041)
+	# fresh stats
+	_eq(gs.stats["summoned"], [0, 0], "stats: fresh summoned")
+	_eq(gs.stats["lost"], [0, 0], "stats: fresh lost")
+	_eq(gs.stats["battles"], 0, "stats: fresh battles")
+	# spawning a non-master unit tallies summoned for its owner; masters do not
+	gs.spawn_unit("cinderling", 0, 1, 1)
+	_eq(gs.stats["summoned"], [1, 0], "stats: spawn_unit tallies summoned")
+	# a resolved battle bumps battles, and a kill bumps the dead unit's owner's lost
+	var atk := gs.spawn_unit("colossus", 0, 2, 2)   # heavy hitter
+	var foe := gs.spawn_unit("cinderling", 1, 3, 2)  # adjacent, frail
+	foe["hp"] = 1                                    # ensure lethal hit (plan used "imp" sprite key, type key is "cinderling")
+	atk["acted"] = false
+	Combat.resolve_attack(gs, atk, foe)
+	_eq(gs.stats["battles"], 1, "stats: resolve bumps battles")
+	_ok(gs.stats["lost"][1] >= 1, "stats: enemy loss tallied on kill")
+
+func _test_new_campaign() -> void:
+	var sc: Dictionary = Campaign.CAMPAIGN[1]   # Drowned Marches: ai_mp_bonus 0, ai_summons ["tidekin"]
+	var gs := GameState.new_campaign(sc, 1)
+	_eq(gs.campaign_index, 1, "campaign: index set")
+	_eq(gs.match_difficulty, "normal", "campaign: match_difficulty from scenario")
+	_eq(gs.difficulty, "normal", "campaign: AI weight profile follows match difficulty")
+	# ai_summons pre-placed for player 1
+	var ai_extra := 0
+	for u in gs.units:
+		if u["owner"] == 1 and not u.get("is_master", false):
+			ai_extra += 1
+	_eq(ai_extra, 1, "campaign: one ai_summon pre-placed")
+	# ai_mp_bonus applied & clamped (mission 1 bonus 0 -> master mp unchanged but >= 4)
+	var m1 = gs.master_of(1)
+	_ok(m1["mp"] >= 4, "campaign: ai master mp clamped >= 4")
