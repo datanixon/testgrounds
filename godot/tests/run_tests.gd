@@ -26,6 +26,7 @@ const AiProfiles = preload("res://data/ai_profiles.gd")
 const AI = preload("res://core/ai.gd")
 const UiQueries = preload("res://core/ui_queries.gd")
 const SaveGame = preload("res://core/save_game.gd")
+const SettingsStore = preload("res://core/settings_store.gd")
 
 var _passed := 0
 var _failed := 0
@@ -63,6 +64,7 @@ func _initialize() -> void:
 	_test_stats()
 	_test_new_campaign()
 	_test_save()
+	_test_settings()
 	print("\n== %d passed, %d failed ==" % [_passed, _failed])
 	quit(1 if _failed > 0 else 0)
 
@@ -1182,3 +1184,22 @@ func _test_save() -> void:
 	# the actual crash scenario: a float subscript would panic here
 	gs4.stats["lost"][ju["owner"]] += 1
 	_ok(true, "save: json-path stats subscript by unit owner does not crash")
+
+func _test_settings() -> void:
+	# default blob shape
+	var d := SettingsStore.defaults()
+	_eq(d["music_vol"], 0.6, "settings: default music_vol")
+	_eq(d["battle_scene"], true, "settings: default battle_scene")
+	_eq(d["difficulty"], "normal", "settings: default difficulty")
+	# merge sanitizes: good values applied, bad ones defaulted
+	var merged := SettingsStore.merge(d, {"music_vol": 0.3, "difficulty": "hard", "map_index": 2, "campaign_progress": 1, "battle_scene": false})
+	_eq(merged["music_vol"], 0.3, "settings: merge applies valid music_vol")
+	_eq(merged["difficulty"], "hard", "settings: merge applies valid difficulty")
+	_eq(merged["map_index"], 2, "settings: merge applies valid map_index")
+	_eq(merged["battle_scene"], false, "settings: merge applies battle_scene")
+	var bad := SettingsStore.merge(d, {"difficulty": "lunatic", "map_index": 99, "music_vol": "loud"})
+	_eq(bad["difficulty"], "normal", "settings: merge rejects bad difficulty")
+	_eq(bad["map_index"], 0, "settings: merge rejects out-of-range map_index")
+	_eq(bad["music_vol"], 0.6, "settings: merge rejects non-number music_vol")
+	var over := SettingsStore.merge(d, {"campaign_progress": 999})
+	_eq(over["campaign_progress"], Campaign.CAMPAIGN.size() - 1, "settings: campaign_progress clamped to last mission")
