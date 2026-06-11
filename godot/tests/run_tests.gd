@@ -58,6 +58,7 @@ func _initialize() -> void:
 	_test_ai_turn()
 	_test_ui_queries()
 	_test_battle_record()
+	_test_battle_phases()
 	print("\n== %d passed, %d failed ==" % [_passed, _failed])
 	quit(1 if _failed > 0 else 0)
 
@@ -1065,3 +1066,29 @@ func _test_battle_record() -> void:
 	_ok(rc["counter"]["happened"], "record: ranged defender counters the adjacent attacker")
 	_eq(rc["atk_hp_before"], sw_hp0, "record: atk_hp_before is pre-swing HP (not post-counter)")
 	_ok(sw["hp"] < sw_hp0, "record: attacker actually took counter damage (so the field is meaningful)")
+
+func _test_battle_phases() -> void:
+	const BS = preload("res://scenes/battle/battle_scene.gd")
+	# With a counter, the full a-then-c sequence runs to done.
+	var seq: Array[String] = []
+	var p := "intro"
+	for i in range(20):
+		seq.append(p)
+		if p == "done":
+			break
+		p = BS.next_phase(p, true)
+	_eq(seq[0], "intro", "phases: starts at intro")
+	_ok(seq.has("cImpact"), "phases: counter runs the c-side")
+	_eq(seq[seq.size() - 1], "done", "phases: reaches done")
+	# Without a counter, aRecover jumps straight to outro (no c-side).
+	var seq2: Array[String] = []
+	var p2 := "intro"
+	for i in range(20):
+		seq2.append(p2)
+		if p2 == "done":
+			break
+		p2 = BS.next_phase(p2, false)
+	_ok(not seq2.has("cCharge"), "phases: no counter skips the c-side")
+	_eq(BS.next_phase("aRecover", false), "outro", "phases: aRecover->outro without counter")
+	_eq(BS.next_phase("aRecover", true), "cPause", "phases: aRecover->cPause with counter")
+	_eq(BS.next_phase("outro", true), "done", "phases: outro->done")
