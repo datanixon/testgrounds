@@ -67,8 +67,12 @@ func _debug_spawn_combat() -> void:
 	var m = state.master_of(state.current_player)
 	if m == null:
 		return
-	var foe_owner := 1 - state.current_player
-	var to_place := [state.current_player, foe_owner]   # ally first, then enemy
+	var foe := 1 - state.current_player
+	var me := state.current_player
+	# [type, owner] on free neighbors: ally cinderling (ignite/enemy-target), enemy
+	# cinderling (a target), ally hexwisp (blink — its teleport is the clearest
+	# on-screen proof a cast fired), ally geomaul (quake — instant area).
+	var to_place := [["cinderling", me], ["cinderling", foe], ["hexwisp", me], ["geomaul", me]]
 	for n in Hex.neighbors(Vector2i(m["q"], m["r"])):
 		if to_place.is_empty():
 			break
@@ -77,7 +81,8 @@ func _debug_spawn_combat() -> void:
 		var cell = state.cell_at(n.x, n.y)
 		if cell == null or cell["terrain"] == "water":
 			continue
-		state.spawn_unit("cinderling", to_place.pop_front(), n.x, n.y)
+		var spec = to_place.pop_front()
+		state.spawn_unit(spec[0], spec[1], n.x, n.y)
 	units_layer.set_state(state)
 
 # TEMP (M4 verification): pan to the nearest neutral tower and drop a current-player
@@ -103,24 +108,39 @@ func _debug_goto_tower() -> void:
 	units_layer.set_state(state)
 
 func _cast_ability() -> void:
+	# TEMP verification feedback via print() — there is no HUD/log yet (M7). Tokens have
+	# no HP bar or status icon, so most cast effects aren't visible on-screen; these prints
+	# confirm what fired. Blink (a teleport) and a lethal hit (token vanishes) ARE visible.
 	if selected == null:
+		print("cast: nothing selected")
 		return
 	var ab = Abilities.ability_for(selected)
-	if ab == null or selected["cd"] > 0:
+	if ab == null:
+		print("cast: %s has no ability" % selected["name"])
+		return
+	if selected["cd"] > 0:
+		print("cast: %s on cooldown (%d turns)" % [ab["key"], selected["cd"]])
 		return
 	match ab["target"]:
 		"none":
 			AbilityResolve.resolve_instant(state, selected, ab)
 			selected["cd"] = ab["cd"]
+			print("cast %s (instant) — effect applied" % ab["key"])
 			_finish_action()
 		"enemy":
 			var targets := Pathfinding.compute_attack_targets(state, selected, selected["q"], selected["r"])
 			if not targets.is_empty():
 				armed = {"ab": ab, "kind": "enemy", "targets": targets}
+				print("armed %s — click an enemy in range" % ab["key"])
+			else:
+				print("cast %s: no enemy in range" % ab["key"])
 		"tile":
 			var tiles := AbilityResolve.blink_targets(state, selected)
 			if not tiles.is_empty():
 				armed = {"ab": ab, "kind": "tile", "targets": tiles}
+				print("armed %s — click a tile to teleport" % ab["key"])
+			else:
+				print("cast %s: nowhere to blink" % ab["key"])
 
 func _resolve_armed(a: Vector2i) -> void:
 	if armed["targets"].has(Hex.key(a)):
