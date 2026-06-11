@@ -17,11 +17,16 @@ const AI = preload("res://core/ai.gd")
 const BoardScript = preload("res://scenes/board/board.gd")
 const UnitsLayerScript = preload("res://scenes/match/units_layer.gd")
 const OverlayScript = preload("res://scenes/match/overlay.gd")
+const TopBarScript = preload("res://scenes/hud/top_bar.gd")
+const InfoCardScript = preload("res://scenes/hud/info_card.gd")
 
 var state: GameState
 var overlay: Overlay
 var units_layer: UnitsLayer
 var cam: Camera2D
+var hud: CanvasLayer
+var top_bar: TopBarScript
+var info_card: InfoCardScript
 var selected = null
 var armed = null   # {ab: Dictionary, kind: String, targets: Dictionary} when an enemy/tile ability is armed
 
@@ -46,6 +51,14 @@ func _ready() -> void:
 	cam.position = Hex.axial_to_pixel(Vector2i(m["q"], m["r"]))
 	add_child(cam)
 	cam.make_current()
+	hud = CanvasLayer.new()
+	add_child(hud)
+	top_bar = TopBarScript.new()
+	top_bar.end_turn_pressed.connect(_on_end_turn)
+	hud.add_child(top_bar)
+	info_card = InfoCardScript.new()
+	hud.add_child(info_card)
+	top_bar.refresh(state)
 
 func _unhandled_input(event: InputEvent) -> void:
 	# --- Camera: middle/right-drag pans, wheel zooms. ---
@@ -65,15 +78,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 		_on_click(Hex.pixel_to_axial(get_global_mouse_position()))
 	elif event is InputEventKey and event.pressed and event.keycode == KEY_ENTER:
-		state.end_turn()
-		# M6: player 1 is the AI. Run its whole turn synchronously, then hand back.
-		# (The difficulty-select UI is M9; player-table/isAI lands then too.)
-		if state.winner == -1 and state.current_player == 1:
-			AI.take_turn(state)
-			if state.winner == -1:
-				state.end_turn()
-		_center_on_master()
-		_finish_action()
+		_on_end_turn()
 	# --- TEMP M4 verification keys (remove when M5 summoning + a real camera land) ---
 	elif event is InputEventKey and event.pressed and event.keycode == KEY_D:
 		_debug_spawn_combat()   # drop an ally + adjacent enemy by your master
@@ -81,6 +86,18 @@ func _unhandled_input(event: InputEvent) -> void:
 		_debug_goto_tower()     # jump to the nearest neutral tower + a unit beside it
 	elif event is InputEventKey and event.pressed and event.keycode == KEY_A:
 		_cast_ability()
+
+func _on_end_turn() -> void:
+	if state.winner != -1:
+		return
+	state.end_turn()
+	# M6: player 1 is the AI. Run its whole turn synchronously, then hand back.
+	if state.winner == -1 and state.current_player == 1:
+		AI.take_turn(state)
+		if state.winner == -1:
+			state.end_turn()
+	_center_on_master()
+	_finish_action()
 
 func _center_on_master() -> void:
 	var m = state.master_of(state.current_player)
@@ -228,5 +245,7 @@ func _clear_selection() -> void:
 func _finish_action() -> void:
 	_clear_selection()
 	units_layer.set_state(state)
+	if top_bar != null:
+		top_bar.refresh(state)
 	if state.winner != -1:
 		print("WINNER: player %d" % state.winner)
