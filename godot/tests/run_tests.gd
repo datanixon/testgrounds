@@ -7,6 +7,7 @@ const Rng = preload("res://core/rng.gd")
 const Terrain = preload("res://data/terrain.gd")
 const Maps = preload("res://data/maps.gd")
 const Campaign = preload("res://data/campaign.gd")
+const MapGen = preload("res://core/map_gen.gd")
 
 var _passed := 0
 var _failed := 0
@@ -16,6 +17,7 @@ func _initialize() -> void:
 	_test_hex()
 	_test_rng()
 	_test_data()
+	_test_map_gen()
 	print("\n== %d passed, %d failed ==" % [_passed, _failed])
 	quit(1 if _failed > 0 else 0)
 
@@ -88,3 +90,43 @@ func _test_data() -> void:
 	_eq(Campaign.CAMPAIGN[0]["map"]["cols"], 11, "campaign: c1 cols")
 	_eq(Campaign.CAMPAIGN[3]["difficulty"], "hard", "campaign: c4 difficulty")
 	_eq(Campaign.CAMPAIGN[3]["map"]["seed"], 86011, "campaign: c4 seed")
+
+func _map_sig(m: Dictionary) -> String:
+	var cells: Dictionary = m["cells"]
+	var keys: Array = cells.keys()
+	keys.sort()
+	var parts := PackedStringArray()
+	for k in keys:
+		var c: Dictionary = cells[k]
+		parts.append("%s:%s:%d" % [k, c["terrain"], c["owner"]])
+	return "|".join(parts)
+
+func _terrain_counts(m: Dictionary) -> Dictionary:
+	var counts := {}
+	for k in m["cells"]:
+		var t: String = m["cells"][k]["terrain"]
+		counts[t] = counts.get(t, 0) + 1
+	return counts
+
+func _test_map_gen() -> void:
+	var c1: Dictionary = Campaign.CAMPAIGN[0]["map"]
+	# Determinism: same seed+def -> identical map.
+	_eq(_map_sig(MapGen.generate(7041, c1)), _map_sig(MapGen.generate(7041, c1)), "mapgen: deterministic")
+	# Cross-engine parity vs the JS reference for seed 7041 / c1.
+	var m: Dictionary = MapGen.generate(7041, c1)
+	_eq(m["cells"].size(), 99, "mapgen: c1 cell count")
+	_eq(_terrain_counts(m), {"plain": 65, "forest": 12, "hill": 8, "water": 5, "mountain": 4, "castle": 2, "tower": 3}, "mapgen: c1 terrain counts")
+	_eq(m["castles"], [Vector2i(0, 1), Vector2i(5, 7)], "mapgen: c1 castles")
+	_eq(m["cells"]["0,1"]["owner"], 0, "mapgen: c1 castle A owner")
+	_eq(m["cells"]["5,7"]["owner"], 1, "mapgen: c1 castle B owner")
+	var towers: Array = (m["towers"] as Array).duplicate()
+	towers.sort_custom(func(a, b): return a.x < b.x or (a.x == b.x and a.y < b.y))
+	_eq(towers, [Vector2i(-3, 6), Vector2i(-1, 5), Vector2i(10, 1)], "mapgen: c1 towers")
+	# Invariants on a skirmish def: 2 owned castles, tower spacing rules.
+	var m2: Dictionary = MapGen.generate(123, Maps.MAPS[0])
+	_eq(m2["castles"].size(), 2, "mapgen: 2 castles")
+	for t in m2["towers"]:
+		_ok(HexLib.distance(t, m2["castles"][0]) >= 3 and HexLib.distance(t, m2["castles"][1]) >= 3, "mapgen: tower >=3 from castles")
+	for i in range(m2["towers"].size()):
+		for j in range(i + 1, m2["towers"].size()):
+			_ok(HexLib.distance(m2["towers"][i], m2["towers"][j]) >= 2, "mapgen: towers >=2 apart")
