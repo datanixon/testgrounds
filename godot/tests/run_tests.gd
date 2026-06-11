@@ -24,6 +24,7 @@ const Abilities = preload("res://data/abilities.gd")
 const AbilityResolve = preload("res://core/ability_resolve.gd")
 const AiProfiles = preload("res://data/ai_profiles.gd")
 const AI = preload("res://core/ai.gd")
+const UiQueries = preload("res://core/ui_queries.gd")
 
 var _passed := 0
 var _failed := 0
@@ -55,6 +56,7 @@ func _initialize() -> void:
 	_test_ai_decision()
 	_test_ai_summons()
 	_test_ai_turn()
+	_test_ui_queries()
 	print("\n== %d passed, %d failed ==" % [_passed, _failed])
 	quit(1 if _failed > 0 else 0)
 
@@ -931,3 +933,84 @@ func _test_ai_turn() -> void:
 	var grunt := gm.spawn_unit("cinderling", 1, 2, 2)
 	AI.take_turn(gm)
 	_ok(Hex.distance(Vector2i(grunt["q"], grunt["r"]), Vector2i(11, 11)) < Hex.distance(Vector2i(2, 2), Vector2i(11, 11)), "ai-turn: grunt advanced on the master")
+
+func _test_ui_queries() -> void:
+	# can_capture: tower-only (the capturable flag), and only when not already owned.
+	var gs := _flat_state(7, 7)
+	var u := gs.spawn_unit("cinderling", 0, 3, 3)
+	_eq(UiQueries.can_capture(gs, u, gs.cell_at(3, 3)), false, "ui: plain tile not capturable")
+	gs.cell_at(3, 3)["terrain"] = "tower"
+	_eq(UiQueries.can_capture(gs, u, gs.cell_at(3, 3)), true, "ui: neutral tower capturable")
+	gs.cell_at(3, 3)["owner"] = 0
+	_eq(UiQueries.can_capture(gs, u, gs.cell_at(3, 3)), false, "ui: own tower not capturable")
+	gs.cell_at(3, 3)["owner"] = 1
+	_eq(UiQueries.can_capture(gs, u, gs.cell_at(3, 3)), true, "ui: enemy tower capturable")
+	_eq(UiQueries.can_capture(gs, u, gs.cell_at(2, 2)), false, "ui: plain neighbor not capturable")
+	gs.cell_at(2, 2)["terrain"] = "castle"
+	_eq(UiQueries.can_capture(gs, u, gs.cell_at(2, 2)), false, "ui: castle tile not capturable")
+
+	# available_actions on an empty plain board: a lone grunt has just Wait.
+	var ga := _flat_state(7, 7)
+	var lone := ga.spawn_unit("cinderling", 0, 3, 3)
+	var acts := UiQueries.available_actions(ga, lone, false)
+	_eq(acts.size(), 2, "ui: lone grunt has ability + wait only")
+	_eq(acts[0]["kind"], "ability", "ui: lone grunt first action is its ability")
+	_eq(acts[acts.size() - 1]["kind"], "wait", "ui: lone grunt ends in wait")
+
+	# with an adjacent enemy, Attack appears (before Wait).
+	ga.spawn_unit("galewisp", 1, 4, 3)
+	var acts2 := UiQueries.available_actions(ga, lone, false)
+	_eq(acts2[0]["kind"], "attack", "ui: attack present with adjacent enemy")
+	_eq(acts2[acts2.size() - 1]["kind"], "wait", "ui: wait is always last")
+
+	# has_undo inserts Undo immediately before Wait.
+	var acts3 := UiQueries.available_actions(ga, lone, true)
+	_eq(acts3[acts3.size() - 2]["kind"], "undo", "ui: undo sits before wait")
+	_eq(acts3[acts3.size() - 1]["kind"], "wait", "ui: wait still last with undo")
+
+	# master with MP >= 6 gets Summon; ability gated by cooldown shows disabled + label.
+	var gm := _flat_state(7, 7)
+	var m := gm.spawn_master(0, 3, 3)
+	m["mp"] = 6
+	var ma := UiQueries.available_actions(gm, m, false)
+	var has_summon := false
+	for a in ma:
+		if a["kind"] == "summon":
+			has_summon = true
+	_ok(has_summon, "ui: master with 6 MP can summon")
+	m["mp"] = 5
+	var ma2 := UiQueries.available_actions(gm, m, false)
+	for a in ma2:
+		_ok(a["kind"] != "summon", "ui: master under 6 MP cannot summon")
+
+	# ability cooldown: a unit with an ability on cd shows it disabled with the count.
+	var gb := _flat_state(7, 7)
+	var ogre := gb.spawn_unit("geomaul", 0, 3, 3)   # quake ability
+	ogre["cd"] = 2
+	var ba := UiQueries.available_actions(gb, ogre, false)
+	var ab_item: Variant = null
+	for a in ba:
+		if a["kind"] == "ability":
+			ab_item = a
+	_ok(ab_item != null and ab_item["disabled"], "ui: ability on cd is disabled")
+	_ok(String(ab_item["label"]).ends_with("(2)"), "ui: disabled ability label carries the cd count")
+
+	# second-move leg: only Capture (if applicable) + Wait — no Attack/Summon/Ability.
+	var gs2 := _flat_state(7, 7)
+	var sk := gs2.spawn_unit("galewisp", 0, 3, 3)
+	gs2.spawn_unit("cinderling", 1, 4, 3)           # adjacent enemy would normally give Attack
+	sk["second_move"] = true
+	var sa := UiQueries.available_actions(gs2, sk, false)
+	for a in sa:
+		_ok(a["kind"] == "capture" or a["kind"] == "wait", "ui: second-move leg is capture/wait only")
+	_eq(sa[sa.size() - 1]["kind"], "wait", "ui: second-move ends in wait")
+
+	# summon_options: full SUMMON_LIST, costs correct, disabled flips at the MP boundary.
+	var gso := _flat_state(7, 7)
+	var sm := gso.spawn_master(1, 3, 3)
+	sm["mp"] = 8
+	var opts := UiQueries.summon_options(gso, sm)
+	_eq(opts.size(), UnitTypes.SUMMON_LIST.size(), "ui: one summon option per SUMMON_LIST entry")
+	for o in opts:
+		_eq(o["disabled"], o["cost"] > 8, "ui: summon option disabled iff cost exceeds MP")
+		_ok(String(o["label"]).ends_with("MP"), "ui: summon label ends in MP")
