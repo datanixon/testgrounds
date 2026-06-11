@@ -17,6 +17,19 @@ new session, then the linked docs as needed.
 
 ## Next session — start here
 
+**UPDATE (2026-06-10): Port is UNDERWAY on branch `godot-port`. M1 + M2 COMPLETE**
+— M1 skeleton + headless test harness + hex math core; M2 bit-exact Mulberry32 RNG
++ data tables (terrain/maps/campaign) + deterministic `generateMap` port (seed 7041
+reproduces the JS c1 layout exactly) + placeholder hex render. 68 tests green,
+render visually verified. **Next: M3 (units + movement).** Resume with:
+- `git checkout godot-port`
+- Tests: `pwsh -ExecutionPolicy Bypass -File godot/tests/run_tests.ps1` (green = `== N passed, 0 failed ==`, EXIT 0). Windowed: `godot godot` (standard, non-.NET build).
+- Tracker: `ROADMAP_GODOT.md`. Docs: `docs/superpowers/specs/2026-06-10-wraithspire-godot-port-design.md` (+ `-art-brief.md`); plans `docs/superpowers/plans/2026-06-10-wraithspire-godot-m{1,2}-*.md`.
+- Engine: standard Godot 4.6.3 build for the GDScript phase; Mono build + .NET 9 SDK retained for the C# hotspot (AI scorer). `godot`/`godot_console` PATH aliases point at the standard build.
+- M3 needs its own plan (writing-plans, one per milestone); execution mode subagent-driven (implementer + spec + quality review per task).
+
+The original port-planning steps below are now historical (kept for reference):
+
 1. `git checkout -b godot-port` (new branch off main, per user instruction).
 2. Plan the Godot 4 port. Carry over DESIGN, not code:
    - `docs/superpowers/specs/2026-06-10-wraithspire-v2-design.md` — v2 spec
