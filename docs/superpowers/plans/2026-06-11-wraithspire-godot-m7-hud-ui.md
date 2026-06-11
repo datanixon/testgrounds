@@ -67,12 +67,14 @@ func _test_ui_queries() -> void:
 	_eq(UiQueries.can_capture(gs, u, gs.cell_at(3, 3)), true, "ui: enemy tower capturable")
 	_eq(UiQueries.can_capture(gs, u, gs.cell_at(2, 2)), false, "ui: plain neighbor not capturable")
 
-	# available_actions on an empty plain board: a lone grunt has just Wait.
+	# available_actions on an empty plain board: a lone grunt has only its ability + Wait
+	# (every SUMMON_LIST unit has an ability; cinderling's is ignite — no attack/capture/summon).
 	var ga := _flat_state(7, 7)
 	var lone := ga.spawn_unit("cinderling", 0, 3, 3)
 	var acts := UiQueries.available_actions(ga, lone, false)
-	_eq(acts.size(), 1, "ui: lone grunt has one action")
-	_eq(acts[0]["kind"], "wait", "ui: lone grunt action is wait")
+	_eq(acts.size(), 2, "ui: lone grunt has ability + wait only")
+	_eq(acts[0]["kind"], "ability", "ui: lone grunt first action is its ability")
+	_eq(acts[acts.size() - 1]["kind"], "wait", "ui: lone grunt ends in wait")
 
 	# with an adjacent enemy, Attack appears (before Wait).
 	ga.spawn_unit("galewisp", 1, 4, 3)
