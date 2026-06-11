@@ -25,6 +25,11 @@ var cam: Camera2D
 var selected = null
 var armed = null   # {ab: Dictionary, kind: String, targets: Dictionary} when an enemy/tile ability is armed
 
+const ZOOM_MIN := 0.5
+const ZOOM_MAX := 2.5
+const ZOOM_STEP := 1.1
+var _panning := false
+
 func _ready() -> void:
 	state = GameState.new_skirmish(Maps.MAPS[0], 42)
 	# Draw order: board (bottom) -> overlay -> tokens (top).
@@ -43,6 +48,20 @@ func _ready() -> void:
 	cam.make_current()
 
 func _unhandled_input(event: InputEvent) -> void:
+	# --- Camera: middle/right-drag pans, wheel zooms. ---
+	if event is InputEventMouseButton:
+		if event.button_index == MOUSE_BUTTON_MIDDLE or event.button_index == MOUSE_BUTTON_RIGHT:
+			_panning = event.pressed
+			return
+		elif event.button_index == MOUSE_BUTTON_WHEEL_UP and event.pressed:
+			cam.zoom = (cam.zoom * ZOOM_STEP).clamp(Vector2(ZOOM_MIN, ZOOM_MIN), Vector2(ZOOM_MAX, ZOOM_MAX))
+			return
+		elif event.button_index == MOUSE_BUTTON_WHEEL_DOWN and event.pressed:
+			cam.zoom = (cam.zoom / ZOOM_STEP).clamp(Vector2(ZOOM_MIN, ZOOM_MIN), Vector2(ZOOM_MAX, ZOOM_MAX))
+			return
+	if event is InputEventMouseMotion and _panning:
+		cam.position -= event.relative / cam.zoom
+		return
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 		_on_click(Hex.pixel_to_axial(get_global_mouse_position()))
 	elif event is InputEventKey and event.pressed and event.keycode == KEY_ENTER:
