@@ -53,6 +53,7 @@ func _initialize() -> void:
 	_test_ai_helpers()
 	_test_ai_attack()
 	_test_ai_decision()
+	_test_ai_summons()
 	print("\n== %d passed, %d failed ==" % [_passed, _failed])
 	quit(1 if _failed > 0 else 0)
 
@@ -866,3 +867,38 @@ func _test_ai_decision() -> void:
 	var actc := AI.decide_unit_action(gc, grabber, tc, emc)
 	_eq(actc["kind"], "capture", "decide: captures a reachable neutral tower")
 	_eq(actc["dest"], Vector2i(3, 4), "decide: capture dest is the tower")
+
+func _test_ai_summons() -> void:
+	# A master with plenty of MP and an enemy army summons at least one unit, adjacent.
+	var gs := GameState.new_skirmish(Maps.MAPS[0], 42)
+	var m1: Variant = gs.master_of(1)
+	m1["mp"] = 30
+	gs.spawn_unit("cinderling", 0, 3, 3)   # an enemy to score matchups against
+	var before := gs.alive_units(1).size()
+	AI.run_summons(gs, m1)
+	_ok(gs.alive_units(1).size() > before, "summons: AI summoned at least one unit")
+	_ok(m1["mp"] < 30, "summons: MP was spent")
+	# summoned units belong to the master's owner, are adjacent, and are flagged acted.
+	for u in gs.alive_units(1):
+		if not u["is_master"]:
+			_ok(Hex.distance(Vector2i(u["q"], u["r"]), Vector2i(m1["q"], m1["r"])) == 1, "summons: spawned adjacent to master")
+			_ok(u["acted"], "summons: summoned unit is acted")
+	# Deterministic on normal: same seed + same setup -> same summoned roster.
+	var ga := GameState.new_skirmish(Maps.MAPS[0], 77)
+	var gb := GameState.new_skirmish(Maps.MAPS[0], 77)
+	ga.master_of(1)["mp"] = 24
+	gb.master_of(1)["mp"] = 24
+	ga.spawn_unit("galewisp", 0, 3, 3); gb.spawn_unit("galewisp", 0, 3, 3)
+	AI.run_summons(ga, ga.master_of(1))
+	AI.run_summons(gb, gb.master_of(1))
+	var types_a := PackedStringArray()
+	for u in ga.alive_units(1): if not u["is_master"]: types_a.append(u["type_key"])
+	var types_b := PackedStringArray()
+	for u in gb.alive_units(1): if not u["is_master"]: types_b.append(u["type_key"])
+	_eq(types_a, types_b, "summons: deterministic roster on normal")
+	# Too little MP (<6) summons nothing.
+	var gp := GameState.new_skirmish(Maps.MAPS[0], 42)
+	gp.master_of(1)["mp"] = 5
+	var n0 := gp.alive_units(1).size()
+	AI.run_summons(gp, gp.master_of(1))
+	_eq(gp.alive_units(1).size(), n0, "summons: <6 MP summons nothing")

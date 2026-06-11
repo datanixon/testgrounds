@@ -13,6 +13,8 @@ const Pathfinding = preload("res://core/pathfinding.gd")
 const Abilities = preload("res://data/abilities.gd")
 const Status = preload("res://core/status.gd")
 const Combat = preload("res://core/combat.gd")
+const Elements = preload("res://data/elements.gd")
+const UnitTypes = preload("res://data/unit_types.gd")
 
 ## weights — the active difficulty's weight profile (defaults to normal).
 static func weights(state) -> Dictionary:
@@ -257,3 +259,111 @@ static func decide_unit_action(state, unit: Dictionary, threat: Dictionary, enem
 	if best_step != null:
 		return {"kind": "move", "dest": best_step}
 	return {"kind": "wait"}
+
+## run_summons — the AI summon economy (MUTATES state: spawns units, spends master MP).
+## Scores types by element matchup vs the enemy army, terrain resonance, stat-value-per-MP,
+## and a variety nudge; banks MP when clearly ahead, floods cheap bodies when the master is
+## threatened. `normal`/`hard` are deterministic; `easy` picks randomly via state.rng.
+static func run_summons(state, master: Dictionary) -> void:
+	var owner: int = master["owner"]
+	var W := weights(state)
+	var enemies: Array = state.alive_units(1 - owner)
+	var my_army: Array[Dictionary] = []
+	for u in state.alive_units(owner):
+		if not u["is_master"]:
+			my_army.append(u)
+
+	# Fraction of the map that empowers each element (+20% terrain).
+	var terr_frac := {}
+	for el in Elements.ELEMENT:
+		var n := 0
+		var tot := 0
+		for k in state.map["cells"]:
+			tot += 1
+			if Elements.affinity_for(el, state.map["cells"][k]["terrain"]) != null:
+				n += 1
+		terr_frac[el] = float(n) / float(tot) if tot > 0 else 0.0
+
+	var ahead: bool = _army_value(my_army) > _army_value(_non_masters(enemies)) * 1.25
+	var emergency := false
+	for e in enemies:
+		if Hex.distance(Vector2i(e["q"], e["r"]), Vector2i(master["q"], master["r"])) <= e["move"] + e["range"]:
+			emergency = true
+			break
+
+	var attempts := 4
+	while attempts > 0 and master["mp"] >= 6:
+		attempts -= 1
+		var pool: Array = []
+		for k in UnitTypes.SUMMON_LIST:
+			if UnitTypes.UNIT_TYPES[k]["cost"] <= master["mp"]:
+				pool.append(k)
+		if pool.is_empty():
+			break
+		if W["random_summons"]:
+			pool = [pool[state.rng.below(pool.size())]]
+		elif emergency:
+			pool.sort_custom(func(a, b): return UnitTypes.UNIT_TYPES[a]["cost"] < UnitTypes.UNIT_TYPES[b]["cost"])
+			pool = pool.slice(0, maxi(1, int(ceil(pool.size() / 2.0))))
+		elif ahead:
+			var bigs: Array = []
+			for k in pool:
+				if UnitTypes.UNIT_TYPES[k]["cost"] >= 12:
+					bigs.append(k)
+			var regen: int = master["mp_regen"] + _owned_tower_count(state, owner) * 2
+			if bigs.is_empty() and master["mp"] + regen <= master["max_mp"]:
+				break
+			if not bigs.is_empty():
+				pool = bigs
+		pool.sort_custom(func(a, b): return _score_type(b, enemies, terr_frac, my_army) > _score_type(a, enemies, terr_frac, my_army))
+		var choice: String = pool[0]
+		var slot: Variant = find_summon_slot(state, master)
+		if slot == null:
+			break
+		master["mp"] -= UnitTypes.UNIT_TYPES[choice]["cost"]
+		var u: Dictionary = state.spawn_unit(choice, owner, slot.x, slot.y)
+		u["acted"] = true
+		my_army.append(u)   # keep the variety penalty honest across the loop
+
+static func _army_value(list: Array) -> float:
+	var v := 0.0
+	for u in list:
+		v += u["power"] + u["max_hp"] * 0.25
+	return v
+
+static func _non_masters(list: Array) -> Array:
+	var out: Array = []
+	for u in list:
+		if not u["is_master"]:
+			out.append(u)
+	return out
+
+static func _owned_tower_count(state, owner: int) -> int:
+	var n := 0
+	for t in state.map.get("towers", []):
+		var c: Variant = state.cell_at(t.x, t.y)
+		if c != null and c.get("owner", -1) == owner:
+			n += 1
+	return n
+
+## _score_type — summon desirability: element edge vs the enemy army (offense minus how
+## hard they counter-hit), terrain resonance, stat value per MP, minus a variety penalty.
+static func _score_type(k: String, enemies: Array, terr_frac: Dictionary, my_army: Array) -> float:
+	var t: Dictionary = UnitTypes.UNIT_TYPES[k]
+	var s := 0.0
+	if not enemies.is_empty():
+		var off := 0.0
+		var deff := 0.0
+		for e in enemies:
+			off += Elements.ELEM_MATRIX[t["element"]][e["element"]] - 1.0
+			deff += Elements.ELEM_MATRIX[e["element"]][t["element"]] - 1.0
+		s += off / enemies.size() * 20.0
+		s -= deff / enemies.size() * 10.0
+	s += terr_frac.get(t["element"], 0.0) * 12.0
+	s += (t["max_hp"] * 0.25 + t["power"]) / float(t["cost"]) * 6.0
+	var same := 0
+	for m in my_army:
+		if m["type_key"] == k:
+			same += 1
+	s -= same * 4.0
+	return s
