@@ -11,7 +11,7 @@ This is the single biggest player-facing quality jump of the port: hand-laid can
 ## Scope
 
 **In M7:**
-- Hex `TileMapLayer` terrain rendering (replaces `scenes/board/board.gd` custom `_draw`).
+- ~~Hex `TileMapLayer` terrain rendering~~ **Superseded (plan-time decision 2026-06-11): keep the custom-hex Node2D terrain (`scenes/board/board.gd`, drawn via `Hex.axial_to_pixel`).** A Godot `TileMapLayer` uses its own hex coordinate system, which would need fragile tuning to co-locate with the `Hex`-positioned unit nodes, and the flat placeholder tiles gain nothing visually over the current `_draw` until real art (M10) — so terrain rendering stays as-is (lightly cleaned) and M10 reskins it.
 - `Sprite2D` unit nodes bound to `GameState` records (replaces `scenes/match/units_layer.gd` tokens): team-colored base-ring, HP pip/bar, status-icon row.
 - Highlight overlay layer (reachable / attack ring / blink + summon-slot / selected outline).
 - Real `Camera2D`: center-on-active-master (current behavior) + drag-pan + scroll-zoom.
