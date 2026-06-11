@@ -9,7 +9,7 @@ reference. ROADMAP2 Phases 2–8 are deferred to their own specs post-parity.
 - [x] **M1 — Skeleton + headless harness + hex core**
 - [x] M2 — Data tables + deterministic map gen (placeholder tiles)
 - [x] M3 — Units + movement/pathfinding + selection
-- [ ] M4 — Combat resolution + status engine + weather (logic + forecast)
+- [x] M4 — Combat resolution + status engine + weather (logic + forecast)
 - [ ] M5 — All 12 abilities
 - [ ] M6 — AI (threat map + decision tree + summon economy)
 - [ ] M7 — HUD/UI as Control nodes
