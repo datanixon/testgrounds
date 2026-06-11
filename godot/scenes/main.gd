@@ -42,7 +42,7 @@ func _on_click(a: Vector2i) -> void:
 	# With a unit selected, a click on a reachable tile moves it there.
 	if selected != null:
 		var reach := Pathfinding.compute_reachable(state, selected)
-		var is_own_tile := (a.x == selected["q"] and a.y == selected["r"])
+		var is_own_tile: bool = (a.x == selected["q"] and a.y == selected["r"])
 		if reach.has(Hex.key(a)) and not is_own_tile:
 			selected["q"] = a.x
 			selected["r"] = a.y
