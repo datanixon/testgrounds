@@ -23,8 +23,11 @@ their own specs once parity lands and plays clean.
 
 ## Locked decisions
 
-- **Engine:** Godot 4, latest stable 4.x, **.NET (Mono) build** from day one so
-  C# is available the moment a hotspot appears.
+- **Engine:** Godot 4.6.3, **standard (non-.NET) build** for the GDScript phase. The
+  Mono build can't run a GDScript-only project windowed (fatal `.NET` assemblies
+  error without a C# solution), which defeats defer-C#. The Mono build + the .NET 9
+  SDK stay installed for the C# hotspot (AI scorer), where we switch back and add a
+  `.csproj`. (Decided during M2 after the Mono windowed run failed to render.)
 - **Language:** **GDScript-first.** Write everything in GDScript. Zero C# until a
   profiler justifies it. The only plausible hotspot in turn-based tactics is AI
   move-scoring, so the AI scorer is isolated behind a clean interface as the
