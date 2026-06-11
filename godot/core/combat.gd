@@ -57,11 +57,13 @@ static func state_distance(a: Dictionary, b: Dictionary) -> int:
 
 ## resolve_attack — INLINE battle (no cutaway). Primary swing, then a counter if the
 ## defender survives and the attacker is within the defender's range. Jitter and the
-## counter 0.8x are drawn from state.rng. Mirrors beginBattle + applySwing, minus the
+## counter 0.8x are drawn from state.rng. `apply_status`/`status_turns` (M5 abilities)
+## apply to the defender ONLY on the primary swing and ONLY if it survives — the
+## counter never inflicts a status. Mirrors beginBattle + applySwing, minus the
 ## animation/float/log side effects (those return with the M8 battle scene + M7 HUD).
-static func resolve_attack(state, attacker: Dictionary, defender: Dictionary) -> void:
+static func resolve_attack(state, attacker: Dictionary, defender: Dictionary, apply_status := "", status_turns := 0) -> void:
 	var a1: Dictionary = compute_damage(state, attacker, defender)
-	_apply_hit(state, attacker, defender, _jitter(state, a1["base"]))
+	_apply_hit(state, attacker, defender, _jitter(state, a1["base"]), apply_status, status_turns)
 	if defender["hp"] > 0:
 		var d: int = state_distance(attacker, defender)
 		if d >= 1 and d <= defender["range"]:
@@ -74,10 +76,11 @@ static func resolve_attack(state, attacker: Dictionary, defender: Dictionary) ->
 static func _jitter(state, base: int) -> int:
 	return maxi(1, base + state.rng.below(3) - 1)
 
-## _apply_hit — one swing: ward absorbs (consumed, no damage/xp); else deal `dmg`,
-## award `dmg` (+kill bonus) XP to `src`, leave death detection to hp <= 0.
-## `_state` is unused now; reserved for M8 float/log emission without a signature change.
-static func _apply_hit(_state, src: Dictionary, dst: Dictionary, dmg: int) -> void:
+## _apply_hit — one swing: ward absorbs (consumed, no damage/xp/status); else deal
+## `dmg`, award `dmg` (+kill bonus) XP to `src`, leave death detection to hp <= 0, and
+## apply `status` to a surviving `dst` (empty string = none). `_state` is unused now;
+## reserved for M8 float/log emission without a signature change.
+static func _apply_hit(_state, src: Dictionary, dst: Dictionary, dmg: int, status := "", status_turns := 0) -> void:
 	if Status.has_status(dst, "ward"):
 		dst["status"].erase("ward")
 		return
@@ -85,3 +88,5 @@ static func _apply_hit(_state, src: Dictionary, dst: Dictionary, dmg: int) -> vo
 	var killed: bool = dst["hp"] <= 0
 	var xp_amt: int = dmg + (Units.KILL_XP_BONUS if killed else 0)
 	Units.gain_xp(src, xp_amt)
+	if status != "" and dst["hp"] > 0:
+		Status.add_status(dst, status, status_turns)

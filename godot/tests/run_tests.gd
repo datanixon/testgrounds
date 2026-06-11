@@ -42,6 +42,7 @@ func _initialize() -> void:
 	_test_resolve()
 	_test_turn()
 	_test_abilities_data()
+	_test_attack_status()
 	print("\n== %d passed, %d failed ==" % [_passed, _failed])
 	quit(1 if _failed > 0 else 0)
 
@@ -601,3 +602,44 @@ func _test_abilities_data() -> void:
 	# master has no ability (type_key "master" not in UNIT_TYPES).
 	var m := Units.make_master(3, 0, 0, 0)
 	_eq(Abilities.ability_for(m), null, "ability_for: master has none")
+
+func _test_attack_status() -> void:
+	# ignite: a surviving defender gets burn(2).
+	var gs := _combat_state()
+	gs.rng = Rng.new(5)
+	var atk := gs.spawn_unit("cinderling", 0, 2, 3)
+	var dfn := gs.spawn_unit("stoneward", 1, 3, 3)   # 22 hp, survives a cinderling hit
+	Combat.resolve_attack(gs, atk, dfn, "burn", 2)
+	_ok(Status.has_status(dfn, "burn"), "attack-status: surviving defender burns")
+	_eq(dfn["status"]["burn"], 2, "attack-status: 2 turns")
+	# a dead defender gets no status (it's gone).
+	var gs2 := _combat_state()
+	gs2.rng = Rng.new(5)
+	var a2 := gs2.spawn_unit("cinderling", 0, 2, 3)
+	var d2 := gs2.spawn_unit("galewisp", 1, 3, 3)
+	d2["hp"] = 2
+	Combat.resolve_attack(gs2, a2, d2, "burn", 2)
+	_ok(d2["hp"] <= 0, "attack-status: lethal kills")
+	_ok(not Status.has_status(d2, "burn"), "attack-status: no status on a dead target")
+	# the counter does NOT inflict the attacker's status on the attacker.
+	var gs3 := _combat_state()
+	gs3.rng = Rng.new(5)
+	var a3 := gs3.spawn_unit("stoneward", 0, 2, 3)   # terra, weak vs nothing; survives
+	var d3 := gs3.spawn_unit("galewisp", 1, 3, 3)     # range 2, counters
+	Combat.resolve_attack(gs3, a3, d3, "burn", 2)
+	_ok(not Status.has_status(a3, "burn"), "attack-status: counter inflicts no status on attacker")
+	# a basic attack (no payload) inflicts nothing.
+	var gs4 := _combat_state()
+	gs4.rng = Rng.new(5)
+	var a4 := gs4.spawn_unit("cinderling", 0, 2, 3)
+	var d4 := gs4.spawn_unit("stoneward", 1, 3, 3)
+	Combat.resolve_attack(gs4, a4, d4)
+	_ok(not Status.has_status(d4, "burn"), "attack-status: plain attack inflicts nothing")
+	# a warded defender absorbs the hit AND takes no status.
+	var gs5 := _combat_state()
+	gs5.rng = Rng.new(5)
+	var a5 := gs5.spawn_unit("cinderling", 0, 2, 3)
+	var d5 := gs5.spawn_unit("stoneward", 1, 3, 3)
+	Status.add_status(d5, "ward", 1)
+	Combat.resolve_attack(gs5, a5, d5, "burn", 2)
+	_ok(not Status.has_status(d5, "burn"), "attack-status: warded hit applies no status")
