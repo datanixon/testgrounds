@@ -1,9 +1,10 @@
 extends Node2D
-## Root match controller (M5): owns a GameState, renders the board + move overlay
+## Root match controller (M6): owns a GameState, renders the board + move overlay
 ## + unit tokens, and handles click select/move/attack/capture, Enter -> end_turn,
 ## and A -> cast ability (instant fires now; enemy/tile arm then resolve on click),
-## all through the pure core. Placeholder interactive slice — the action menu +
-## `acted` enforcement (M7), AI (M6), and the gameover screen (M9) are still to come.
+## all through the pure core. Enter also runs the enemy AI (player 1) synchronously
+## then hands back. Placeholder interactive slice — the action menu + `acted`
+## enforcement (M7), the battle cutaway (M8), and the gameover screen (M9) are still to come.
 
 const Hex = preload("res://core/hex.gd")
 const Maps = preload("res://data/maps.gd")
@@ -12,6 +13,7 @@ const Pathfinding = preload("res://core/pathfinding.gd")
 const Combat = preload("res://core/combat.gd")
 const Abilities = preload("res://data/abilities.gd")
 const AbilityResolve = preload("res://core/ability_resolve.gd")
+const AI = preload("res://core/ai.gd")
 const BoardScript = preload("res://scenes/board/board.gd")
 const UnitsLayerScript = preload("res://scenes/match/units_layer.gd")
 const OverlayScript = preload("res://scenes/match/overlay.gd")
@@ -45,6 +47,12 @@ func _unhandled_input(event: InputEvent) -> void:
 		_on_click(Hex.pixel_to_axial(get_global_mouse_position()))
 	elif event is InputEventKey and event.pressed and event.keycode == KEY_ENTER:
 		state.end_turn()
+		# M6: player 1 is the AI. Run its whole turn synchronously, then hand back.
+		# (The difficulty-select UI is M9; player-table/isAI lands then too.)
+		if state.winner == -1 and state.current_player == 1:
+			AI.take_turn(state)
+			if state.winner == -1:
+				state.end_turn()
 		_center_on_master()
 		_finish_action()
 	# --- TEMP M4 verification keys (remove when M5 summoning + a real camera land) ---

@@ -11,6 +11,7 @@ const Hex = preload("res://core/hex.gd")
 const Terrain = preload("res://data/terrain.gd")
 const Pathfinding = preload("res://core/pathfinding.gd")
 const Abilities = preload("res://data/abilities.gd")
+const AbilityResolve = preload("res://core/ability_resolve.gd")
 const Status = preload("res://core/status.gd")
 const Combat = preload("res://core/combat.gd")
 const Elements = preload("res://data/elements.gd")
@@ -367,3 +368,64 @@ static func _score_type(k: String, enemies: Array, terr_frac: Dictionary, my_arm
 			same += 1
 	s -= same * 4.0
 	return s
+
+## take_turn — run the current player's entire AI turn synchronously (combat is inline
+## in M6; the battle-scene awaiting returns at M8 as a coroutine). For each non-acted unit
+## (masters last), decide and apply an action; then run the summon economy. Does NOT call
+## end_turn — the caller does. MUTATES state.
+static func take_turn(state) -> void:
+	var owner: int = state.current_player
+	var enemy_master: Variant = state.master_of(1 - owner)
+	if enemy_master == null:
+		return
+	var queue: Array[Dictionary] = []
+	for u in state.alive_units(owner):
+		if not u["acted"]:
+			queue.append(u)
+	queue.sort_custom(func(a, b): return (0 if a["is_master"] else -1) < (0 if b["is_master"] else -1))  # masters last
+	var threat := build_threat_map(state, owner)
+	for u in queue:
+		if u["hp"] <= 0:
+			continue
+		_apply_action(state, u, decide_unit_action(state, u, threat, enemy_master))
+		u["acted"] = true
+		if state.winner != -1:
+			return
+	var master: Variant = state.master_of(owner)
+	if master != null and master["mp"] >= 6:
+		run_summons(state, master)
+
+## _apply_action — execute one decided action (MUTATES state). Move/attack/capture/instant.
+static func _apply_action(state, unit: Dictionary, action: Dictionary) -> void:
+	match action["kind"]:
+		"attack":
+			unit["q"] = action["dest"].x
+			unit["r"] = action["dest"].y
+			var target: Variant = _unit_by_id(state, action["target_id"])
+			if target == null:
+				return
+			if action["ab"] != null:
+				unit["cd"] = action["ab"]["cd"]
+				Combat.resolve_attack(state, unit, target, action["ab"]["status"], action["ab"]["status_turns"])
+			else:
+				Combat.resolve_attack(state, unit, target)
+		"instant":
+			AbilityResolve.resolve_instant(state, unit, action["ab"])
+			unit["cd"] = action["ab"]["cd"]
+		"capture":
+			unit["q"] = action["dest"].x
+			unit["r"] = action["dest"].y
+			var cell: Variant = state.cell_at(action["dest"].x, action["dest"].y)
+			if cell != null and cell["terrain"] == "tower" and cell.get("owner", -1) != unit["owner"]:
+				state.capture_tower(unit, cell)
+		"move":
+			unit["q"] = action["dest"].x
+			unit["r"] = action["dest"].y
+		"wait":
+			pass
+
+static func _unit_by_id(state, id: int):
+	for u in state.units:
+		if u["id"] == id and u["hp"] > 0:
+			return u
+	return null

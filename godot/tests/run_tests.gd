@@ -54,6 +54,7 @@ func _initialize() -> void:
 	_test_ai_attack()
 	_test_ai_decision()
 	_test_ai_summons()
+	_test_ai_turn()
 	print("\n== %d passed, %d failed ==" % [_passed, _failed])
 	quit(1 if _failed > 0 else 0)
 
@@ -902,3 +903,31 @@ func _test_ai_summons() -> void:
 	var n0 := gp.alive_units(1).size()
 	AI.run_summons(gp, gp.master_of(1))
 	_eq(gp.alive_units(1).size(), n0, "summons: <6 MP summons nothing")
+
+func _test_ai_turn() -> void:
+	# A full AI turn: every AI unit ends up acted; a guaranteed kill is executed.
+	var gs := _combat_state()
+	gs.current_player = 1                      # AI's turn
+	var killer := gs.spawn_unit("geomaul", 1, 2, 3)
+	var prey := gs.spawn_unit("galewisp", 0, 3, 3)
+	prey["hp"] = 2
+	gs.spawn_master(0, 6, 6)                    # enemy master (so take_turn has a target)
+	gs.spawn_master(1, 0, 0)                    # AI master
+	AI.take_turn(gs)
+	_ok(prey["hp"] <= 0, "ai-turn: AI executed the guaranteed kill")
+	for u in gs.alive_units(1):
+		_ok(u["acted"], "ai-turn: every AI unit acted")
+	# No enemy master -> take_turn is a no-op (and does not crash).
+	var gn := _combat_state()
+	gn.current_player = 1
+	gn.spawn_unit("cinderling", 1, 2, 3)
+	AI.take_turn(gn)
+	_ok(true, "ai-turn: no enemy master -> safe no-op")
+	# A move-toward-master turn for a lone grunt actually moves it.
+	var gm := _flat_state(13, 13)
+	gm.current_player = 1
+	gm.spawn_master(0, 11, 11)
+	gm.spawn_master(1, 0, 0)
+	var grunt := gm.spawn_unit("cinderling", 1, 2, 2)
+	AI.take_turn(gm)
+	_ok(Hex.distance(Vector2i(grunt["q"], grunt["r"]), Vector2i(11, 11)) < Hex.distance(Vector2i(2, 2), Vector2i(11, 11)), "ai-turn: grunt advanced on the master")
