@@ -17,30 +17,32 @@ new session, then the linked docs as needed.
 
 ## Next session — start here
 
-**UPDATE (2026-06-10): Port is UNDERWAY on branch `godot-port`. M1 + M2 + M3 + M4 COMPLETE**
-— M1 skeleton + headless harness + hex; M2 bit-exact Mulberry32 RNG + data tables
-+ deterministic `generateMap` (seed 7041 = JS c1) + placeholder render; M3 unit data
-(`unit_types.gd`), factories + `GameState` + `pathfinding.gd` (Dijkstra reachable/attack/path)
-+ interactive tokens (click-select/move); M4 combat+status+weather, resolved INLINE
-(no cutaway): `data/{elements,statuses,weather}.gd`; `core/status.gd` (add/has/tick),
-`core/weather.gd` (now/roll, RNG-order faithful), `core/combat.gd` (pure deterministic
-`compute_damage` base + `forecast_battle` + inline `resolve_attack` with counter/ward/jitter),
-leveling+evolution in `core/units.gd`, turn machinery in `game_state.gd` (`end_turn`:
-MP regen + status tick + tower/castle heals + evolve + weather roll; `check_win_condition`;
-`capture_tower`), `effective_move` extended with slow/skitter/weather, and `main.gd` wired
-(click-to-attack, capture-on-move, Enter→end_turn). **236 tests green; board verified by user.**
-Determinism: ALL runtime randomness (combat ±1 jitter, weather roll) routes through
-`GameState.rng` (seeded Mulberry32); `compute_damage` is pure (no rng).
-**Next: M5 (all 12 abilities — wire into combat/status/weather).** Resume with:
+**UPDATE (2026-06-11): Port is UNDERWAY on branch `godot-port`. M1–M5 COMPLETE**
+— M1 skeleton + headless harness + hex; M2 Mulberry32 RNG + data + deterministic
+`generateMap` (seed 7041 = JS c1) + render; M3 unit data + `GameState` + `pathfinding.gd`
+(Dijkstra reachable/attack/path) + interactive tokens; M4 combat+status+weather INLINE
+(`data/{elements,statuses,weather}.gd`, `core/{status,weather,combat}.gd` — pure deterministic
+`compute_damage` + inline `resolve_attack`, leveling+evolution, turn machinery `end_turn`/
+`check_win_condition`/`capture_tower`, `effective_move` modifiers); M5 ALL 12 ABILITIES:
+`data/abilities.gd` (ABILITIES + `ability_for`, evolved cd-1 via `t.evolved`), `core/combat.gd`
+`resolve_attack` gained optional `apply_status`/`status_turns` (the 5 enemy abilities —
+ignite/cinderBreath/frostBite/undertow/diveMark, applied on surviving primary swing only),
+`core/ability_resolve.gd` (`resolve_instant` for the 6 instants — heal/quake/skitter/galeRush/
+bulwark/ward; `blink_targets`+`do_blink` for the 1 tile ability), `main.gd` wired (A = cast;
+instant fires now, enemy/tile arm→click; `armed` state machine + `_finish_action`).
+**279 tests green; both gates (harness + headless boot) verified.** Determinism unchanged
+(all runtime randomness via `GameState.rng`; `compute_damage` pure).
+**Next: M6 (AI — threat map + scored decision tree + summon economy; the designated C#-swap seam).** Resume with:
 - `git checkout godot-port`
 - Tests: `pwsh -ExecutionPolicy Bypass -File godot/tests/run_tests.ps1` (green = `== N passed, 0 failed ==`, EXIT 0). Windowed run of the actual game: `godot --path godot` (NOT `godot godot` — that opens the editor/project-manager, gray viewport, nothing playing).
 - **HARNESS BLIND SPOT (cost an M3 bug):** `run_tests.gd` only loads scripts that declare `class_name` (global registry). Entry-point scene scripts like `scenes/main.gd` have NO `class_name`, so a parse error there passes the headless suite yet breaks the running game (gray screen). Catch it cheaply with a headless boot: `godot --headless --path godot --quit-after 30 2>&1 | Select-String "SCRIPT ERROR|Parse Error|Failed to load"` (clean = no matches, EXIT 0). Run this in addition to the suite whenever a no-`class_name` scene script changes. Consider folding it into `run_tests.ps1` in M4.
-- Tracker: `ROADMAP_GODOT.md`. Docs: `docs/superpowers/specs/2026-06-10-wraithspire-godot-port-design.md` (+ `-art-brief.md`); plans `docs/superpowers/plans/2026-06-10-wraithspire-godot-m{1,2,3,4}-*.md`.
-- Engine: standard Godot 4.6.3 build for the GDScript phase; Mono build + .NET 9 SDK retained for the C# hotspot (AI scorer). `godot`/`godot_console` PATH aliases point at the standard build.
-- M5 needs its own plan (writing-plans, one per milestone); execution mode subagent-driven (grinder implementer + general-purpose spec review + code-reviewer quality review per task) worked very well across M3 (4 tasks) and M4 (8 tasks). ALWAYS run BOTH gates after a `main.gd` change: the harness AND the headless boot (see blind-spot note above).
-- **M4 → M5 handoff:** the status ENGINE (add/has/tick) + combat READS of mark/bulwark/ward/slow/skitter are done, but statuses have NO in-game WRITER yet — M5 abilities are the writers. `resolve_attack(state, attacker, defender)` has NO status-apply param yet; M5 adds the optional `apply_status`/`status_turns` path (JS `applySwing` `b.applyStatus`, game.js:2385). `ABILITIES` table + `STATUS_META` consumers, `aiScoreInstantAbility` (M6). `unit["cd"]` (cooldown) is decremented in `end_turn` but nothing sets it yet — abilities set it.
-- **M4 accepted divergence from JS (record in design-doc parity gaps):** a WARDED defender whose primary swing is absorbed still COUNTERS if in range — `resolve_attack` checks post-swing `hp > 0`, whereas JS `beginBattle` pre-computes `willDie1` from raw damage ignoring ward and suppresses the counter. The Godot behavior is more intuitive; locked in by a `_test_resolve` assert. Only differs in the rare ward+would-die+in-range case.
-- **M5/M6 coverage TODOs (flagged by the M4 final review):** add a compound-modifier combat assert (mark+bulwark+weather together) when abilities first stack statuses; assert `forecast_battle` counter band (`c_lo`/`c_hi`) when M6 AI consumes it; test `resolve_attack`→master-kill→`winner` as one integrated path; test the capture→`end_turn`→MP +2/tower regen interaction (only the 0-tower baseline is covered). Older still-open: `reconstruct_path` destination-not-in-reach → `[]`; `compute_attack_targets` from a projected post-move tile; 0-HP blocker doesn't block pathing.
+- Tracker: `ROADMAP_GODOT.md`. Docs: `docs/superpowers/specs/2026-06-10-wraithspire-godot-port-design.md` (+ `-art-brief.md`); plans `docs/superpowers/plans/2026-06-10-wraithspire-godot-m{1,2,3,4,5}-*.md`.
+- Engine: standard Godot 4.6.3 build for the GDScript phase; Mono build + .NET 9 SDK retained for the C# hotspot (AI scorer — M6 is where it may finally matter). `godot`/`godot_console` PATH aliases point at the standard build.
+- M6 needs its own plan (writing-plans, one per milestone); execution mode subagent-driven (grinder implementer + general-purpose spec review + code-reviewer quality review per task) worked very well across M3 (4 tasks), M4 (8 tasks), M5 (5 tasks). ALWAYS run BOTH gates after a `main.gd` change: the harness AND the headless boot (see blind-spot note above).
+- **M5 → M6 handoff:** all 12 abilities resolve (`ability_for` + `resolve_instant`/`resolve_attack`-status/`blink`). M6 ports `aiTakeTurn` + the scored decision tree (kill → retreat → instant ability → capture → attack → move) + threat map + summon economy + `aiScoreInstantAbility` (game.js ~1140–1410, 5822). The AI is the designated **C#-swap seam** — keep it behind a clean pure interface (it already can be: it reads `GameState` + the pure queries). The JS `setTimeout`-chain + battle-flag polling becomes a coroutine/turn-runner in the presentation layer (the one control-flow REWRITE, not a straight port — design spec "Risks"). `ai_profiles.gd` (AI_PROFILES difficulty knobs) ports here too. `unit["cd"]` is set by abilities (M5) and decremented in `end_turn`; the AI must respect `cd > 0` (the `aiScoreInstantAbility` guard already does).
+- **M4 accepted divergence from JS (still open — record in design-doc parity gaps):** a WARDED defender whose primary swing is absorbed still COUNTERS if in range — `resolve_attack` checks post-swing `hp > 0`, whereas JS `beginBattle` pre-computes `willDie1` ignoring ward and suppresses the counter. Godot behavior is more intuitive; locked by a `_test_resolve` assert.
+- **M7 carry-forwards (from M5):** (1) the M4 temp debug keys in `main.gd` (`D`=spawn combat, `T`=goto tower) + the minimal `A`=cast keybind are placeholders — replace with the action menu + summon list. (2) Re-introduce the JS "ability mis-click backs out to the post-move menu without freeing the unit" exploit-fix (game.js 4276–4283) — M5 simplified it to a plain deselect (`main.gd _resolve_armed` miss path). (3) Add `acted`/second-move-leg gating: `second_move` is set by skitter/galeRush but only consumed via `effective_move`'s `skitterBoost +2` today; the "take a second move-only action" UX is M7.
+- **Test coverage TODOs (carried + new from M5 review):** end-to-end "enemy-ability status through a board cast" (the `ability_for→main.gd→resolve_attack` seam is only read-verified — `main.gd` has no class_name so it's harness-invisible; add once M7 gives a testable cast entry point); evolved-cd behaviorally through a cast; the other 4 enemy abilities individually (only ignite→burn is asserted, same code path). Older still-open: compound-modifier combat (mark+bulwark+weather); `forecast_battle` counter band (`c_lo`/`c_hi`, M6 AI consumes it); `resolve_attack`→master-kill→`winner` integrated; capture→`end_turn`→MP +2/tower regen; `reconstruct_path` destination-not-in-reach → `[]`; `compute_attack_targets` from a projected post-move tile; 0-HP blocker doesn't block pathing.
 
 The original port-planning steps below are now historical (kept for reference):
 
