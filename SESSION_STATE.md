@@ -17,7 +17,7 @@ new session, then the linked docs as needed.
 
 ## Next session — start here
 
-**UPDATE (2026-06-11): Port is UNDERWAY on branch `godot-port`. M1–M6 COMPLETE**
+**UPDATE (2026-06-11): Port is UNDERWAY on branch `godot-port`. M1–M7 COMPLETE**
 — M1 skeleton + headless harness + hex; M2 Mulberry32 RNG + data + deterministic
 `generateMap` (seed 7041 = JS c1) + render; M3 unit data + `GameState` + `pathfinding.gd`
 (Dijkstra reachable/attack/path) + interactive tokens; M4 combat+status+weather INLINE
@@ -35,16 +35,25 @@ in new `core/ai.gd` (class AI — the C#-swap seam): `data/ai_profiles.gd` (AI_P
 `score_attacks` (PURE, probe-copy) / `decide_unit_action` (kill→retreat→instant→capture→attack→move)
 / `run_summons` (element/terrain/value scoring, bank vs flood) / `take_turn` (SYNCHRONOUS runner,
 masters last), `main.gd` Enter wired to run the AI for player 1 then hand back.
-**330 tests green; both gates (harness + headless boot) verified; final opus milestone review = SHIP.**
+AI hardcoded to player 1 (player/isAI table + difficulty-select UI = M9); M7 HUD/UI + presentation
+refactor: pure `core/ui_queries.gd` (class UiQueries — `available_actions`/`summon_options`/
+`can_capture`, harness-tested; HUD renders only what it returns), per-unit `UnitNode` (HP bar +
+status pips) via a `UnitsLayer` manager, enhanced `overlay.gd` (reachable/attack/armed/selection),
+Camera2D pan+zoom, a `CanvasLayer` HUD (`top_bar`/`info_card`/`action_menu`/`summon_list`), and the
+real interaction state machine in `main.gd` (select→move→post-move action menu→Attack/Ability/
+Capture/Summon/Undo/Wait; armed mis-click backs out to the menu; second-move skitter/galeRush leg;
+`acted` enforcement); temp `D`/`T`/`A` debug keys retired. Board terrain stays a custom-hex Node2D
+(NOT TileMapLayer — deliberate; M10 reskins). **374 tests green; both gates verified after every
+main.gd change; final opus milestone review = SHIP.**
 Determinism unchanged (normal/hard zero-RNG; only easy draws `state.rng`; `compute_damage` pure).
-AI hardcoded to player 1 (player/isAI table + difficulty-select UI = M9).
-**Next: M7 (HUD/UI — action menu + summon list/cooldown display).**
+**Next: M8 (battle cutaway scene — and `AI.take_turn` becomes a coroutine that awaits each battle).**
 
->>> PICK UP HERE (M7 — HUD/UI) <<<
-- **Tracker:** `ROADMAP_GODOT.md` — M1–M6 ✅; next `- [ ] M7 — HUD/UI as Control nodes`. M7 needs its own plan (use `superpowers:writing-plans`).
-- **M7 scope (HUD/menu + summoning UI as Control nodes):** replace the temp debug keybinds in `godot/scenes/main.gd` (`D`=spawn combat, `T`=goto tower, `A`=minimal cast) with the real post-move action menu + summon list + cooldown display. Carry-forwards: (1) re-introduce the JS "ability mis-click backs out to the post-move menu without freeing the unit" exploit-fix (game.js 4276–4283; M5 simplified the `main.gd _resolve_armed` miss path to a plain deselect); (2) add the "take a second move-only action" UX (`second_move` is set by skitter/galeRush but only consumed via `effective_move`'s +2 today); (3) `acted`/second-move-leg gating.
-- **Execution mode (proven across M3/M4/M5/M6):** subagent-driven — per task: dispatch a `grinder` implementer (model sonnet) with the task's verbatim steps; then a `general-purpose` spec reviewer; then a `feature-dev:code-reviewer` quality reviewer. Apply review fixes via the SAME implementer (SendMessage to its agentId) and `git commit --amend`. After all tasks, one final whole-milestone review (opus over `git diff <base> <final>`). Invoke `superpowers:subagent-driven-development` to drive it.
-- **Gates:** harness `pwsh -File godot/tests/run_tests.ps1` (expect `== N passed, 0 failed ==`, EXIT 0) after every task; the `-ExecutionPolicy Bypass` form is BLOCKED by the Claude Code classifier — use plain `pwsh -File`. AND the headless boot (blind-spot note below) after ANY `main.gd` change (`main.gd` has no class_name → harness can't see its parse errors). M7 is heavily `main.gd`/scene work → run the headless boot constantly.
+>>> PICK UP HERE (M8 — battle cutaway) <<<
+- **Tracker:** `ROADMAP_GODOT.md` — M1–M7 ✅; next `- [ ] M8 — battle cutaway`. M8 needs its own spec (brainstorming) + plan (writing-plans).
+- **M8 scope:** port the JS battle-scene state machine (`intro→standoff→aCharge→aImpact→aRecover→cPause→cCharge→cImpact→cRecover→outro→done`) as a Godot scene using `Tween`/`AnimationPlayer` (design spec "Presentation layer / BattleScene"). Reads the combat snapshot, applies HP at impact frames only, arena backdrop varies by defender terrain, attack effects keyed off `unit.attack`. THE control-flow change: `AI.take_turn` (synchronous in M6) becomes a COROUTINE in the presentation layer that `await`s each battle cutaway; the pure decision functions in `core/ai.gd` DON'T change (C#-swap seam stays intact). The human attack path in `main.gd` also routes through the cutaway. The **move-slide animation** (unit slides hex-to-hex along its Dijkstra path before the menu) also lands here (deferred from M7).
+- **M7 minor carry-forwards (fold into M8 presentation polish — non-blocking, from the final review):** (1) `overlay.gd` has a dead `set_attack()`/`attack` field+draw — attack targets render via `set_armed` instead; wire it for an attack-range hover preview or delete it. (2) `info_card` clears rather than live-updating mid-action (self-heal/ward/bulwark/capture don't refresh the card before it's cleared on commit). (3) `action_menu`/`summon_list` `_clamp_on_screen` uses hardcoded panel widths (120/180) that underestimate the widest labels, so a right-edge popup can still overflow — compute from the real panel size.
+- **Execution mode (proven across M3–M7):** subagent-driven — per task: `grinder` implementer (model sonnet) with verbatim steps; then a spec reviewer (`general-purpose`) + a quality reviewer (`feature-dev:code-reviewer` or, for tiny diffs, `caveman:cavecrew-reviewer`). Apply fixes via the SAME implementer (SendMessage to its agentId) + `git commit --amend`. After all tasks, one final whole-milestone review (opus over `git diff <base> <final>`). Invoke `superpowers:subagent-driven-development` to drive it.
+- **Gates:** harness `pwsh -File godot/tests/run_tests.ps1` (expect `== N passed, 0 failed ==`, EXIT 0) after every task; the `-ExecutionPolicy Bypass` form is BLOCKED by the Claude Code classifier — use plain `pwsh -File`. AND the headless boot after ANY scene/`main.gd` change (`main.gd` has no class_name → harness can't see its parse errors): `godot --headless --path godot --quit-after 30 2>&1 | Select-String "SCRIPT ERROR|Parse Error|Failed to load"` (clean = no matches). M8 is heavy scene work → run the boot constantly.
 - **M8 note (for when it comes):** `AI.take_turn` becomes a coroutine in the presentation layer that `await`s each battle cutaway; the decision functions (the C#-swap seam) DON'T change.
 
 Original resume steps (still valid):
