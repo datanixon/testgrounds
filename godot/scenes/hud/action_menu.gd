@@ -19,7 +19,8 @@ func _ready() -> void:
 
 func open(actions: Array, screen_pos: Vector2) -> void:
 	for c in _vbox.get_children():
-		c.free()
+		_vbox.remove_child(c)
+		c.queue_free()
 	var first_enabled: Button = null
 	for a in actions:
 		var b := Button.new()

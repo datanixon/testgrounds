@@ -1,10 +1,12 @@
 extends Node2D
-## Root match controller (M6): owns a GameState, renders the board + move overlay
-## + unit tokens, and handles click select/move/attack/capture, Enter -> end_turn,
-## and A -> cast ability (instant fires now; enemy/tile arm then resolve on click),
-## all through the pure core. Enter also runs the enemy AI (player 1) synchronously
-## then hands back. Placeholder interactive slice — the action menu + `acted`
-## enforcement (M7), the battle cutaway (M8), and the gameover screen (M9) are still to come.
+## Root match controller (M7): owns a GameState; renders the board + overlay + per-unit
+## nodes + a CanvasLayer HUD (topbar / info card / action menu / summon list); a real
+## pan/zoom Camera2D. Interaction: click select -> click reachable tile to move -> the
+## post-move action menu (Attack / Ability / Capture / Summon / Undo / Wait, built from
+## UiQueries.available_actions) drives the rest; Attack/enemy-ability/blink arm then
+## resolve on click (a mis-click backs out to the menu). Enter / End-Turn runs the enemy
+## AI (player 1) synchronously then hands back. The battle cutaway + move-slide animation
+## are M8; title / gameover / save / difficulty-select are M9; real art is M10.
 
 const Hex = preload("res://core/hex.gd")
 const Maps = preload("res://data/maps.gd")
@@ -14,6 +16,8 @@ const Combat = preload("res://core/combat.gd")
 const Abilities = preload("res://data/abilities.gd")
 const AbilityResolve = preload("res://core/ability_resolve.gd")
 const AI = preload("res://core/ai.gd")
+const UnitTypes = preload("res://data/unit_types.gd")
+const UiQueries = preload("res://core/ui_queries.gd")
 const BoardScript = preload("res://scenes/board/board.gd")
 const UnitsLayerScript = preload("res://scenes/match/units_layer.gd")
 const OverlayScript = preload("res://scenes/match/overlay.gd")
@@ -33,6 +37,7 @@ var action_menu: ActionMenuScript
 var summon_list: SummonListScript
 var selected = null
 var armed = null   # {ab: Dictionary, kind: String, targets: Dictionary} when an enemy/tile ability is armed
+var undo_snapshot = null   # {unit, q, r} — the pre-move position, live until the action commits
 
 const ZOOM_MIN := 0.5
 const ZOOM_MAX := 2.5
@@ -67,6 +72,9 @@ func _ready() -> void:
 	summon_list = SummonListScript.new()
 	hud.add_child(summon_list)
 	top_bar.refresh(state)
+	action_menu.action_chosen.connect(_on_action_chosen)
+	summon_list.summon_chosen.connect(_on_summon_chosen)
+	summon_list.back.connect(_on_summon_back)
 
 func _unhandled_input(event: InputEvent) -> void:
 	# --- Camera: middle/right-drag pans, wheel zooms. ---
@@ -87,13 +95,6 @@ func _unhandled_input(event: InputEvent) -> void:
 		_on_click(Hex.pixel_to_axial(get_global_mouse_position()))
 	elif event is InputEventKey and event.pressed and event.keycode == KEY_ENTER:
 		_on_end_turn()
-	# --- TEMP M4 verification keys (remove when M5 summoning + a real camera land) ---
-	elif event is InputEventKey and event.pressed and event.keycode == KEY_D:
-		_debug_spawn_combat()   # drop an ally + adjacent enemy by your master
-	elif event is InputEventKey and event.pressed and event.keycode == KEY_T:
-		_debug_goto_tower()     # jump to the nearest neutral tower + a unit beside it
-	elif event is InputEventKey and event.pressed and event.keycode == KEY_A:
-		_cast_ability()
 
 func _on_end_turn() -> void:
 	if state.winner != -1:
@@ -112,143 +113,190 @@ func _center_on_master() -> void:
 	if m != null:
 		cam.position = Hex.axial_to_pixel(Vector2i(m["q"], m["r"]))
 
-# TEMP (M4 verification): there is no summoning yet (M5), so spawn a friendly + an
-# adjacent enemy beside the current player's master to exercise attack/counter on
-# screen. Removed once summoning provides the real way to field units.
-func _debug_spawn_combat() -> void:
-	var m = state.master_of(state.current_player)
-	if m == null:
-		return
-	var foe := 1 - state.current_player
-	var me := state.current_player
-	# [type, owner] on free neighbors: ally cinderling (ignite/enemy-target), enemy
-	# cinderling (a target), ally hexwisp (blink — its teleport is the clearest
-	# on-screen proof a cast fired), ally geomaul (quake — instant area).
-	var to_place := [["cinderling", me], ["cinderling", foe], ["hexwisp", me], ["geomaul", me]]
-	for n in Hex.neighbors(Vector2i(m["q"], m["r"])):
-		if to_place.is_empty():
-			break
-		if not state.in_bounds(n.x, n.y) or state.unit_at(n.x, n.y) != null:
-			continue
-		var cell = state.cell_at(n.x, n.y)
-		if cell == null or cell["terrain"] == "water":
-			continue
-		var spec = to_place.pop_front()
-		state.spawn_unit(spec[0], spec[1], n.x, n.y)
-	units_layer.set_state(state)
+## World hex -> screen position for anchoring a HUD popup at a unit (CanvasLayer is not
+## affected by the camera, so convert through the canvas transform).
+func _hex_screen_pos(q: int, r: int) -> Vector2:
+	return get_viewport().get_canvas_transform() * Hex.axial_to_pixel(Vector2i(q, r))
 
-# TEMP (M4 verification): pan to the nearest neutral tower and drop a current-player
-# flyer next to it, so one click-move onto the tower captures it.
-func _debug_goto_tower() -> void:
-	var m = state.master_of(state.current_player)
-	if m == null or state.map["towers"].is_empty():
-		return
-	var best: Vector2i = state.map["towers"][0]
-	var best_d := 99999
-	for t in state.map["towers"]:
-		var d: int = Hex.distance(Vector2i(m["q"], m["r"]), t)
-		if d < best_d:
-			best_d = d
-			best = t
-	for n in Hex.neighbors(best):
-		if state.in_bounds(n.x, n.y) and state.unit_at(n.x, n.y) == null:
-			var cell = state.cell_at(n.x, n.y)
-			if cell != null and cell["terrain"] != "water":
-				state.spawn_unit("galewisp", state.current_player, n.x, n.y)
-				break
-	cam.position = Hex.axial_to_pixel(best)
-	units_layer.set_state(state)
-
-func _cast_ability() -> void:
-	# TEMP verification feedback via print() — there is no HUD/log yet (M7). Tokens have
-	# no HP bar or status icon, so most cast effects aren't visible on-screen; these prints
-	# confirm what fired. Blink (a teleport) and a lethal hit (token vanishes) ARE visible.
-	if selected == null:
-		print("cast: nothing selected")
-		return
-	var ab = Abilities.ability_for(selected)
-	if ab == null:
-		print("cast: %s has no ability" % selected["name"])
-		return
-	if selected["cd"] > 0:
-		print("cast: %s on cooldown (%d turns)" % [ab["key"], selected["cd"]])
-		return
-	match ab["target"]:
-		"none":
-			AbilityResolve.resolve_instant(state, selected, ab)
-			selected["cd"] = ab["cd"]
-			print("cast %s (instant) — effect applied" % ab["key"])
-			_finish_action()
-		"enemy":
-			var targets := Pathfinding.compute_attack_targets(state, selected, selected["q"], selected["r"])
-			if not targets.is_empty():
-				armed = {"ab": ab, "kind": "enemy", "targets": targets}
-				print("armed %s — click an enemy in range" % ab["key"])
-			else:
-				print("cast %s: no enemy in range" % ab["key"])
-		"tile":
-			var tiles := AbilityResolve.blink_targets(state, selected)
-			if not tiles.is_empty():
-				armed = {"ab": ab, "kind": "tile", "targets": tiles}
-				print("armed %s — click a tile to teleport" % ab["key"])
-			else:
-				print("cast %s: nowhere to blink" % ab["key"])
-
-func _resolve_armed(a: Vector2i) -> void:
-	if armed["targets"].has(Hex.key(a)):
-		if armed["kind"] == "enemy":
-			var foe = state.unit_at(a.x, a.y)
-			if foe != null:
-				Combat.resolve_attack(state, selected, foe, armed["ab"].get("status", ""), armed["ab"].get("status_turns", 0))
-				selected["cd"] = armed["ab"]["cd"]
-		else:   # tile (blink)
-			AbilityResolve.do_blink(selected, a.x, a.y)
-			selected["cd"] = armed["ab"]["cd"]
-		armed = null
-		_finish_action()
-		return
-	# Miss: cancel the armed state silently.
-	armed = null
-	_clear_selection()
+func _open_menu_for(unit) -> void:
+	var has_undo: bool = undo_snapshot != null and undo_snapshot["unit"] == unit
+	var actions := UiQueries.available_actions(state, unit, has_undo)
+	selected = unit
+	action_menu.open(actions, _hex_screen_pos(unit["q"], unit["r"]))
 
 func _on_click(a: Vector2i) -> void:
+	# An armed ability/attack is waiting for a target click.
 	if armed != null:
 		_resolve_armed(a)
 		return
-	# With a unit selected: attack an enemy in range, else move (and maybe capture).
-	if selected != null:
-		# Attack: clicked tile holds an enemy within attack range.
-		var targets := Pathfinding.compute_attack_targets(state, selected, selected["q"], selected["r"])
-		if targets.has(Hex.key(a)):
-			var foe = state.unit_at(a.x, a.y)
-			if foe != null:
-				Combat.resolve_attack(state, selected, foe)
-				_finish_action()
-				return
-		# Move: clicked a reachable tile (not the unit's own).
+	# The action menu is open — clicks on the board are ignored (use the menu).
+	if action_menu.visible or summon_list.visible:
+		return
+	# With a unit selected (and not yet acted): move onto a reachable tile.
+	if selected != null and not selected["acted"]:
 		var reach := Pathfinding.compute_reachable(state, selected)
 		var is_own_tile: bool = (a.x == selected["q"] and a.y == selected["r"])
 		if reach.has(Hex.key(a)) and not is_own_tile:
+			undo_snapshot = {"unit": selected, "q": selected["q"], "r": selected["r"]}
 			selected["q"] = a.x
 			selected["r"] = a.y
-			# Capture a tower we landed on that isn't already ours.
-			var cell = state.cell_at(a.x, a.y)
-			if cell != null and cell["terrain"] == "tower" and cell.get("owner", -1) != selected["owner"]:
-				state.capture_tower(selected, cell)
-			_clear_selection()
 			units_layer.set_state(state)
+			overlay.set_highlights({}, selected)
+			_open_menu_for(selected)
 			return
-	# Otherwise (re)select the current player's unit under the cursor.
+		if is_own_tile:
+			_open_menu_for(selected)   # act without moving
+			return
+	# Otherwise (re)select the current player's un-acted unit under the cursor.
 	var u = state.unit_at(a.x, a.y)
-	if u != null and u["owner"] == state.current_player:
+	if u != null and u["owner"] == state.current_player and not u["acted"]:
 		selected = u
+		undo_snapshot = null
 		overlay.set_highlights(Pathfinding.compute_reachable(state, u), u)
+		info_card.show_unit(u)
 	else:
 		_clear_selection()
 
+func _on_action_chosen(kind: String) -> void:
+	action_menu.close()
+	var unit = selected
+	if unit == null:
+		return
+	match kind:
+		"attack":
+			var targets := Pathfinding.compute_attack_targets(state, unit, unit["q"], unit["r"])
+			if targets.is_empty():
+				_open_menu_for(unit)   # nothing in range after all — back to the menu
+				return
+			armed = {"ab": null, "kind": "enemy", "targets": targets}
+			overlay.set_armed(targets)
+		"ability":
+			_arm_ability(unit)
+		"capture":
+			var cell = state.cell_at(unit["q"], unit["r"])
+			if cell != null and UiQueries.can_capture(state, unit, cell):
+				state.capture_tower(unit, cell)
+			_commit(unit)
+		"summon":
+			summon_list.open(UiQueries.summon_options(state, unit), _hex_screen_pos(unit["q"], unit["r"]))
+		"undo":
+			if undo_snapshot != null and undo_snapshot["unit"] == unit:
+				unit["q"] = undo_snapshot["q"]
+				unit["r"] = undo_snapshot["r"]
+				undo_snapshot = null
+				units_layer.set_state(state)
+				selected = unit
+				overlay.set_highlights(Pathfinding.compute_reachable(state, unit), unit)
+				info_card.show_unit(unit)
+		"wait":
+			_commit(unit)
+
+func _arm_ability(unit) -> void:
+	var ab = Abilities.ability_for(unit)
+	if ab == null or unit["cd"] > 0:
+		_open_menu_for(unit)
+		return
+	match ab["target"]:
+		"none":
+			AbilityResolve.resolve_instant(state, unit, ab)
+			unit["cd"] = ab["cd"]
+			# Skitter / Gale Rush grant a second move-only action: keep the unit selected
+			# with fresh (boosted) reach so the next reachable click moves it again, after
+			# which available_actions' second-move branch (Capture/Wait) opens. Other
+			# instants (heal/quake/bulwark/ward) commit immediately.
+			if unit.get("second_move", false):
+				undo_snapshot = null
+				units_layer.set_state(state)
+				selected = unit
+				overlay.set_highlights(Pathfinding.compute_reachable(state, unit), unit)
+				info_card.show_unit(unit)
+				return
+			_commit(unit)
+		"enemy":
+			var targets := Pathfinding.compute_attack_targets(state, unit, unit["q"], unit["r"])
+			if targets.is_empty():
+				_open_menu_for(unit)
+				return
+			armed = {"ab": ab, "kind": "enemy", "targets": targets}
+			overlay.set_armed(targets)
+		"tile":
+			var tiles := AbilityResolve.blink_targets(state, unit)
+			if tiles.is_empty():
+				_open_menu_for(unit)
+				return
+			armed = {"ab": ab, "kind": "tile", "targets": tiles}
+			overlay.set_armed(tiles)
+
+func _on_summon_chosen(key: String) -> void:
+	var unit = selected
+	if unit == null:
+		return
+	var slot = AI.find_summon_slot(state, unit)
+	if slot == null:
+		return   # no open hex; leave the list open for another pick or Back
+	unit["mp"] -= UnitTypes.UNIT_TYPES[key]["cost"]
+	var u := state.spawn_unit(key, unit["owner"], slot.x, slot.y)
+	u["acted"] = true
+	summon_list.close()
+	_commit(unit)
+
+func _on_summon_back() -> void:
+	summon_list.close()
+	if selected != null:
+		_open_menu_for(selected)
+
+func _resolve_armed(a: Vector2i) -> void:
+	var unit = selected
+	if armed["targets"].has(Hex.key(a)):
+		if armed["kind"] == "enemy":
+			var foe = state.unit_at(a.x, a.y)
+			if foe == null:
+				armed = null
+				overlay.set_armed({})
+				if unit != null:
+					_open_menu_for(unit)
+				return
+			var ab = armed["ab"]
+			if ab != null:
+				Combat.resolve_attack(state, unit, foe, ab.get("status", ""), ab.get("status_turns", 0))
+				unit["cd"] = ab["cd"]
+			else:
+				Combat.resolve_attack(state, unit, foe)
+		else:   # tile (blink)
+			AbilityResolve.do_blink(unit, a.x, a.y)
+			unit["cd"] = armed["ab"]["cd"]
+		armed = null
+		overlay.set_armed({})
+		_commit(unit)
+		return
+	# Miss: cancel the arm and RE-OPEN the menu without freeing the unit (exploit-fix).
+	armed = null
+	overlay.set_armed({})
+	if unit != null:
+		_open_menu_for(unit)
+
+func _commit(unit) -> void:
+	if unit != null:
+		unit["acted"] = true
+	undo_snapshot = null
+	armed = null
+	action_menu.close()
+	summon_list.close()
+	overlay.clear_all()
+	_finish_action()
+
 func _clear_selection() -> void:
 	selected = null
-	overlay.set_highlights({}, null)
+	undo_snapshot = null
+	armed = null
+	if action_menu != null:
+		action_menu.close()
+	if summon_list != null:
+		summon_list.close()
+	if overlay != null:
+		overlay.clear_all()
+	if info_card != null:
+		info_card.clear()
 
 func _finish_action() -> void:
 	_clear_selection()

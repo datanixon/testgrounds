@@ -12,7 +12,7 @@ reference. ROADMAP2 Phases 2–8 are deferred to their own specs post-parity.
 - [x] M4 — Combat resolution + status engine + weather (logic + forecast)
 - [x] M5 — All 12 abilities
 - [x] M6 — AI (threat map + decision tree + summon economy)
-- [ ] M7 — HUD/UI as Control nodes
+- [x] M7 — HUD/UI as Control nodes
 - [ ] M8 — Battle cutaway scene
 - [ ] M9 — Title + gameover + save/load + maps + campaign → parity
 - [ ] M10 — Art + audio pass (real sprites swap in)
