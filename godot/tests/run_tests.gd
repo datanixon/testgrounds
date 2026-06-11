@@ -4,6 +4,9 @@ extends SceneTree
 ## Exits 0 if all asserts pass, 1 otherwise. Pure-logic tests only (no display).
 const HexLib = preload("res://core/hex.gd")
 const Rng = preload("res://core/rng.gd")
+const Terrain = preload("res://data/terrain.gd")
+const Maps = preload("res://data/maps.gd")
+const Campaign = preload("res://data/campaign.gd")
 
 var _passed := 0
 var _failed := 0
@@ -12,6 +15,7 @@ func _initialize() -> void:
 	_test_harness_smoke()
 	_test_hex()
 	_test_rng()
+	_test_data()
 	print("\n== %d passed, %d failed ==" % [_passed, _failed])
 	quit(1 if _failed > 0 else 0)
 
@@ -61,3 +65,26 @@ func _test_rng() -> void:
 	_eq(Rng.new(12345).next(), 4207900869.0 / 4294967296.0, "rng: next() float")
 	# below(n) = floor(next()*n); seed 0 first next()=0.2664... -> below(10)=2
 	_eq(Rng.new(0).below(10), 2, "rng: below(10) seed 0")
+
+func _test_data() -> void:
+	# Terrain
+	_eq(Terrain.TERRAIN.size(), 7, "terrain: 7 types")
+	_eq(Terrain.TERRAIN["plain"]["move_cost"], 1, "terrain: plain move_cost")
+	_eq(Terrain.TERRAIN["mountain"]["flyers_only"], true, "terrain: mountain flyers_only")
+	_eq(Terrain.TERRAIN["water"]["blocks"], true, "terrain: water blocks")
+	_eq(Terrain.TERRAIN["water"]["move_cost"], 99, "terrain: water move_cost")
+	_eq(Terrain.TERRAIN["tower"]["capturable"], true, "terrain: tower capturable")
+	_eq(Terrain.TERRAIN["castle"]["def"], 4, "terrain: castle def")
+	# Maps
+	_eq(Maps.MAPS.size(), 4, "maps: 4 skirmish")
+	_eq(Maps.MAPS[0]["key"], "frontier", "maps: [0] key")
+	_eq(Maps.MAPS[0]["cols"], 14, "maps: [0] cols")
+	_eq(Maps.MAPS[2]["key"], "crags", "maps: [2] key")
+	_eq(Maps.MAPS[2]["castles"], [Vector2i(0, 5), Vector2i(9, 5)], "maps: crags castles")
+	_eq(Maps.MAPS[2]["weather_table"], ["heat", "heat", "clear", "gale"], "maps: crags weather")
+	# Campaign
+	_eq(Campaign.CAMPAIGN.size(), 4, "campaign: 4 missions")
+	_eq(Campaign.CAMPAIGN[0]["map"]["seed"], 7041, "campaign: c1 seed")
+	_eq(Campaign.CAMPAIGN[0]["map"]["cols"], 11, "campaign: c1 cols")
+	_eq(Campaign.CAMPAIGN[3]["difficulty"], "hard", "campaign: c4 difficulty")
+	_eq(Campaign.CAMPAIGN[3]["map"]["seed"], 86011, "campaign: c4 seed")
