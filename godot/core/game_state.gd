@@ -20,6 +20,7 @@ var rng: Mulberry32 = Rng.new(0)   # placeholder seed; new_skirmish reseeds. Avo
 var weather: Dictionary = {}  # {key, turns_left}
 var map_def: Dictionary = {}  # the active map def (for its weather_table)
 var winner: int = -1          # -1 none; else the winning owner
+var difficulty := "normal"    # AI weight profile (easy/normal/hard); difficulty-select UI is M9
 
 func _new_id() -> int:
 	var n := _next_id

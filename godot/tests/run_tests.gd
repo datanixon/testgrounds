@@ -21,6 +21,8 @@ const Weather = preload("res://core/weather.gd")
 const Combat = preload("res://core/combat.gd")
 const Abilities = preload("res://data/abilities.gd")
 const AbilityResolve = preload("res://core/ability_resolve.gd")
+const AiProfiles = preload("res://data/ai_profiles.gd")
+const AI = preload("res://core/ai.gd")
 
 var _passed := 0
 var _failed := 0
@@ -46,6 +48,7 @@ func _initialize() -> void:
 	_test_attack_status()
 	_test_instant_abilities()
 	_test_blink()
+	_test_ai_profiles()
 	print("\n== %d passed, %d failed ==" % [_passed, _failed])
 	quit(1 if _failed > 0 else 0)
 
@@ -718,3 +721,17 @@ func _test_instant_abilities() -> void:
 	_ok(Status.has_status(ward_u, "bulwark"), "bulwark: self shielded")
 	_ok(Status.has_status(ally, "bulwark"), "bulwark: adjacent ally shielded")
 	_ok(not Status.has_status(enemy, "bulwark"), "bulwark: enemy not shielded")
+
+func _test_ai_profiles() -> void:
+	_eq(AiProfiles.AI_PROFILES.size(), 3, "ai_profiles: 3 difficulties")
+	_eq(AiProfiles.DIFFICULTIES, ["easy", "normal", "hard"], "ai_profiles: difficulty order")
+	_eq(AiProfiles.AI_PROFILES["normal"]["kill_bonus"], 30, "ai_profiles: normal kill_bonus")
+	_eq(AiProfiles.AI_PROFILES["hard"]["master_bonus"], 26, "ai_profiles: hard master_bonus")
+	_eq(AiProfiles.AI_PROFILES["easy"]["random_summons"], true, "ai_profiles: easy random summons")
+	_eq(AiProfiles.AI_PROFILES["normal"]["random_summons"], false, "ai_profiles: normal not random")
+	# GameState defaults to normal; weights() reads it.
+	var gs := GameState.new_skirmish(Maps.MAPS[0], 42)
+	_eq(gs.difficulty, "normal", "ai_profiles: state defaults normal")
+	_eq(AI.weights(gs)["kill_bonus"], 30, "ai_profiles: weights() picks the state profile")
+	gs.difficulty = "hard"
+	_eq(AI.weights(gs)["kill_bonus"], 40, "ai_profiles: weights() follows difficulty")
