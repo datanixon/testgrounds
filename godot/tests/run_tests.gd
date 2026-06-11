@@ -9,6 +9,7 @@ const Maps = preload("res://data/maps.gd")
 const Campaign = preload("res://data/campaign.gd")
 const MapGen = preload("res://core/map_gen.gd")
 const BoardLib = preload("res://scenes/board/board.gd")
+const UnitTypes = preload("res://data/unit_types.gd")
 
 var _passed := 0
 var _failed := 0
@@ -20,6 +21,7 @@ func _initialize() -> void:
 	_test_data()
 	_test_map_gen()
 	_test_board()
+	_test_unit_types()
 	print("\n== %d passed, %d failed ==" % [_passed, _failed])
 	quit(1 if _failed > 0 else 0)
 
@@ -138,3 +140,23 @@ func _test_board() -> void:
 	_eq(BoardLib.terrain_color("water"), Color("#264a78"), "board: water color")
 	_eq(BoardLib.terrain_color("castle"), Color("#9a8a52"), "board: castle color")
 	_eq(BoardLib.hex_corners(Vector2.ZERO).size(), 6, "board: 6 corners")
+
+func _test_unit_types() -> void:
+	# 8 original base + 8 evolved + 4 new base = 20.
+	_eq(UnitTypes.UNIT_TYPES.size(), 20, "unit_types: 20 entries")
+	_eq(UnitTypes.SUMMON_LIST.size(), 12, "unit_types: 12 summonable")
+	_eq(UnitTypes.SUMMON_LIST[0], "cinderling", "unit_types: summon[0]")
+	# Representative balance-locked values.
+	_eq(UnitTypes.UNIT_TYPES["cinderling"]["max_hp"], 12, "unit_types: cinderling max_hp")
+	_eq(UnitTypes.UNIT_TYPES["cinderling"]["move"], 4, "unit_types: cinderling move")
+	_eq(UnitTypes.UNIT_TYPES["cinderling"]["evolves_to"], "infernite", "unit_types: cinderling evolves_to")
+	_eq(UnitTypes.UNIT_TYPES["geomaul"]["power"], 9, "unit_types: geomaul power")
+	_eq(UnitTypes.UNIT_TYPES["skyharrow"]["flying"], true, "unit_types: skyharrow flying")
+	_eq(UnitTypes.UNIT_TYPES["infernite"]["evolved"], true, "unit_types: infernite evolved")
+	_eq(UnitTypes.UNIT_TYPES["hexwisp"]["element"], "arcane", "unit_types: hexwisp element")
+	_eq(UnitTypes.UNIT_TYPES["duneskink"]["ability"], "skitter", "unit_types: duneskink ability")
+	# Master template.
+	_eq(UnitTypes.MASTER_TEMPLATE["max_hp"], 40, "unit_types: master max_hp")
+	_eq(UnitTypes.MASTER_TEMPLATE["max_mp"], 30, "unit_types: master max_mp")
+	_eq(UnitTypes.MASTER_TEMPLATE["mp_regen"], 4, "unit_types: master mp_regen")
+	_eq(UnitTypes.MASTER_TEMPLATE["move"], 3, "unit_types: master move")
