@@ -10,6 +10,8 @@ const Campaign = preload("res://data/campaign.gd")
 const MapGen = preload("res://core/map_gen.gd")
 const BoardLib = preload("res://scenes/board/board.gd")
 const UnitTypes = preload("res://data/unit_types.gd")
+const Units = preload("res://core/units.gd")
+const GameState = preload("res://core/game_state.gd")
 
 var _passed := 0
 var _failed := 0
@@ -22,6 +24,7 @@ func _initialize() -> void:
 	_test_map_gen()
 	_test_board()
 	_test_unit_types()
+	_test_units_state()
 	print("\n== %d passed, %d failed ==" % [_passed, _failed])
 	quit(1 if _failed > 0 else 0)
 
@@ -160,3 +163,46 @@ func _test_unit_types() -> void:
 	_eq(UnitTypes.MASTER_TEMPLATE["max_mp"], 30, "unit_types: master max_mp")
 	_eq(UnitTypes.MASTER_TEMPLATE["mp_regen"], 4, "unit_types: master mp_regen")
 	_eq(UnitTypes.MASTER_TEMPLATE["move"], 3, "unit_types: master move")
+
+func _test_units_state() -> void:
+	# --- factories ---
+	var m := Units.make_master(1, 0, 3, 4)
+	_eq(m["id"], 1, "units: master id")
+	_eq(m["type_key"], "master", "units: master type_key")
+	_eq(m["hp"], 40, "units: master hp")
+	_eq(m["max_mp"], 30, "units: master max_mp")
+	_eq(m["mp"], 14, "units: master starting mp")
+	_eq(m["move"], 3, "units: master move")
+	_eq(m["is_master"], true, "units: master is_master")
+	_eq(m["q"], 3, "units: master q")
+	var u := Units.make_unit(2, "cinderling", 1, 5, 6)
+	_eq(u["type_key"], "cinderling", "units: unit type_key")
+	_eq(u["max_hp"], 12, "units: unit max_hp")
+	_eq(u["hp"], 12, "units: unit hp == max_hp")
+	_eq(u["move"], 4, "units: unit move")
+	_eq(u["owner"], 1, "units: unit owner")
+	_eq(u["is_master"], false, "units: unit is_master")
+	_eq(u["level"], 1, "units: unit level")
+	_eq(u["acted"], false, "units: unit acted")
+	# --- GameState queries ---
+	var gs := GameState.new_skirmish(Maps.MAPS[0], 42)
+	_eq(gs.units.size(), 2, "state: two archons placed")
+	_eq(gs.current_player, 0, "state: starts player 0")
+	var m0: Variant = gs.master_of(0)
+	var m1: Variant = gs.master_of(1)
+	_ok(m0 != null and m1 != null, "state: both masters found")
+	_eq(m0["owner"], 0, "state: master_of(0) owner")
+	_eq(m1["owner"], 1, "state: master_of(1) owner")
+	_ok(m0["id"] != m1["id"], "state: distinct ids")
+	# masters sit on the two castles
+	var castles: Array = gs.map["castles"]
+	_eq(Vector2i(m0["q"], m0["r"]), castles[0], "state: master 0 on castle 0")
+	_eq(Vector2i(m1["q"], m1["r"]), castles[1], "state: master 1 on castle 1")
+	# unit_at / alive_units / bounds / cell_at
+	_eq(gs.unit_at(m0["q"], m0["r"])["id"], m0["id"], "state: unit_at finds master")
+	_eq(gs.unit_at(9999, 9999), null, "state: unit_at empty -> null")
+	_eq(gs.alive_units(0).size(), 1, "state: alive_units(0)")
+	_ok(gs.in_bounds(castles[0].x, castles[0].y), "state: castle in bounds")
+	_ok(not gs.in_bounds(9999, 9999), "state: off-board not in bounds")
+	_eq(gs.cell_at(castles[0].x, castles[0].y)["terrain"], "castle", "state: cell_at castle terrain")
+	_eq(gs.cell_at(9999, 9999), null, "state: cell_at off-board -> null")
