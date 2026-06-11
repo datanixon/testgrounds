@@ -17,7 +17,7 @@ new session, then the linked docs as needed.
 
 ## Next session — start here
 
-**UPDATE (2026-06-11): Port is UNDERWAY on branch `godot-port`. M1–M5 COMPLETE**
+**UPDATE (2026-06-11): Port is UNDERWAY on branch `godot-port`. M1–M6 COMPLETE**
 — M1 skeleton + headless harness + hex; M2 Mulberry32 RNG + data + deterministic
 `generateMap` (seed 7041 = JS c1) + render; M3 unit data + `GameState` + `pathfinding.gd`
 (Dijkstra reachable/attack/path) + interactive tokens; M4 combat+status+weather INLINE
@@ -29,18 +29,23 @@ new session, then the linked docs as needed.
 ignite/cinderBreath/frostBite/undertow/diveMark, applied on surviving primary swing only),
 `core/ability_resolve.gd` (`resolve_instant` for the 6 instants — heal/quake/skitter/galeRush/
 bulwark/ward; `blink_targets`+`do_blink` for the 1 tile ability), `main.gd` wired (A = cast;
-instant fires now, enemy/tile arm→click; `armed` state machine + `_finish_action`).
-**279 tests green; both gates (harness + headless boot) verified.** Determinism unchanged
-(all runtime randomness via `GameState.rng`; `compute_damage` pure).
-**Next: EXECUTE the M6 (AI) plan — it is WRITTEN + COMMITTED but NOT yet implemented.**
+instant fires now, enemy/tile arm→click; `armed` state machine + `_finish_action`); M6 ENEMY AI
+in new `core/ai.gd` (class AI — the C#-swap seam): `data/ai_profiles.gd` (AI_PROFILES + DIFFICULTIES)
++ `GameState.difficulty`, `weights`/`build_threat_map`/`find_summon_slot`/`score_instant_ability`/
+`score_attacks` (PURE, probe-copy) / `decide_unit_action` (kill→retreat→instant→capture→attack→move)
+/ `run_summons` (element/terrain/value scoring, bank vs flood) / `take_turn` (SYNCHRONOUS runner,
+masters last), `main.gd` Enter wired to run the AI for player 1 then hand back.
+**330 tests green; both gates (harness + headless boot) verified; final opus milestone review = SHIP.**
+Determinism unchanged (normal/hard zero-RNG; only easy draws `state.rng`; `compute_damage` pure).
+AI hardcoded to player 1 (player/isAI table + difficulty-select UI = M9).
+**Next: M7 (HUD/UI — action menu + summon list/cooldown display).**
 
->>> PICK UP HERE (M6 execution) <<<
-- **Plan:** `docs/superpowers/plans/2026-06-11-wraithspire-godot-m6-ai.md` — 6 tasks (1 ai_profiles+difficulty+weights, 2 threat-map+helpers, 3 attack-scoring, 4 decision-tree, 5 summon-economy, 6 turn-runner+wire+close). All AI in one new `core/ai.gd` (the C#-swap seam).
-- **Base SHA:** `0713218` (HEAD of `godot-port`; = the M6-plan commit). Test baseline at this commit: **279 passed, 0 failed**. (Plan's per-task counts are estimates; `0 failed` is the gate.)
-- **Execution mode (proven across M3/M4/M5):** subagent-driven — per task: dispatch a `grinder` implementer (model sonnet) with the task's verbatim steps; then a `general-purpose` spec reviewer; then a `feature-dev:code-reviewer` quality reviewer. Apply review fixes via the SAME implementer (SendMessage to its agentId) and `git commit --amend`. After all 6 tasks, one final whole-milestone review (opus over `git diff 0713218 <final>`). Invoke the `superpowers:subagent-driven-development` skill to drive it.
-- **Gates (run BOTH yourself after Task 6's `main.gd` change, and the harness after every task):** harness `pwsh -ExecutionPolicy Bypass -File godot/tests/run_tests.ps1` (expect `== N passed, 0 failed ==`, EXIT 0) AND the headless boot in the blind-spot note below (`main.gd` has no class_name → harness can't see its parse errors).
-- **M6 design notes baked into the plan:** AI turn-runner is SYNCHRONOUS (M4 made combat inline; no cutaway until M8 → the JS setTimeout/battle-poll collapses to a loop). Scoring is PURE via a duplicated probe unit (not the JS mutate-restore). `normal`/`hard` use zero RNG; only `easy` draws via `state.rng`. AI hardcoded to player 1 (players/isAI table + difficulty UI are M9). Add `GameState.difficulty := "normal"` (Task 1).
-- After M6 closes: update this block (mark M6 done, point at M7 HUD), check off `ROADMAP_GODOT.md`, update the memory file `wraithspire-godot-port.md` + MEMORY.md index.
+>>> PICK UP HERE (M7 — HUD/UI) <<<
+- **Tracker:** `ROADMAP_GODOT.md` — M1–M6 ✅; next `- [ ] M7 — HUD/UI as Control nodes`. M7 needs its own plan (use `superpowers:writing-plans`).
+- **M7 scope (HUD/menu + summoning UI as Control nodes):** replace the temp debug keybinds in `godot/scenes/main.gd` (`D`=spawn combat, `T`=goto tower, `A`=minimal cast) with the real post-move action menu + summon list + cooldown display. Carry-forwards: (1) re-introduce the JS "ability mis-click backs out to the post-move menu without freeing the unit" exploit-fix (game.js 4276–4283; M5 simplified the `main.gd _resolve_armed` miss path to a plain deselect); (2) add the "take a second move-only action" UX (`second_move` is set by skitter/galeRush but only consumed via `effective_move`'s +2 today); (3) `acted`/second-move-leg gating.
+- **Execution mode (proven across M3/M4/M5/M6):** subagent-driven — per task: dispatch a `grinder` implementer (model sonnet) with the task's verbatim steps; then a `general-purpose` spec reviewer; then a `feature-dev:code-reviewer` quality reviewer. Apply review fixes via the SAME implementer (SendMessage to its agentId) and `git commit --amend`. After all tasks, one final whole-milestone review (opus over `git diff <base> <final>`). Invoke `superpowers:subagent-driven-development` to drive it.
+- **Gates:** harness `pwsh -File godot/tests/run_tests.ps1` (expect `== N passed, 0 failed ==`, EXIT 0) after every task; the `-ExecutionPolicy Bypass` form is BLOCKED by the Claude Code classifier — use plain `pwsh -File`. AND the headless boot (blind-spot note below) after ANY `main.gd` change (`main.gd` has no class_name → harness can't see its parse errors). M7 is heavily `main.gd`/scene work → run the headless boot constantly.
+- **M8 note (for when it comes):** `AI.take_turn` becomes a coroutine in the presentation layer that `await`s each battle cutaway; the decision functions (the C#-swap seam) DON'T change.
 
 Original resume steps (still valid):
 - `git checkout godot-port`
