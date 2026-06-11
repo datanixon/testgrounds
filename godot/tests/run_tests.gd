@@ -38,6 +38,7 @@ func _initialize() -> void:
 	_test_weather()
 	_test_leveling()
 	_test_combat()
+	_test_resolve()
 	print("\n== %d passed, %d failed ==" % [_passed, _failed])
 	quit(1 if _failed > 0 else 0)
 
@@ -481,3 +482,45 @@ func _test_combat() -> void:
 	# sure_kill when defender hp <= base-1.
 	dfn["hp"] = 3
 	_ok(Combat.forecast_battle(gs, atk, dfn)["sure_kill"], "forecast: sure kill flagged")
+
+func _test_resolve() -> void:
+	# Attacker kills a low-HP defender; no counter; attacker gains dmg+kill xp.
+	var gs := _combat_state()
+	gs.rng = Rng.new(7)
+	var atk := gs.spawn_unit("cinderling", 0, 2, 3)   # pyro power 5
+	var dfn := gs.spawn_unit("galewisp", 1, 3, 3)      # zephyr hp 10
+	dfn["hp"] = 4
+	Combat.resolve_attack(gs, atk, dfn)
+	_ok(dfn["hp"] <= 0, "resolve: lethal hit kills defender")
+	_ok(atk["xp"] > 0, "resolve: attacker gained xp")
+	_eq(atk["hp"], atk["max_hp"], "resolve: no counter from a dead defender (attacker at full hp)")
+	# Two healthy units trade: defender survives and counters (galewisp range 2).
+	var gs2 := _combat_state()
+	gs2.rng = Rng.new(7)
+	var a2 := gs2.spawn_unit("stoneward", 0, 2, 3)   # terra hp 22
+	var d2 := gs2.spawn_unit("galewisp", 1, 3, 3)     # zephyr hp 10, range 2
+	var a_hp0: int = a2["hp"]
+	var d_hp0: int = d2["hp"]
+	Combat.resolve_attack(gs2, a2, d2)
+	_ok(d2["hp"] < d_hp0, "resolve: defender took the primary hit")
+	_ok(a2["hp"] < a_hp0, "resolve: attacker took a counter")
+	# Ward absorbs the primary hit (no damage, ward consumed).
+	var gs3 := _combat_state()
+	gs3.rng = Rng.new(1)
+	var a3 := gs3.spawn_unit("cinderling", 0, 2, 3)
+	var d3 := gs3.spawn_unit("stoneward", 1, 3, 3)
+	var d3_hp0: int = d3["hp"]
+	Status.add_status(d3, "ward", 1)
+	Combat.resolve_attack(gs3, a3, d3)
+	_eq(d3["hp"], d3_hp0, "resolve: ward absorbs the hit")
+	_ok(not Status.has_status(d3, "ward"), "resolve: ward consumed")
+	_ok(a3["hp"] < a3["max_hp"], "resolve: ward absorbs primary but in-range defender still counters")
+	# Out-of-range counter: a melee defender can't counter a range-2 attacker at dist 2.
+	var gs4 := _combat_state()
+	gs4.rng = Rng.new(3)
+	var a4 := gs4.spawn_unit("pyrowyrm", 0, 1, 3)    # range 2
+	var d4 := gs4.spawn_unit("stoneward", 1, 3, 3)    # range 1, distance 2 away
+	var a4_hp0: int = a4["hp"]
+	Combat.resolve_attack(gs4, a4, d4)
+	_ok(d4["hp"] < d4["max_hp"], "resolve: ranged attacker hits")
+	_eq(a4["hp"], a4_hp0, "resolve: melee defender out of range cannot counter")
