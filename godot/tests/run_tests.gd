@@ -51,6 +51,7 @@ func _initialize() -> void:
 	_test_blink()
 	_test_ai_profiles()
 	_test_ai_helpers()
+	_test_ai_attack()
 	print("\n== %d passed, %d failed ==" % [_passed, _failed])
 	quit(1 if _failed > 0 else 0)
 
@@ -782,3 +783,45 @@ func _test_ai_helpers() -> void:
 	var rnode: Variant = AI._retreat_node(gr, retreater, rr, rthreat)
 	_ok(rnode != null, "retreat: found a node")
 	_ok(Hex.distance(Vector2i(rnode["q"], rnode["r"]), Vector2i(4, 4)) <= Hex.distance(Vector2i(2, 4), Vector2i(4, 4)), "retreat: node is no farther from the owned castle than the start")
+
+func _test_ai_attack() -> void:
+	var gs := _combat_state()                          # 7x7 plain, clear weather, rng default
+	var atk := gs.spawn_unit("cinderling", 1, 2, 3)    # AI unit (player 1), pyro
+	var foe := gs.spawn_unit("galewisp", 0, 4, 3)       # human unit, zephyr (pyro>zephyr), 2 tiles away
+	var reach := Pathfinding.compute_reachable(gs, atk)
+	var threat := {}                                    # ignore threat for this scoring test
+	var W: Dictionary = AI.weights(gs)
+	var best: Variant = AI.score_attacks(gs, atk, reach, threat, W)
+	_ok(best != null, "ai-attack: found an attack")
+	_eq(best["target_id"], foe["id"], "ai-attack: targets the reachable foe")
+	# the chosen end tile is adjacent to the foe (cinderling range 1) and reachable.
+	_eq(Hex.distance(best["dest"], Vector2i(foe["q"], foe["r"])), 1, "ai-attack: ends in range")
+	# a confirmed kill is flagged and scores above a non-kill.
+	var gk := _combat_state()
+	var killer := gk.spawn_unit("geomaul", 1, 2, 3)     # power 9
+	var prey := gk.spawn_unit("galewisp", 0, 3, 3)       # adjacent, low hp
+	prey["hp"] = 2
+	var bk: Variant = AI.score_attacks(gk, killer, Pathfinding.compute_reachable(gk, killer), {}, AI.weights(gk))
+	_ok(bk != null and bk["kills"], "ai-attack: lethal hit flagged as kill")
+	# no enemy in reach -> null.
+	var gn := _combat_state()
+	var lonely := gn.spawn_unit("cinderling", 1, 2, 3)
+	_eq(AI.score_attacks(gn, lonely, Pathfinding.compute_reachable(gn, lonely), {}, AI.weights(gn)), null, "ai-attack: no targets -> null")
+	# scoring did NOT mutate the attacker's position.
+	_eq(Vector2i(atk["q"], atk["r"]), Vector2i(2, 3), "ai-attack: attacker position unchanged by scoring")
+	# kill-drops-ability: an enemy-target-ability unit (cinderling/ignite) that scores a
+	# guaranteed kill takes the PLAIN swing (ab nulled — no status on a corpse).
+	var gd := _combat_state()
+	var burner := gd.spawn_unit("cinderling", 1, 2, 3)   # ignite (target enemy), cd 0
+	var dying := gd.spawn_unit("galewisp", 0, 3, 3)        # adjacent
+	dying["hp"] = 1
+	var bk2: Variant = AI.score_attacks(gd, burner, Pathfinding.compute_reachable(gd, burner), {}, AI.weights(gd))
+	_ok(bk2 != null and bk2["kills"], "ai-attack: cinderling lethal swing flagged kill")
+	_eq(bk2["ab"], null, "ai-attack: kill drops the enemy-target ability")
+	# non-kill: the same unit vs a healthy foe KEEPS its ability armed.
+	var ge := _combat_state()
+	var burner2 := ge.spawn_unit("cinderling", 1, 2, 3)
+	ge.spawn_unit("stoneward", 0, 3, 3)                    # tanky, won't die in one hit
+	var bk3: Variant = AI.score_attacks(ge, burner2, Pathfinding.compute_reachable(ge, burner2), {}, AI.weights(ge))
+	_ok(bk3 != null and not bk3["kills"], "ai-attack: non-lethal swing not a kill")
+	_ok(bk3["ab"] != null and bk3["ab"]["key"] == "ignite", "ai-attack: non-kill keeps the ignite ability")

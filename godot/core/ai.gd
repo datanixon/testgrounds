@@ -12,6 +12,7 @@ const Terrain = preload("res://data/terrain.gd")
 const Pathfinding = preload("res://core/pathfinding.gd")
 const Abilities = preload("res://data/abilities.gd")
 const Status = preload("res://core/status.gd")
+const Combat = preload("res://core/combat.gd")
 
 ## weights — the active difficulty's weight profile (defaults to normal).
 static func weights(state) -> Dictionary:
@@ -120,3 +121,60 @@ static func score_instant_ability(state, unit: Dictionary) -> Variant:
 			if s < 12:
 				s = 0.0
 	return {"score": s} if s > 0 else null
+
+## score_attacks — best (end tile, target) attack for `unit` over its reachable tiles,
+## scored with forecast_battle. PURE: a candidate end tile is evaluated on a duplicated
+## probe unit moved to that tile (so attacker terrain/affinity are correct) — the real
+## unit is never moved. Returns {score, dest:Vector2i, target_id:int, kills:bool, ab:Variant}
+## or null. `ab` is the enemy-target ability to use (null on a plain attack / a kill, which
+## takes the plain swing to keep the cooldown ready). Mirrors game.js 1224–1258.
+static func score_attacks(state, unit: Dictionary, reach: Dictionary, threat: Dictionary, W: Dictionary) -> Variant:
+	var atk_ab: Variant = null
+	var ability: Variant = Abilities.ability_for(unit)
+	if ability != null and ability["target"] == "enemy" and unit["cd"] <= 0:
+		atk_ab = ability
+	var low_hp: bool = unit["hp"] < unit["max_hp"] * W["retreat_hp_frac"]
+	var best: Variant = null
+	for k in reach:
+		var node: Dictionary = reach[k]
+		var targets := Pathfinding.compute_attack_targets(state, unit, node["q"], node["r"])
+		if targets.is_empty():
+			continue
+		var probe := unit.duplicate()
+		probe["q"] = node["q"]
+		probe["r"] = node["r"]
+		var tdef: int = Terrain.TERRAIN[state.cell_at(node["q"], node["r"])["terrain"]]["def"]
+		for tk in targets:
+			var enemy: Variant = _unit_at_key(state, tk)
+			if enemy == null:
+				continue
+			var f: Dictionary = Combat.forecast_battle(state, probe, enemy)
+			var kills: bool = enemy["hp"] <= f["lo"]   # worst roll still lethal -> no counter
+			var score: float = (f["lo"] + f["hi"]) / 2.0
+			if kills:
+				score += W["kill_bonus"]
+			if enemy["is_master"]:
+				score += W["master_bonus"]
+			score += W["focus_fire"] * (1.0 - float(enemy["hp"]) / float(enemy["max_hp"]))
+			if not kills and f["can_counter"]:
+				score -= f["c_hi"] * W["counter_risk"]
+				if unit["hp"] <= f["c_hi"]:
+					score -= W["counter_death"]
+			score += tdef * W["terrain_def"] * 0.5
+			score -= threat_at(threat, node["q"], node["r"]) * (W["threat_hurt"] if low_hp else W["threat_safe"]) * 0.5
+			if W["score_jitter"] != 0:
+				score += (state.rng.next() * 2.0 - 1.0) * W["score_jitter"]
+			if atk_ab != null:
+				score += 6
+			if best == null or score > best["score"]:
+				best = {"score": score, "dest": Vector2i(node["q"], node["r"]), "target_id": enemy["id"], "kills": kills, "ab": atk_ab}
+	# On a predicted kill, take the plain swing (no status on a corpse) — drop the ability.
+	if best != null and best["kills"]:
+		best["ab"] = null
+	return best
+
+static func _unit_at_key(state, key: String):
+	for u in state.units:
+		if u["hp"] > 0 and Hex.key(Vector2i(u["q"], u["r"])) == key:
+			return u
+	return null
