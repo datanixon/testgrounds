@@ -25,6 +25,7 @@ const AbilityResolve = preload("res://core/ability_resolve.gd")
 const AiProfiles = preload("res://data/ai_profiles.gd")
 const AI = preload("res://core/ai.gd")
 const UiQueries = preload("res://core/ui_queries.gd")
+const SaveGame = preload("res://core/save_game.gd")
 
 var _passed := 0
 var _failed := 0
@@ -61,6 +62,7 @@ func _initialize() -> void:
 	_test_battle_phases()
 	_test_stats()
 	_test_new_campaign()
+	_test_save()
 	print("\n== %d passed, %d failed ==" % [_passed, _failed])
 	quit(1 if _failed > 0 else 0)
 
@@ -1128,3 +1130,55 @@ func _test_new_campaign() -> void:
 	# ai_mp_bonus applied & clamped (mission 1 bonus 0 -> master mp unchanged but >= 4)
 	var m1 = gs.master_of(1)
 	_ok(m1["mp"] >= 4, "campaign: ai master mp clamped >= 4")
+
+func _test_save() -> void:
+	var gs := GameState.new_skirmish(Maps.MAPS[0], 7041)
+	gs.spawn_unit("cinderling", 0, 1, 1)
+	gs.spawn_unit("colossus", 1, 5, 5)
+	gs.turn = 4
+	gs.current_player = 1
+	gs.campaign_index = 2
+	gs.match_difficulty = "hard"
+	gs.stats["battles"] = 3
+	# round-trip through the pure dict
+	var blob := SaveGame.to_dict(gs)
+	_eq(blob["v"], 1, "save: version")
+	var gs2 = SaveGame.from_dict(blob)
+	_ok(gs2 != null, "save: from_dict returns a state")
+	_eq(gs2.turn, 4, "save: turn restored")
+	_eq(gs2.current_player, 1, "save: current_player restored")
+	_eq(gs2.campaign_index, 2, "save: campaign_index restored")
+	_eq(gs2.match_difficulty, "hard", "save: match_difficulty restored")
+	_eq(gs2.stats["battles"], 3, "save: stats restored")
+	# units (living only) restored with full fields
+	_eq(gs2.units.size(), gs.units.size(), "save: unit count")
+	var cinderling_unit = gs2.unit_at(1, 1)
+	_ok(cinderling_unit != null and cinderling_unit["type_key"] == "cinderling", "save: unit identity restored")
+	_ok(typeof(cinderling_unit["cd"]) == TYPE_INT or typeof(cinderling_unit["cd"]) == TYPE_FLOAT, "save: unit cd present")
+	# weather + map_def carried (closes the JS resumed-campaign-weather gap)
+	_eq(gs2.weather.get("key"), gs.weather.get("key"), "save: weather restored")
+	_eq(gs2.map_def.get("key"), gs.map_def.get("key"), "save: map_def restored")
+	# map cells + rebuilt tower/castle lists
+	_eq(gs2.map["cells"].size(), gs.map["cells"].size(), "save: cell count")
+	_eq(gs2.map["castles"].size(), gs.map["castles"].size(), "save: castle list rebuilt")
+	# version guard
+	var bad := blob.duplicate(true)
+	bad["v"] = 99
+	_eq(SaveGame.from_dict(bad), null, "save: version guard rejects v!=1")
+	# old-blob cd normalization
+	var nocd := blob.duplicate(true)
+	for u in nocd["units"]:
+		u.erase("cd")
+	var gs3 = SaveGame.from_dict(nocd)
+	_ok(gs3 != null and gs3.units[0].get("cd", -1) == 0, "save: missing cd normalized to 0")
+	# JSON-path round-trip (the real file path): ints must survive as ints, not floats
+	var json_blob = JSON.parse_string(JSON.stringify(SaveGame.to_dict(gs)))
+	var gs4 = SaveGame.from_dict(json_blob)
+	_ok(gs4 != null, "save: json-path from_dict")
+	var ju = gs4.unit_at(1, 1)
+	_eq(typeof(ju["owner"]), TYPE_INT, "save: json-path unit owner is int")
+	_eq(typeof(ju["hp"]), TYPE_INT, "save: json-path unit hp is int")
+	_eq(typeof(gs4.stats["lost"][0]), TYPE_INT, "save: json-path stats int")
+	# the actual crash scenario: a float subscript would panic here
+	gs4.stats["lost"][ju["owner"]] += 1
+	_ok(true, "save: json-path stats subscript by unit owner does not crash")
