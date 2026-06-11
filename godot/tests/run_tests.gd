@@ -14,6 +14,8 @@ const Units = preload("res://core/units.gd")
 const GameState = preload("res://core/game_state.gd")
 const Pathfinding = preload("res://core/pathfinding.gd")
 const Elements = preload("res://data/elements.gd")
+const Statuses = preload("res://data/statuses.gd")
+const Status = preload("res://core/status.gd")
 
 var _passed := 0
 var _failed := 0
@@ -29,6 +31,7 @@ func _initialize() -> void:
 	_test_units_state()
 	_test_pathfinding()
 	_test_elements()
+	_test_status()
 	print("\n== %d passed, %d failed ==" % [_passed, _failed])
 	quit(1 if _failed > 0 else 0)
 
@@ -303,6 +306,33 @@ func _test_pathfinding() -> void:
 		if HexLib.distance(path[i - 1], path[i]) != 1:
 			contiguous = false
 	_ok(contiguous, "path: each step is one hex")
+
+func _test_status() -> void:
+	_eq(Statuses.STATUS_META.size(), 7, "status: 7 meta entries")
+	_eq(Statuses.STATUS_META["burn"]["label"], "burning", "status: burn label")
+	# add/has
+	var u := {"hp": 20, "max_hp": 20, "owner": 0, "q": 0, "r": 0}
+	_ok(not Status.has_status(u, "slow"), "status: none initially")
+	Status.add_status(u, "slow", 2)
+	_ok(Status.has_status(u, "slow"), "status: slow added")
+	# add_status keeps the MAX of existing vs new turns (never shortens)
+	Status.add_status(u, "slow", 1)
+	_eq(u["status"]["slow"], 2, "status: add keeps max turns")
+	# tick: burn deals 3, regen heals 2, all statuses decrement, expired drop
+	var gs := _flat_state(5, 5)
+	var b := gs.spawn_unit("stoneward", 0, 1, 1)   # hp 22
+	Status.add_status(b, "burn", 2)
+	Status.add_status(b, "regen", 1)
+	Status.tick_statuses(gs, 0)
+	_eq(b["hp"], 22 - 3 + 2, "status: burn -3 then regen +2")   # 21
+	_eq(b["status"]["burn"], 1, "status: burn decremented")
+	_ok(not Status.has_status(b, "regen"), "status: regen expired (1->0 dropped)")
+	# burn can kill (hp floored at 0)
+	var c := gs.spawn_unit("galewisp", 0, 2, 2)   # hp 10
+	c["hp"] = 2
+	Status.add_status(c, "burn", 1)
+	Status.tick_statuses(gs, 0)
+	_eq(c["hp"], 0, "status: burn floors at 0 (kill)")
 
 func _test_elements() -> void:
 	_eq(Elements.ELEMENT.size(), 5, "elements: 5 elements")

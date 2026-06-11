@@ -58,6 +58,10 @@ func spawn_master(owner: int, q: int, r: int) -> Dictionary:
 	units.append(u)
 	return u
 
+## check_win_condition — set winner if a master is dead. Full body in Task 7.
+func check_win_condition() -> void:
+	pass
+
 ## new_skirmish — port of startNewGame's match setup (sec. 13): generate the map,
 ## place both archons on their castles, start at turn 1 / player 0. Campaign AI
 ## summons + weather init land in their owning milestones.
