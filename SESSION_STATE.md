@@ -29,7 +29,8 @@ the M4 modifier seam), and interactive placeholder tokens + click-to-select/move
 Board interaction needs windowed visual confirmation (headless can't render).
 **Next: M4 (combat resolution + status engine + weather — logic + forecast).** Resume with:
 - `git checkout godot-port`
-- Tests: `pwsh -ExecutionPolicy Bypass -File godot/tests/run_tests.ps1` (green = `== N passed, 0 failed ==`, EXIT 0). Windowed: `godot godot` (standard, non-.NET build).
+- Tests: `pwsh -ExecutionPolicy Bypass -File godot/tests/run_tests.ps1` (green = `== N passed, 0 failed ==`, EXIT 0). Windowed run of the actual game: `godot --path godot` (NOT `godot godot` — that opens the editor/project-manager, gray viewport, nothing playing).
+- **HARNESS BLIND SPOT (cost an M3 bug):** `run_tests.gd` only loads scripts that declare `class_name` (global registry). Entry-point scene scripts like `scenes/main.gd` have NO `class_name`, so a parse error there passes the headless suite yet breaks the running game (gray screen). Catch it cheaply with a headless boot: `godot --headless --path godot --quit-after 30 2>&1 | Select-String "SCRIPT ERROR|Parse Error|Failed to load"` (clean = no matches, EXIT 0). Run this in addition to the suite whenever a no-`class_name` scene script changes. Consider folding it into `run_tests.ps1` in M4.
 - Tracker: `ROADMAP_GODOT.md`. Docs: `docs/superpowers/specs/2026-06-10-wraithspire-godot-port-design.md` (+ `-art-brief.md`); plans `docs/superpowers/plans/2026-06-10-wraithspire-godot-m{1,2,3}-*.md`.
 - Engine: standard Godot 4.6.3 build for the GDScript phase; Mono build + .NET 9 SDK retained for the C# hotspot (AI scorer). `godot`/`godot_console` PATH aliases point at the standard build.
 - M4 needs its own plan (writing-plans, one per milestone); execution mode subagent-driven (implementer + spec + quality review per task) worked well for M3.
