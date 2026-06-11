@@ -35,6 +35,7 @@ func _initialize() -> void:
 	_test_elements()
 	_test_status()
 	_test_weather()
+	_test_leveling()
 	print("\n== %d passed, %d failed ==" % [_passed, _failed])
 	quit(1 if _failed > 0 else 0)
 
@@ -376,3 +377,53 @@ func _test_weather() -> void:
 	_eq(a.weather["key"], b.weather["key"], "weather: roll deterministic (key)")
 	_eq(a.weather["turns_left"], b.weather["turns_left"], "weather: roll deterministic (turns)")
 	_ok(crags["weather_table"].has(a.weather["key"]), "weather: rolled key from map table")
+
+func _test_leveling() -> void:
+	# XP curve: 12, 20, 28, 36 to advance FROM levels 1..4; huge at max.
+	_eq(Units.xp_to_next(1), 12, "level: xp_to_next(1)")
+	_eq(Units.xp_to_next(2), 20, "level: xp_to_next(2)")
+	_eq(Units.xp_to_next(4), 36, "level: xp_to_next(4)")
+	_ok(Units.xp_to_next(5) > 100000, "level: max level no advance")
+	# gain_xp: a single level-up bumps stats and full-heals.
+	var u := Units.make_unit(1, "cinderling", 0, 0, 0)  # hp 12, power 5, def 1
+	u["hp"] = 3
+	var gained := Units.gain_xp(u, 12)
+	_eq(gained, 1, "level: gained one level")
+	_eq(u["level"], 2, "level: now level 2")
+	_eq(u["max_hp"], 16, "level: +4 max_hp")        # 12 + 4
+	_eq(u["power"], 6, "level: +1 power")
+	_eq(u["def"], 2, "level: +1 def")
+	_eq(u["hp"], 16, "level: full heal on level up")
+	# multi-level in one award; xp carries the remainder.
+	var v := Units.make_unit(2, "cinderling", 0, 0, 0)
+	var g2 := Units.gain_xp(v, 12 + 20 + 5)   # level 1->3, 5 xp into level 3
+	_eq(g2, 2, "level: two levels at once")
+	_eq(v["level"], 3, "level: reached level 3")
+	_eq(v["xp"], 5, "level: remainder xp carried")
+	# master grows +6 max_hp per level.
+	var m := Units.make_master(3, 0, 0, 0)   # max_hp 40
+	Units.gain_xp(m, 12)
+	_eq(m["max_hp"], 46, "level: master +6 max_hp")
+	# evolution: a level-4 cinderling on an owned tower -> infernite, absorbing growth.
+	var e := Units.make_unit(4, "cinderling", 0, 0, 0)
+	Units.gain_xp(e, 12 + 20 + 28)   # level 1->4 (lvlBonus 3)
+	_eq(e["level"], 4, "level: at evolve level")
+	var tower_cell := {"terrain": "tower", "owner": 0}
+	_ok(Units.try_evolve(e, tower_cell), "evolve: fires on owned tower at L4")
+	_eq(e["type_key"], "infernite", "evolve: became infernite")
+	_eq(e["evolved"], true, "evolve: evolved flag")
+	# infernite base max_hp 22 + lvlBonus(3)*4 = 34; power 9 + 3 = 12; def 3 + 3 = 6.
+	_eq(e["max_hp"], 22 + 3 * 4, "evolve: absorbs level max_hp")
+	_eq(e["power"], 9 + 3, "evolve: absorbs level power")
+	_eq(e["hp"], e["max_hp"], "evolve: full restore")
+	# gating: not at level, not owned, wrong terrain, already evolved.
+	var low := Units.make_unit(5, "cinderling", 0, 0, 0)  # level 1
+	_ok(not Units.try_evolve(low, tower_cell), "evolve: blocked below level 4")
+	_ok(not Units.try_evolve(e, tower_cell), "evolve: blocked when already evolved")
+	# remaining gates: enemy-owned tower (false), non-tower/castle terrain (false),
+	# then the castle branch (true). e2 is a fresh, un-evolved level-4 cinderling.
+	var e2 := Units.make_unit(6, "cinderling", 0, 0, 0)
+	Units.gain_xp(e2, 12 + 20 + 28)
+	_ok(not Units.try_evolve(e2, {"terrain": "tower", "owner": 1}), "evolve: blocked on enemy tower")
+	_ok(not Units.try_evolve(e2, {"terrain": "plain", "owner": 0}), "evolve: blocked on non-tower/castle")
+	_ok(Units.try_evolve(e2, {"terrain": "castle", "owner": 0}), "evolve: also fires on owned castle")

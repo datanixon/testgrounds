@@ -34,3 +34,75 @@ static func make_master(id: int, owner: int, q: int, r: int) -> Dictionary:
 		"acted": false, "is_master": true,
 		"cd": 0, "second_move": false,
 	}
+
+# ---- XP, leveling, evolution (port of game.js sec. 4 cont.) ----
+const MAX_LEVEL := 5
+const KILL_XP_BONUS := 10
+const EVOLVE_LEVEL := 4
+
+## XP required to advance FROM `level` (12, 20, 28, 36); effectively infinite at max.
+static func xp_to_next(level: int) -> int:
+	return 1_000_000_000 if level >= MAX_LEVEL else 12 + (level - 1) * 8
+
+## One level-up: bump maxHp/power/def and full-restore HP (classic MoM behaviour).
+static func apply_level_growth(unit: Dictionary) -> void:
+	unit["max_hp"] += 6 if unit["is_master"] else 4
+	unit["power"] += 1
+	unit["def"] += 1
+	unit["hp"] = unit["max_hp"]
+
+## Award XP, resolving multi-level-ups. Returns levels gained this call.
+static func gain_xp(unit: Dictionary, amount: int) -> int:
+	if amount <= 0 or unit["level"] >= MAX_LEVEL:
+		return 0
+	unit["xp"] += amount
+	var gained := 0
+	while unit["level"] < MAX_LEVEL and unit["xp"] >= xp_to_next(unit["level"]):
+		unit["xp"] -= xp_to_next(unit["level"])
+		unit["level"] += 1
+		apply_level_growth(unit)
+		gained += 1
+	if unit["level"] >= MAX_LEVEL:
+		unit["xp"] = 0
+	return gained
+
+## Evolve a unit into its terminal form, absorbing accumulated level growth.
+## NOTE: `ability` is NOT cached on the unit record — read it via
+## UnitTypes.UNIT_TYPES[unit["type_key"]]["ability"], which now points at the evo.
+static func evolve_unit(unit: Dictionary) -> bool:
+	var base: Dictionary = UnitTypes.UNIT_TYPES.get(unit["type_key"], {})
+	if base.is_empty() or not base.has("evolves_to"):
+		return false
+	var evo: Dictionary = UnitTypes.UNIT_TYPES.get(base["evolves_to"], {})
+	if evo.is_empty():
+		return false
+	var lvl_bonus: int = unit["level"] - 1
+	unit["type_key"] = base["evolves_to"]
+	unit["name"] = evo["name"]
+	unit["element"] = evo["element"]
+	unit["move"] = evo["move"]
+	unit["range"] = evo["range"]
+	unit["flying"] = evo["flying"]
+	unit["sprite"] = evo["sprite"]
+	unit["attack"] = evo["attack"]
+	unit["max_hp"] = evo["max_hp"] + lvl_bonus * 4
+	unit["power"] = evo["power"] + lvl_bonus
+	unit["def"] = evo["def"] + lvl_bonus
+	unit["hp"] = unit["max_hp"]
+	unit["evolved"] = true
+	return true
+
+## Try to evolve `unit` standing on `cell`: level 4+, not master, not already
+## evolved, on an OWNED tower/castle, and has an evolution path. Returns success.
+static func try_evolve(unit: Dictionary, cell: Variant) -> bool:
+	if unit["is_master"] or unit.get("evolved", false):
+		return false
+	if unit["level"] < EVOLVE_LEVEL:
+		return false
+	if cell == null or cell["owner"] != unit["owner"]:
+		return false
+	if cell["terrain"] != "tower" and cell["terrain"] != "castle":
+		return false
+	if not UnitTypes.UNIT_TYPES.get(unit["type_key"], {}).has("evolves_to"):
+		return false
+	return evolve_unit(unit)
