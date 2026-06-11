@@ -20,6 +20,7 @@ const WeatherData = preload("res://data/weather.gd")
 const Weather = preload("res://core/weather.gd")
 const Combat = preload("res://core/combat.gd")
 const Abilities = preload("res://data/abilities.gd")
+const AbilityResolve = preload("res://core/ability_resolve.gd")
 
 var _passed := 0
 var _failed := 0
@@ -43,6 +44,7 @@ func _initialize() -> void:
 	_test_turn()
 	_test_abilities_data()
 	_test_attack_status()
+	_test_instant_abilities()
 	print("\n== %d passed, %d failed ==" % [_passed, _failed])
 	quit(1 if _failed > 0 else 0)
 
@@ -643,3 +645,48 @@ func _test_attack_status() -> void:
 	Status.add_status(d5, "ward", 1)
 	Combat.resolve_attack(gs5, a5, d5, "burn", 2)
 	_ok(not Status.has_status(d5, "burn"), "attack-status: warded hit applies no status")
+
+func _instant(key: String) -> Dictionary:
+	return {"key": key}   # resolve_instant only reads ab["key"]
+
+func _test_instant_abilities() -> void:
+	# healPulse: +5 to a wounded adjacent ally, capped at max_hp; full allies untouched.
+	var gs := _flat_state(5, 5)
+	var caster := gs.spawn_unit("tidekin", 0, 2, 2)      # healPulse line
+	var hurt := gs.spawn_unit("stoneward", 0, 3, 2)      # adjacent ally, hp 22
+	hurt["hp"] = 10
+	var full := gs.spawn_unit("cinderling", 0, 2, 3)     # adjacent ally at full
+	_ok(AbilityResolve.resolve_instant(gs, caster, _instant("healPulse")), "instant: heal fired")
+	_eq(hurt["hp"], 15, "heal: +5 to wounded ally")
+	_eq(full["hp"], full["max_hp"], "heal: full ally untouched")
+	# quake: 4 dmg to every adjacent enemy, no counter; caster gains xp; a kill counts.
+	var gq := _flat_state(5, 5)
+	var ogre := gq.spawn_unit("geomaul", 0, 2, 2)        # quake line
+	var e1 := gq.spawn_unit("cinderling", 1, 3, 2)       # adjacent enemy, hp 12
+	var e2 := gq.spawn_unit("galewisp", 1, 2, 3)         # adjacent enemy, hp 10
+	e2["hp"] = 3                                          # will die to the 4 dmg
+	_ok(AbilityResolve.resolve_instant(gq, ogre, _instant("quake")), "instant: quake fired")
+	_eq(e1["hp"], 8, "quake: -4 to survivor")
+	_ok(e2["hp"] <= 0, "quake: kills the soft target")
+	_ok(ogre["xp"] > 0 or ogre["level"] > 1, "quake: caster gained xp")
+	# skitter: adds skitterBoost(1) and flags a second move.
+	var gsk := _flat_state(5, 5)
+	var skink := gsk.spawn_unit("duneskink", 0, 2, 2)
+	_ok(AbilityResolve.resolve_instant(gsk, skink, _instant("skitter")), "instant: skitter fired")
+	_ok(Status.has_status(skink, "skitterBoost"), "skitter: boost applied")
+	_ok(skink["second_move"], "skitter: second move flagged")
+	# galeRush: second move, but NO skitterBoost.
+	var ggr := _flat_state(5, 5)
+	var wisp := ggr.spawn_unit("galewisp", 0, 2, 2)
+	_ok(AbilityResolve.resolve_instant(ggr, wisp, _instant("galeRush")), "instant: galeRush fired")
+	_ok(wisp["second_move"], "galeRush: second move flagged")
+	_ok(not Status.has_status(wisp, "skitterBoost"), "galeRush: no skitter boost")
+	# bulwark: self + adjacent allies get bulwark(1); enemies don't.
+	var gb := _flat_state(5, 5)
+	var ward_u := gb.spawn_unit("stoneward", 0, 2, 2)    # bulwark line
+	var ally := gb.spawn_unit("cinderling", 0, 3, 2)
+	var enemy := gb.spawn_unit("cinderling", 1, 2, 3)
+	_ok(AbilityResolve.resolve_instant(gb, ward_u, _instant("bulwark")), "instant: bulwark fired")
+	_ok(Status.has_status(ward_u, "bulwark"), "bulwark: self shielded")
+	_ok(Status.has_status(ally, "bulwark"), "bulwark: adjacent ally shielded")
+	_ok(not Status.has_status(enemy, "bulwark"), "bulwark: enemy not shielded")
