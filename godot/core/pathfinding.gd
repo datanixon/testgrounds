@@ -7,12 +7,21 @@ extends RefCounted
 
 const Hex = preload("res://core/hex.gd")
 const Terrain = preload("res://data/terrain.gd")
+const Status = preload("res://core/status.gd")
+const Weather = preload("res://core/weather.gd")
 
-## effectiveMove — a unit's move allowance. M3 returns base move; the status
-## (slow / skitterBoost) and weather (flyBonus) modifiers layer in at M4 when
-## those systems exist, exactly as in the JS reference (effectiveMove).
-static func effective_move(unit: Dictionary) -> int:
-	return unit["move"]
+## effectiveMove — move allowance after status + weather. Slow -2 (min 1), skitter +2,
+## and the weather fly bonus for flyers. Needs `state` for the active weather.
+static func effective_move(unit: Dictionary, state) -> int:
+	var m: int = unit["move"]
+	if Status.has_status(unit, "slow"):
+		m = maxi(1, m - 2)
+	if Status.has_status(unit, "skitterBoost"):
+		m += 2
+	var w: Dictionary = Weather.weather_now(state)
+	if w.get("fly_bonus", 0) != 0 and unit["flying"]:
+		m += w["fly_bonus"]
+	return m
 
 ## moveCostFor — cost to ENTER `cell`, or INF if impassable for this unit. `cell`
 ## may be null (off-board). Flyers pay 1 everywhere and ignore the mountain/water
@@ -39,7 +48,7 @@ static func compute_reachable(state, unit: Dictionary) -> Dictionary:
 	var start := Hex.key(Vector2i(unit["q"], unit["r"]))
 	out[start] = {"cost": 0.0, "prev": null, "q": unit["q"], "r": unit["r"]}
 	var frontier: Array = [{"q": unit["q"], "r": unit["r"], "cost": 0}]
-	var limit := effective_move(unit)
+	var limit := effective_move(unit, state)
 	while not frontier.is_empty():
 		frontier.sort_custom(func(a, b): return a["cost"] < b["cost"])
 		var cur: Dictionary = frontier.pop_front()

@@ -39,6 +39,7 @@ func _initialize() -> void:
 	_test_leveling()
 	_test_combat()
 	_test_resolve()
+	_test_turn()
 	print("\n== %d passed, %d failed ==" % [_passed, _failed])
 	quit(1 if _failed > 0 else 0)
 
@@ -524,3 +525,58 @@ func _test_resolve() -> void:
 	Combat.resolve_attack(gs4, a4, d4)
 	_ok(d4["hp"] < d4["max_hp"], "resolve: ranged attacker hits")
 	_eq(a4["hp"], a4_hp0, "resolve: melee defender out of range cannot counter")
+
+func _test_turn() -> void:
+	var gs := GameState.new_skirmish(Maps.MAPS[0], 42)
+	var m0: Variant = gs.master_of(0)
+	var m1: Variant = gs.master_of(1)
+	# Capture player 1's master MP BEFORE it is brought in (starts at 14).
+	var m1_mp0: int = m1["mp"]
+	# end_turn flips the player, locks the outgoing side, regens the incoming master.
+	gs.end_turn()
+	_eq(gs.current_player, 1, "turn: switched to player 1")
+	_ok(m0["acted"], "turn: outgoing units locked (acted)")
+	# Incoming master regenerates MP (base mp_regen 4, +2/owned-tower = 0 at start).
+	_eq(m1["mp"], mini(m1["max_mp"], m1_mp0 + 4), "turn: incoming master regained base MP")
+	gs.end_turn()   # back to player 0
+	_eq(gs.current_player, 0, "turn: back to player 0")
+	_eq(gs.turn, 2, "turn: counter advances on player-0 round")
+	# Incoming units are unlocked for the new turn.
+	_ok(not m0["acted"], "turn: incoming units unlocked")
+	# Heal on owned castle: wound master, end a full round, it heals +4 (castle).
+	m0["hp"] = m0["max_hp"] - 10
+	var hp_before: int = m0["hp"]
+	gs.end_turn(); gs.end_turn()   # back to player 0, on its castle
+	_ok(m0["hp"] > hp_before, "turn: unit on owned castle heals")
+	# Win condition: kill a master, end_turn detects it.
+	var gs2 := GameState.new_skirmish(Maps.MAPS[0], 42)
+	gs2.master_of(1)["hp"] = 0
+	gs2.check_win_condition()
+	_eq(gs2.winner, 0, "win: surviving owner wins")
+	# capture_tower flips ownership.
+	var gs3 := GameState.new_skirmish(Maps.MAPS[0], 42)
+	var tower_pos: Vector2i = gs3.map["towers"][0]
+	var tcell: Dictionary = gs3.cell_at(tower_pos.x, tower_pos.y)
+	var u := gs3.spawn_unit("cinderling", 0, tower_pos.x, tower_pos.y)
+	gs3.capture_tower(u, tcell)
+	_eq(tcell["owner"], 0, "capture: tower owner flipped")
+	# effective_move now honours slow / skitter / weather fly bonus.
+	var gw := _flat_state(5, 5)
+	gw.weather = {"key": "clear", "turns_left": 5}
+	var s := gw.spawn_unit("cinderling", 0, 2, 2)   # move 4
+	_eq(Pathfinding.effective_move(s, gw), 4, "move: base move")
+	Status.add_status(s, "slow", 2)
+	_eq(Pathfinding.effective_move(s, gw), 2, "move: slow -2")
+	s["status"].erase("slow")
+	Status.add_status(s, "skitterBoost", 2)
+	_eq(Pathfinding.effective_move(s, gw), 6, "move: skitter +2")
+	s["status"].erase("skitterBoost")
+	var fl := gw.spawn_unit("galewisp", 0, 1, 1)     # flying, move 5
+	gw.weather = {"key": "gale", "turns_left": 5}    # gale fly_bonus 1
+	_eq(Pathfinding.effective_move(fl, gw), 6, "move: gale +1 for flyers")
+	# weather counter expires during a full round -> end_turn re-rolls it.
+	var gsw := GameState.new_skirmish(Maps.MAPS[0], 42)
+	gsw.weather = {"key": "clear", "turns_left": 1}
+	gsw.end_turn()   # -> player 1; no countdown (only ticks on the player-0 boundary)
+	gsw.end_turn()   # -> player 0; turns_left 1 -> 0 -> re-roll
+	_ok(gsw.weather["turns_left"] >= 4, "turn: weather re-rolled when counter expired")
