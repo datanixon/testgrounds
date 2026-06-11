@@ -12,6 +12,7 @@ const BoardLib = preload("res://scenes/board/board.gd")
 const UnitTypes = preload("res://data/unit_types.gd")
 const Units = preload("res://core/units.gd")
 const GameState = preload("res://core/game_state.gd")
+const Pathfinding = preload("res://core/pathfinding.gd")
 
 var _passed := 0
 var _failed := 0
@@ -25,6 +26,7 @@ func _initialize() -> void:
 	_test_board()
 	_test_unit_types()
 	_test_units_state()
+	_test_pathfinding()
 	print("\n== %d passed, %d failed ==" % [_passed, _failed])
 	quit(1 if _failed > 0 else 0)
 
@@ -206,3 +208,96 @@ func _test_units_state() -> void:
 	_ok(not gs.in_bounds(9999, 9999), "state: off-board not in bounds")
 	_eq(gs.cell_at(castles[0].x, castles[0].y)["terrain"], "castle", "state: cell_at castle terrain")
 	_eq(gs.cell_at(9999, 9999), null, "state: cell_at off-board -> null")
+
+# A rectangular all-`terrain` board (axial q,r in [0,cols)x[0,rows)). in_bounds is
+# a plain dict lookup, so the un-offset rectangle is fine for movement asserts.
+func _flat_state(cols: int, rows: int, terrain := "plain") -> GameState:
+	var gs := GameState.new()
+	var cells := {}
+	for r in range(rows):
+		for q in range(cols):
+			cells["%d,%d" % [q, r]] = {"q": q, "r": r, "terrain": terrain, "owner": -1}
+	gs.map = {"cols": cols, "rows": rows, "cells": cells, "castles": [], "towers": []}
+	return gs
+
+func _test_pathfinding() -> void:
+	# --- move_cost_for: terrain + flying matrix ---
+	var ground := {"flying": false}
+	var flyer := {"flying": true}
+	_eq(Pathfinding.move_cost_for(ground, {"terrain": "plain"}), 1.0, "cost: plain ground")
+	_eq(Pathfinding.move_cost_for(ground, {"terrain": "forest"}), 2.0, "cost: forest ground")
+	_ok(not is_finite(Pathfinding.move_cost_for(ground, {"terrain": "water"})), "cost: water ground INF")
+	_eq(Pathfinding.move_cost_for(flyer, {"terrain": "water"}), 1.0, "cost: water flyer")
+	_ok(not is_finite(Pathfinding.move_cost_for(ground, {"terrain": "mountain"})), "cost: mountain ground INF")
+	_eq(Pathfinding.move_cost_for(flyer, {"terrain": "mountain"}), 1.0, "cost: mountain flyer")
+	_ok(not is_finite(Pathfinding.move_cost_for(ground, null)), "cost: off-board INF")
+
+	# --- reachable on an open plain field ---
+	var gs := _flat_state(9, 9)
+	var mover := gs.spawn_unit("stoneward", 0, 4, 4)   # move 2... use a 3-mover instead:
+	mover["move"] = 3
+	var reach := Pathfinding.compute_reachable(gs, mover)
+	_ok(reach.has("4,4"), "reach: start present")
+	_ok(reach.has("7,4"), "reach: distance-3 reachable")        # hex_distance((4,4),(7,4)) == 3
+	_ok(not reach.has("8,4"), "reach: distance-4 unreachable")  # cost 4 > move 3
+	# On uniform plain, every reachable tile's cost equals its hex distance and is <= move.
+	var all_ok := true
+	for k in reach:
+		var v: Dictionary = reach[k]
+		var d := HexLib.distance(Vector2i(4, 4), Vector2i(v["q"], v["r"]))
+		if v["cost"] != d or v["cost"] > 3:
+			all_ok = false
+	_ok(all_ok, "reach: cost == hex distance, <= move")
+
+	# --- enemy blocks, friendly is passable ---
+	var gs2 := _flat_state(9, 9)
+	var u2 := gs2.spawn_unit("cinderling", 0, 4, 4)   # move 4
+	gs2.spawn_unit("cinderling", 1, 5, 4)             # ENEMY directly east (4,4)->(5,4)
+	var reach2 := Pathfinding.compute_reachable(gs2, u2)
+	_ok(not reach2.has("5,4"), "reach: enemy tile excluded")
+	_ok(reach2.has("6,4"), "reach: tile past enemy still reachable around")
+	var gs3 := _flat_state(9, 9)
+	var u3 := gs3.spawn_unit("cinderling", 0, 4, 4)   # move 4
+	gs3.spawn_unit("cinderling", 0, 5, 4)             # FRIENDLY east — passable, but a dead end
+	var reach3 := Pathfinding.compute_reachable(gs3, u3)
+	_ok(not reach3.has("5,4"), "reach: friendly-occupied tile dropped as a destination")
+	_eq(reach3["6,4"]["cost"], 2, "reach: path passes THROUGH friendly (cost 2)")
+
+	# --- flyer crosses water; grounded unit is stuck ---
+	var gw := _flat_state(9, 9, "water")
+	var fly := gw.spawn_unit("galewisp", 0, 4, 4)     # flying, move 5
+	var reach_fly := Pathfinding.compute_reachable(gw, fly)
+	_ok(reach_fly.size() > 1, "reach: flyer moves over water")
+	var gg := _flat_state(9, 9, "water")
+	var grd := gg.spawn_unit("cinderling", 0, 4, 4)   # grounded
+	var reach_grd := Pathfinding.compute_reachable(gg, grd)
+	_eq(reach_grd.size(), 1, "reach: grounded unit landlocked (start only)")
+
+	# --- attack targets by range ---
+	var ga := _flat_state(9, 9)
+	var melee := ga.spawn_unit("cinderling", 0, 4, 4) # range 1
+	var foe := ga.spawn_unit("cinderling", 1, 5, 4)   # distance 1
+	var ally := ga.spawn_unit("cinderling", 0, 3, 4)  # friendly, never a target
+	var t1 := Pathfinding.compute_attack_targets(ga, melee, melee["q"], melee["r"])
+	_eq(t1.size(), 1, "attack: melee hits adjacent foe")
+	_ok(t1.has("5,4"), "attack: foe key present")
+	foe["q"] = 6   # move foe to distance 2
+	var t2 := Pathfinding.compute_attack_targets(ga, melee, melee["q"], melee["r"])
+	_eq(t2.size(), 0, "attack: melee can't reach distance 2")
+	var ranged := ga.spawn_unit("pyrowyrm", 0, 4, 4)  # range 2, same tile as melee for the query
+	var t3 := Pathfinding.compute_attack_targets(ga, ranged, 4, 4)
+	_ok(t3.has("6,4"), "attack: range-2 reaches distance-2 foe")
+	_ok(not t3.has("3,4"), "attack: friendly excluded")
+
+	# --- reconstruct_path: contiguous, start-first ---
+	var gp := _flat_state(9, 9)
+	var pm := gp.spawn_unit("cinderling", 0, 4, 4)
+	var rp := Pathfinding.compute_reachable(gp, pm)
+	var path := Pathfinding.reconstruct_path(rp, 7, 4)
+	_eq(path[0], Vector2i(4, 4), "path: starts at the unit")
+	_eq(path[path.size() - 1], Vector2i(7, 4), "path: ends at the destination")
+	var contiguous := true
+	for i in range(1, path.size()):
+		if HexLib.distance(path[i - 1], path[i]) != 1:
+			contiguous = false
+	_ok(contiguous, "path: each step is one hex")
