@@ -25,12 +25,15 @@ const TopBarScript = preload("res://scenes/hud/top_bar.gd")
 const InfoCardScript = preload("res://scenes/hud/info_card.gd")
 const ActionMenuScript = preload("res://scenes/hud/action_menu.gd")
 const SummonListScript = preload("res://scenes/hud/summon_list.gd")
+const BattleSceneScript = preload("res://scenes/battle/battle_scene.gd")
 
 var state: GameState
 var overlay: Overlay
 var units_layer: UnitsLayer
 var cam: Camera2D
 var hud: CanvasLayer
+var battle_scene: BattleSceneScript
+var _busy := false   # blocks board input while a cutaway or move-slide plays
 var top_bar: TopBarScript
 var info_card: InfoCardScript
 var action_menu: ActionMenuScript
@@ -75,8 +78,12 @@ func _ready() -> void:
 	action_menu.action_chosen.connect(_on_action_chosen)
 	summon_list.summon_chosen.connect(_on_summon_chosen)
 	summon_list.back.connect(_on_summon_back)
+	battle_scene = BattleSceneScript.new()
+	hud.add_child(battle_scene)
 
 func _unhandled_input(event: InputEvent) -> void:
+	if _busy:
+		return
 	# --- Camera: middle/right-drag pans, wheel zooms. ---
 	if event is InputEventMouseButton:
 		if event.button_index == MOUSE_BUTTON_MIDDLE or event.button_index == MOUSE_BUTTON_RIGHT:
@@ -125,6 +132,8 @@ func _open_menu_for(unit) -> void:
 	action_menu.open(actions, _hex_screen_pos(unit["q"], unit["r"]))
 
 func _on_click(a: Vector2i) -> void:
+	if _busy:
+		return
 	# An armed ability/attack is waiting for a target click.
 	if armed != null:
 		_resolve_armed(a)
@@ -245,6 +254,22 @@ func _on_summon_back() -> void:
 	if selected != null:
 		_open_menu_for(selected)
 
+## _play_battles — drain GameState.battle_log, awaiting one cutaway per recorded battle.
+## Blocks board input via _busy. Refreshes the board + HUD afterward. No state mutation
+## (combat already resolved; the cutaway is pure animation).
+func _play_battles() -> void:
+	if state.battle_log.is_empty():
+		return
+	_busy = true
+	while not state.battle_log.is_empty():
+		var rec: Dictionary = state.battle_log.pop_front()
+		battle_scene.play(rec)
+		await battle_scene.finished
+	_busy = false
+	units_layer.set_state(state)
+	if top_bar != null:
+		top_bar.refresh(state)
+
 func _resolve_armed(a: Vector2i) -> void:
 	var unit = selected
 	if armed["targets"].has(Hex.key(a)):
@@ -268,6 +293,7 @@ func _resolve_armed(a: Vector2i) -> void:
 		armed = null
 		overlay.set_armed({})
 		_commit(unit)
+		await _play_battles()
 		return
 	# Miss: cancel the arm and RE-OPEN the menu without freeing the unit (exploit-fix).
 	armed = null
