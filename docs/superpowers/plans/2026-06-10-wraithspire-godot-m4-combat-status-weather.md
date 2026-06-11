@@ -719,7 +719,9 @@ func _test_resolve() -> void:
 	Combat.resolve_attack(gs, atk, dfn)
 	_ok(dfn["hp"] <= 0, "resolve: lethal hit kills defender")
 	_ok(atk["xp"] > 0, "resolve: attacker gained xp")
-	_eq(atk["hp"], 12, "resolve: no counter from a dead defender")
+	# A kill earns dmg+10 XP -> the L1 cinderling levels up (full-heals to new max_hp),
+	# so assert "no counter" as "attacker at full hp" rather than the literal 12.
+	_eq(atk["hp"], atk["max_hp"], "resolve: no counter from a dead defender (attacker at full hp)")
 	# Two healthy units trade: defender survives and counters (galewisp range 2).
 	var gs2 := _combat_state()
 	gs2.rng = Rng.new(7)
