@@ -2,11 +2,12 @@ class_name BattleScene
 extends Control
 ## Full-screen battle cutaway (resolve-then-replay): play(record) animates one already-
 ## resolved battle, then emits finished. Self-contained — it fills the screen and does NOT
-## render the map underneath. Portraits (battle_sprites) + effects (battle_fx) wire in at
-## Tasks 3-4; this skeleton draws placeholder combatant boxes. Phase durations port the JS
-## `B` table (frames @60fps). The phase ORDER is the pure next_phase() (harness-tested).
+## render the map underneath. Phase durations port the JS `B` table (frames @60fps).
+## The phase ORDER is the pure next_phase() (harness-tested).
 
 signal finished
+
+const BattleSprites = preload("res://scenes/battle/battle_sprites.gd")
 
 ## Phase frame budgets (JS B table; charge/impact/recover/pause shared by both sides).
 const DUR := {
@@ -91,12 +92,11 @@ func _draw() -> void:
 	elif _phase == "outro":
 		reveal = 1.0 - clampf(float(_frame) / float(DUR["outro"]), 0.0, 1.0)
 	draw_rect(Rect2(Vector2.ZERO, sz), Color("#020107"))
-	# Placeholder combatants (Task 3 replaces with portraits).
 	var ground := sz.y * 0.62
 	var ax := sz.x * 0.30 + ox
 	var dx := sz.x * 0.70 + ox
-	_draw_box(Vector2(ax, ground + oy), _rec["attacker"]["owner"])
-	_draw_box(Vector2(dx, ground + oy), _rec["defender"]["owner"])
+	BattleSprites.draw_unit(self, _rec["attacker"], ax, ground + oy, 1, _pose_for("a"), _phase_t())
+	BattleSprites.draw_unit(self, _rec["defender"], dx, ground + oy, -1, _pose_for("c"), _phase_t())
 	# Letterbox bars.
 	var bar_h := sz.y * (1.0 - reveal) / 2.0
 	draw_rect(Rect2(Vector2.ZERO, Vector2(sz.x, bar_h)), Color.BLACK)
@@ -105,6 +105,19 @@ func _draw() -> void:
 	if flash > 0.01:
 		draw_rect(Rect2(Vector2.ZERO, sz), Color(1, 1, 1, clampf(flash, 0, 1) * 0.6))
 
-func _draw_box(center: Vector2, owner: int) -> void:
-	var col := Color("#5aa8d8") if owner == 0 else Color("#cc6a4a")
-	draw_rect(Rect2(center - Vector2(40, 80), Vector2(80, 80)), col)
+func _phase_t() -> float:
+	var budget: int = DUR.get(_phase, 1)
+	return clampf(float(_frame) / float(maxi(1, budget)), 0.0, 1.0)
+
+## _pose_for — map the current phase to a combatant pose for side "a" (attacker) or "c" (defender).
+func _pose_for(side: String) -> String:
+	var p := _phase
+	if side == "a":
+		if p == "aCharge": return "charge"
+		if p == "aImpact": return "impact"
+		if p == "aRecover": return "recover"
+	else:
+		if p == "cCharge": return "charge"
+		if p == "cImpact": return "impact"
+		if p == "cRecover": return "recover"
+	return "idle"
