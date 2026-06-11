@@ -85,7 +85,7 @@ static func draw_arena(ci: CanvasItem, terrain: String, screen: Vector2) -> void
 	# Ground splotches per terrain.
 	for i in range(20):
 		var sx := fmod(float(i) * 83.7 + 11.3, w)
-		var sy := ground_y + 20.0 + fmod(float(i) * 61.3 + 7.1, (h - ground_y - 40.0))
+		var sy := ground_y + 20.0 + fmod(float(i) * 61.3 + 7.1, maxf(1.0, h - ground_y - 40.0))
 		ci.draw_rect(Rect2(sx, sy, 8.0, 3.0), t_col)
 
 	# Foreground terrain details.

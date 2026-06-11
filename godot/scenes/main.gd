@@ -104,12 +104,16 @@ func _unhandled_input(event: InputEvent) -> void:
 		_on_end_turn()
 
 func _on_end_turn() -> void:
+	if _busy:
+		return
 	if state.winner != -1:
 		return
 	state.end_turn()
-	# M6: player 1 is the AI. Run its whole turn synchronously, then hand back.
+	# M6: player 1 is the AI. Run its whole turn synchronously, replay its battles, then hand back.
 	if state.winner == -1 and state.current_player == 1:
 		AI.take_turn(state)
+		_finish_action()
+		await _play_battles()
 		if state.winner == -1:
 			state.end_turn()
 	_center_on_master()
@@ -147,10 +151,12 @@ func _on_click(a: Vector2i) -> void:
 		var is_own_tile: bool = (a.x == selected["q"] and a.y == selected["r"])
 		if reach.has(Hex.key(a)) and not is_own_tile:
 			undo_snapshot = {"unit": selected, "q": selected["q"], "r": selected["r"]}
+			var from_px := Hex.axial_to_pixel(Vector2i(selected["q"], selected["r"]))
+			var to_px := Hex.axial_to_pixel(a)
 			selected["q"] = a.x
 			selected["r"] = a.y
-			units_layer.set_state(state)
 			overlay.set_highlights({}, selected)
+			await _slide_unit(selected, from_px, to_px)
 			_open_menu_for(selected)
 			return
 		if is_own_tile:
@@ -220,6 +226,7 @@ func _arm_ability(unit) -> void:
 				overlay.set_highlights(Pathfinding.compute_reachable(state, unit), unit)
 				info_card.show_unit(unit)
 				return
+			info_card.show_unit(unit)
 			_commit(unit)
 		"enemy":
 			var targets := Pathfinding.compute_attack_targets(state, unit, unit["q"], unit["r"])
@@ -269,6 +276,27 @@ func _play_battles() -> void:
 	units_layer.set_state(state)
 	if top_bar != null:
 		top_bar.refresh(state)
+
+## _slide_unit — animate the moving unit's UnitNode from from_px to to_px, then snap the
+## layer to final state. A straight glide (per-hex path-following is a later polish).
+func _slide_unit(unit, from_px: Vector2, to_px: Vector2) -> void:
+	_busy = true
+	units_layer.set_state(state)              # rebuild so the node exists at the new record
+	var node: Node2D = _unit_node_for(unit)
+	if node != null:
+		node.position = from_px
+		var tw := create_tween()
+		tw.tween_property(node, "position", to_px, 0.18)
+		await tw.finished
+	_busy = false
+	units_layer.set_state(state)
+
+## _unit_node_for — find the UnitNode bound to `unit` in the units layer (or null).
+func _unit_node_for(unit):
+	for child in units_layer.get_children():
+		if child.unit == unit:
+			return child
+	return null
 
 func _resolve_armed(a: Vector2i) -> void:
 	var unit = selected

@@ -46,5 +46,5 @@ func close() -> void:
 
 func _clamp_on_screen(p: Vector2) -> Vector2:
 	var vp := get_viewport_rect().size
-	var sz := Vector2(180, 28 * maxi(1, _vbox.get_child_count()))
+	var sz := _panel.size if _panel.size.x > 0 else Vector2(160, 28 * maxi(1, _vbox.get_child_count()))
 	return Vector2(clampf(p.x, 0, vp.x - sz.x), clampf(p.y, 36, vp.y - sz.y))

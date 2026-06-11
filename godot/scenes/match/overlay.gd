@@ -12,7 +12,6 @@ const Hex = preload("res://core/hex.gd")
 const BoardLib = preload("res://scenes/board/board.gd")
 
 var reachable: Dictionary = {}
-var attack: Dictionary = {}
 var armed: Dictionary = {}
 var selected: Variant = null
 
@@ -21,17 +20,12 @@ func set_highlights(reach: Dictionary, sel) -> void:
 	selected = sel
 	queue_redraw()
 
-func set_attack(tiles: Dictionary) -> void:
-	attack = tiles
-	queue_redraw()
-
 func set_armed(tiles: Dictionary) -> void:
 	armed = tiles
 	queue_redraw()
 
 func clear_all() -> void:
 	reachable = {}
-	attack = {}
 	armed = {}
 	selected = null
 	queue_redraw()
@@ -44,7 +38,6 @@ func _fill(tiles: Dictionary, col: Color) -> void:
 
 func _draw() -> void:
 	_fill(reachable, Color(0.4, 0.7, 1.0, 0.28))
-	_fill(attack, Color(1.0, 0.35, 0.35, 0.30))
 	_fill(armed, Color(1.0, 0.82, 0.30, 0.42))
 	if selected != null:
 		var outline := BoardLib.hex_corners(Hex.axial_to_pixel(Vector2i(selected["q"], selected["r"])))
