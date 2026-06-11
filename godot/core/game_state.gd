@@ -7,12 +7,18 @@ extends RefCounted
 
 const Units = preload("res://core/units.gd")
 const MapGen = preload("res://core/map_gen.gd")
+const Rng = preload("res://core/rng.gd")
+const Weather = preload("res://core/weather.gd")
 
 var map: Dictionary = {}              # the generate() result: cols, rows, cells, castles, towers
 var units: Array[Dictionary] = []
 var current_player: int = 0
 var turn: int = 1
 var _next_id: int = 1
+var rng: Mulberry32 = Rng.new(0)   # placeholder seed; new_skirmish reseeds. Avoids null on bare GameState.new()
+var weather: Dictionary = {}  # {key, turns_left}
+var map_def: Dictionary = {}  # the active map def (for its weather_table)
+var winner: int = -1          # -1 none; else the winning owner
 
 func _new_id() -> int:
 	var n := _next_id
@@ -68,6 +74,9 @@ func check_win_condition() -> void:
 static func new_skirmish(def: Dictionary, seed: int) -> GameState:
 	var gs := new()
 	gs.map = MapGen.generate(seed, def)
+	gs.map_def = def
+	gs.rng = Rng.new(seed)
+	Weather.roll_weather(gs, true)
 	var castles: Array = gs.map["castles"]
 	gs.spawn_master(0, castles[0].x, castles[0].y)
 	gs.spawn_master(1, castles[1].x, castles[1].y)

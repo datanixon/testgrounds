@@ -16,6 +16,8 @@ const Pathfinding = preload("res://core/pathfinding.gd")
 const Elements = preload("res://data/elements.gd")
 const Statuses = preload("res://data/statuses.gd")
 const Status = preload("res://core/status.gd")
+const WeatherData = preload("res://data/weather.gd")
+const Weather = preload("res://core/weather.gd")
 
 var _passed := 0
 var _failed := 0
@@ -32,6 +34,7 @@ func _initialize() -> void:
 	_test_pathfinding()
 	_test_elements()
 	_test_status()
+	_test_weather()
 	print("\n== %d passed, %d failed ==" % [_passed, _failed])
 	quit(1 if _failed > 0 else 0)
 
@@ -351,3 +354,25 @@ func _test_elements() -> void:
 	_ok(Elements.affinity_for("pyro", "hill") != null, "elements: pyro empowered on hill")
 	_eq(Elements.affinity_for("pyro", "water"), null, "elements: pyro not on water")
 	_ok(Elements.affinity_for("arcane", "tower") != null, "elements: arcane on tower")
+
+func _test_weather() -> void:
+	_eq(WeatherData.WEATHERS.size(), 4, "weather: 4 types")
+	_eq(WeatherData.WEATHERS["rain"]["atk_mul"]["hydro"], 1.15, "weather: rain boosts hydro")
+	_eq(WeatherData.WEATHERS["gale"]["ranged_mul"], 0.8, "weather: gale dampens ranged")
+	_eq(WeatherData.WEATHERS["gale"]["fly_bonus"], 1, "weather: gale fly bonus")
+	# weather_now defaults to clear when unset.
+	var bare := GameState.new()
+	_eq(Weather.weather_now(bare)["name"], "Clear", "weather: defaults to clear")
+	# new_skirmish initialises weather to clear (initial roll).
+	var gs := GameState.new_skirmish(Maps.MAPS[0], 42)
+	_eq(gs.weather["key"], "clear", "weather: match starts clear")
+	_ok(gs.weather["turns_left"] >= 4 and gs.weather["turns_left"] <= 6, "weather: turns_left 4..6")
+	# roll_weather determinism: same seed -> same roll. crags has a custom table.
+	var crags: Dictionary = Maps.MAPS[2]
+	var a := GameState.new_skirmish(crags, 99)
+	var b := GameState.new_skirmish(crags, 99)
+	Weather.roll_weather(a, false)
+	Weather.roll_weather(b, false)
+	_eq(a.weather["key"], b.weather["key"], "weather: roll deterministic (key)")
+	_eq(a.weather["turns_left"], b.weather["turns_left"], "weather: roll deterministic (turns)")
+	_ok(crags["weather_table"].has(a.weather["key"]), "weather: rolled key from map table")
