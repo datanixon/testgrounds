@@ -18,6 +18,7 @@ const Statuses = preload("res://data/statuses.gd")
 const Status = preload("res://core/status.gd")
 const WeatherData = preload("res://data/weather.gd")
 const Weather = preload("res://core/weather.gd")
+const Combat = preload("res://core/combat.gd")
 
 var _passed := 0
 var _failed := 0
@@ -36,6 +37,7 @@ func _initialize() -> void:
 	_test_status()
 	_test_weather()
 	_test_leveling()
+	_test_combat()
 	print("\n== %d passed, %d failed ==" % [_passed, _failed])
 	quit(1 if _failed > 0 else 0)
 
@@ -427,3 +429,55 @@ func _test_leveling() -> void:
 	_ok(not Units.try_evolve(e2, {"terrain": "tower", "owner": 1}), "evolve: blocked on enemy tower")
 	_ok(not Units.try_evolve(e2, {"terrain": "plain", "owner": 0}), "evolve: blocked on non-tower/castle")
 	_ok(Units.try_evolve(e2, {"terrain": "castle", "owner": 0}), "evolve: also fires on owned castle")
+
+func _combat_state() -> GameState:
+	var gs := _flat_state(7, 7)
+	gs.map_def = {}            # default weather table; weather stays clear
+	gs.weather = {"key": "clear", "turns_left": 5}
+	return gs
+
+func _test_combat() -> void:
+	# cinderling (pyro, power 5, hp 12/12) vs galewisp (zephyr, def 1). pyro>zephyr 1.3.
+	# raw = 5 * (12/12*0.5+0.5) = 5; mit = def1 + 0 + plainDef0*0.5 = 1.
+	# base = max(1, round(5 * 1.3 * 1.0(aff) * 1.0(mark) * 1.0(weather) - 1*0.6))
+	#      = round(6.5 - 0.6) = round(5.9) = 6.
+	var gs := _combat_state()
+	var atk := gs.spawn_unit("cinderling", 0, 2, 3)   # pyro
+	var dfn := gs.spawn_unit("galewisp", 1, 3, 3)      # zephyr, def 1
+	var r := Combat.compute_damage(gs, atk, dfn)
+	_eq(r["elem_mul"], 1.3, "combat: pyro>zephyr mult")
+	_eq(r["base"], 6, "combat: base damage on plain")
+	# wounded attacker scales down: hp 6/12 -> raw = 5*(0.25+0.5)=3.75.
+	atk["hp"] = 6
+	# base = max(1, round(3.75 * 1.3 - 0.6)) = round(4.875 - 0.6) = round(4.275) = 4.
+	_eq(Combat.compute_damage(gs, atk, dfn)["base"], 4, "combat: wounded scales damage")
+	atk["hp"] = 12
+	# mark on defender -> *1.2 ; bulwark -> +2 mitigation.
+	Status.add_status(dfn, "mark", 2)
+	# base = round(5*1.3*1.2 - 0.6) = round(7.8 - 0.6) = round(7.2) = 7.
+	_eq(Combat.compute_damage(gs, atk, dfn)["base"], 7, "combat: mark amplifies")
+	dfn["status"].erase("mark")
+	Status.add_status(dfn, "bulwark", 2)
+	# mit = 1 + 2 = 3; base = round(6.5 - 3*0.6) = round(6.5 - 1.8) = round(4.7) = 5.
+	_eq(Combat.compute_damage(gs, atk, dfn)["base"], 5, "combat: bulwark mitigates")
+	dfn["status"].erase("bulwark")
+	# weather: heat boosts pyro 1.15. base = round(5*1.3*1.15 - 0.6) = round(7.475-0.6)=round(6.875)=7.
+	gs.weather = {"key": "heat", "turns_left": 5}
+	_eq(Combat.compute_damage(gs, atk, dfn)["base"], 7, "combat: heat boosts pyro")
+	gs.weather = {"key": "clear", "turns_left": 5}
+	# affinity: pyro attacking FROM a hill -> +20%. Put attacker on a hill tile.
+	gs.cell_at(2, 3)["terrain"] = "hill"
+	var rh := Combat.compute_damage(gs, atk, dfn)
+	_ok(rh["has_affinity"], "combat: pyro has hill affinity")
+	# mit = def1 + plainDef0*0.5 = 1 (defender stays on plain; the hill is the attacker's tile, affinity only).
+	# base = round(5*1.3*1.2(aff) - 1*0.6) = round(7.8 - 0.6) = round(7.2) = 7.
+	_eq(rh["base"], 7, "combat: affinity + terrain def")
+	gs.cell_at(2, 3)["terrain"] = "plain"
+	# forecast: lo/hi straddle base, counter detected when defender in range.
+	var f := Combat.forecast_battle(gs, atk, dfn)
+	_eq(f["lo"], 5, "forecast: lo = base-1")
+	_eq(f["hi"], 7, "forecast: hi = base+1")
+	_ok(f["can_counter"], "forecast: adjacent ranged defender counters")  # galewisp range 2, dist 1
+	# sure_kill when defender hp <= base-1.
+	dfn["hp"] = 3
+	_ok(Combat.forecast_battle(gs, atk, dfn)["sure_kill"], "forecast: sure kill flagged")
