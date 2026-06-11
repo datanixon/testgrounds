@@ -3,6 +3,7 @@ extends SceneTree
 ##   godot --headless --path godot --script res://tests/run_tests.gd
 ## Exits 0 if all asserts pass, 1 otherwise. Pure-logic tests only (no display).
 const HexLib = preload("res://core/hex.gd")
+const Hex = preload("res://core/hex.gd")
 const Rng = preload("res://core/rng.gd")
 const Terrain = preload("res://data/terrain.gd")
 const Maps = preload("res://data/maps.gd")
@@ -49,6 +50,7 @@ func _initialize() -> void:
 	_test_instant_abilities()
 	_test_blink()
 	_test_ai_profiles()
+	_test_ai_helpers()
 	print("\n== %d passed, %d failed ==" % [_passed, _failed])
 	quit(1 if _failed > 0 else 0)
 
@@ -735,3 +737,48 @@ func _test_ai_profiles() -> void:
 	_eq(AI.weights(gs)["kill_bonus"], 30, "ai_profiles: weights() picks the state profile")
 	gs.difficulty = "hard"
 	_eq(AI.weights(gs)["kill_bonus"], 40, "ai_profiles: weights() follows difficulty")
+
+func _test_ai_helpers() -> void:
+	# threat map: a lone enemy contributes its power to every tile it could attack.
+	var gs := _flat_state(9, 9)
+	var foe := gs.spawn_unit("cinderling", 1, 4, 4)   # power 5, move 4, range 1
+	var threat := AI.build_threat_map(gs, 0)           # threat to player 0 from player 1
+	# the foe's own tile is reachable; a tile adjacent to it is threatened (>=5).
+	_ok(threat.get("5,4", 0) >= 5, "threat: adjacent tile threatened by foe power")
+	# a far tile (distance > move+range) is unthreatened.
+	_eq(threat.get("0,0", 0), 0, "threat: far tile not threatened")
+	# two enemies stack on a shared tile.
+	gs.spawn_unit("cinderling", 1, 6, 4)
+	var threat2 := AI.build_threat_map(gs, 0)
+	_ok(threat2.get("5,4", 0) >= 10, "threat: two foes stack")
+	# find_summon_slot: first free non-blocking neighbor of the master.
+	var gs2 := GameState.new_skirmish(Maps.MAPS[0], 42)
+	var m: Variant = gs2.master_of(0)
+	var slot: Variant = AI.find_summon_slot(gs2, m)
+	_ok(slot != null, "summon-slot: found a free neighbor")
+	_eq(Hex.distance(slot, Vector2i(m["q"], m["r"])), 1, "summon-slot: adjacent to master")
+	_ok(gs2.unit_at(slot.x, slot.y) == null, "summon-slot: empty")
+	# score_instant_ability: a quaker with two adjacent enemies wants to quake.
+	var gq := _flat_state(7, 7)
+	var ogre := gq.spawn_unit("geomaul", 0, 3, 3)       # quake (target none)
+	gq.spawn_unit("cinderling", 1, 4, 3)
+	gq.spawn_unit("galewisp", 1, 3, 4)
+	var inst: Variant = AI.score_instant_ability(gq, ogre)
+	_ok(inst != null and inst["score"] > 0, "instant-score: quake scored with 2 adjacent enemies")
+	# a quaker with no adjacent enemy scores nothing.
+	var gq2 := _flat_state(7, 7)
+	var lone := gq2.spawn_unit("geomaul", 0, 3, 3)
+	_eq(AI.score_instant_ability(gq2, lone), null, "instant-score: no targets -> null")
+	# an enemy-target ability (cinderling/ignite) is NOT an instant -> null.
+	_eq(AI.score_instant_ability(gq2, gq2.spawn_unit("cinderling", 0, 1, 1)), null, "instant-score: enemy-target ability not instant")
+	# _retreat_node: a wounded unit prefers the reachable tile nearest an owned heal cell.
+	var gr := _flat_state(9, 9)
+	gr.cell_at(4, 4)["terrain"] = "castle"
+	gr.cell_at(4, 4)["owner"] = 0
+	var retreater := gr.spawn_unit("cinderling", 0, 2, 4)   # move 4
+	retreater["hp"] = 3
+	var rr := Pathfinding.compute_reachable(gr, retreater)
+	var rthreat := AI.build_threat_map(gr, 0)
+	var rnode: Variant = AI._retreat_node(gr, retreater, rr, rthreat)
+	_ok(rnode != null, "retreat: found a node")
+	_ok(Hex.distance(Vector2i(rnode["q"], rnode["r"]), Vector2i(4, 4)) <= Hex.distance(Vector2i(2, 4), Vector2i(4, 4)), "retreat: node is no farther from the owned castle than the start")
