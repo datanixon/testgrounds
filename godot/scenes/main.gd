@@ -19,6 +19,8 @@ const UnitsLayerScript = preload("res://scenes/match/units_layer.gd")
 const OverlayScript = preload("res://scenes/match/overlay.gd")
 const TopBarScript = preload("res://scenes/hud/top_bar.gd")
 const InfoCardScript = preload("res://scenes/hud/info_card.gd")
+const ActionMenuScript = preload("res://scenes/hud/action_menu.gd")
+const SummonListScript = preload("res://scenes/hud/summon_list.gd")
 
 var state: GameState
 var overlay: Overlay
@@ -27,6 +29,8 @@ var cam: Camera2D
 var hud: CanvasLayer
 var top_bar: TopBarScript
 var info_card: InfoCardScript
+var action_menu: ActionMenuScript
+var summon_list: SummonListScript
 var selected = null
 var armed = null   # {ab: Dictionary, kind: String, targets: Dictionary} when an enemy/tile ability is armed
 
@@ -58,6 +62,10 @@ func _ready() -> void:
 	hud.add_child(top_bar)
 	info_card = InfoCardScript.new()
 	hud.add_child(info_card)
+	action_menu = ActionMenuScript.new()
+	hud.add_child(action_menu)
+	summon_list = SummonListScript.new()
+	hud.add_child(summon_list)
 	top_bar.refresh(state)
 
 func _unhandled_input(event: InputEvent) -> void:
