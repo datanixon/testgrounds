@@ -52,6 +52,7 @@ func _initialize() -> void:
 	_test_ai_profiles()
 	_test_ai_helpers()
 	_test_ai_attack()
+	_test_ai_decision()
 	print("\n== %d passed, %d failed ==" % [_passed, _failed])
 	quit(1 if _failed > 0 else 0)
 
@@ -825,3 +826,43 @@ func _test_ai_attack() -> void:
 	var bk3: Variant = AI.score_attacks(ge, burner2, Pathfinding.compute_reachable(ge, burner2), {}, AI.weights(ge))
 	_ok(bk3 != null and not bk3["kills"], "ai-attack: non-lethal swing not a kill")
 	_ok(bk3["ab"] != null and bk3["ab"]["key"] == "ignite", "ai-attack: non-kill keeps the ignite ability")
+
+func _test_ai_decision() -> void:
+	# Confirmed kill is taken (kind "attack", flagged kill via ab==null + lethal).
+	var gk := _combat_state()
+	var killer := gk.spawn_unit("geomaul", 1, 2, 3)
+	var prey := gk.spawn_unit("galewisp", 0, 3, 3)
+	prey["hp"] = 2
+	var enemy_master := gk.spawn_master(0, 6, 6)
+	var threat := AI.build_threat_map(gk, 1)
+	var act := AI.decide_unit_action(gk, killer, threat, enemy_master)
+	_eq(act["kind"], "attack", "decide: takes the confirmed kill")
+	_eq(act["target_id"], prey["id"], "decide: kill targets the prey")
+	# A lone unit with nothing in reach moves toward the enemy master (move-only).
+	var gm := _flat_state(13, 13)
+	var em2 := gm.spawn_master(0, 11, 11)
+	var grunt := gm.spawn_unit("cinderling", 1, 2, 2)
+	var t2 := AI.build_threat_map(gm, 1)
+	var act2 := AI.decide_unit_action(gm, grunt, t2, em2)
+	_eq(act2["kind"], "move", "decide: lone grunt moves")
+	# the move steps CLOSER to the enemy master.
+	_ok(Hex.distance(act2["dest"], Vector2i(11, 11)) < Hex.distance(Vector2i(2, 2), Vector2i(11, 11)), "decide: move approaches the master")
+	# A quaker surrounded by enemies prefers its instant ability over a weak attack.
+	var gi := _flat_state(7, 7)
+	var emi := gi.spawn_master(0, 0, 0)
+	var ogre := gi.spawn_unit("geomaul", 1, 3, 3)
+	gi.spawn_unit("stoneward", 0, 4, 3)    # tanky adjacent enemies — attack is weak, quake hits both
+	gi.spawn_unit("stoneward", 0, 3, 4)
+	var ti := AI.build_threat_map(gi, 1)
+	var acti := AI.decide_unit_action(gi, ogre, ti, emi)
+	_ok(acti["kind"] == "instant" or acti["kind"] == "attack", "decide: quaker acts (instant or attack)")
+	# A unit adjacent to an unowned tower it can reach, with no better attack, captures.
+	var gc := _flat_state(7, 7)
+	gc.cell_at(3, 4)["terrain"] = "tower"   # neutral tower next to the unit
+	gc.map["towers"].append(Vector2i(3, 4))  # register so capture branch can find it
+	var emc := gc.spawn_master(0, 0, 0)
+	var grabber := gc.spawn_unit("cinderling", 1, 3, 3)
+	var tc := AI.build_threat_map(gc, 1)
+	var actc := AI.decide_unit_action(gc, grabber, tc, emc)
+	_eq(actc["kind"], "capture", "decide: captures a reachable neutral tower")
+	_eq(actc["dest"], Vector2i(3, 4), "decide: capture dest is the tower")

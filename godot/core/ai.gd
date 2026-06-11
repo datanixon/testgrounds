@@ -178,3 +178,82 @@ static func _unit_at_key(state, key: String):
 		if u["hp"] > 0 and Hex.key(Vector2i(u["q"], u["r"])) == key:
 			return u
 	return null
+
+## decide_unit_action — the scored decision tree for one unit. Returns an action dict
+## (see the plan header for shapes). Pure: reads state + helpers, mutates nothing.
+## Order: confirmed kill -> wounded retreat -> instant ability -> capture -> plain
+## attack -> move-only. Mirrors game.js aiActUnit 1217–1349.
+static func decide_unit_action(state, unit: Dictionary, threat: Dictionary, enemy_master: Dictionary) -> Dictionary:
+	var W: Dictionary = weights(state)
+	var reach := Pathfinding.compute_reachable(state, unit)
+	var low_hp: bool = unit["hp"] < unit["max_hp"] * W["retreat_hp_frac"]
+	var best_atk: Variant = score_attacks(state, unit, reach, threat, W)
+
+	# 1. Confirmed kills are always worth taking (no counter comes back). The master
+	#    still refuses if the end tile is hot enough to kill it next turn.
+	if best_atk != null and best_atk["kills"] and not (unit["is_master"] and threat_at(threat, best_atk["dest"].x, best_atk["dest"].y) >= unit["hp"]):
+		return {"kind": "attack", "dest": best_atk["dest"], "target_id": best_atk["target_id"], "ab": best_atk["ab"]}
+
+	# 2. Wounded units fall back toward owned heal tiles.
+	if low_hp:
+		var node: Variant = _retreat_node(state, unit, reach, threat)
+		if node != null:
+			return {"kind": "move", "dest": Vector2i(node["q"], node["r"])}
+
+	# 3. Instant ability when its heuristic beats the best attack on offer.
+	var best_inst: Variant = score_instant_ability(state, unit)
+	if best_inst != null and (best_atk == null or best_inst["score"] > best_atk["score"]):
+		return {"kind": "instant", "ab": Abilities.ability_for(unit)}
+
+	# 4. Capture: any unit can flip a spire; scored against the best attack.
+	var best_cap: Variant = null
+	for t in state.map["towers"]:
+		var cell: Variant = state.cell_at(t.x, t.y)
+		if cell == null or cell.get("owner", -1) == unit["owner"]:
+			continue
+		var node: Variant = reach.get(Hex.key(t))
+		if node == null:
+			continue
+		var heat := threat_at(threat, t.x, t.y)
+		if heat >= unit["hp"]:
+			continue   # don't capture into certain death
+		var cap_score: float = W["capture_bonus"] - heat * 0.5 - node["cost"]
+		if best_cap == null or cap_score > best_cap["score"]:
+			best_cap = {"score": cap_score, "dest": t}
+	if best_cap != null and (best_atk == null or best_cap["score"] > best_atk["score"]):
+		return {"kind": "capture", "dest": best_cap["dest"]}
+
+	# 5. Plain attack: clear the floor; the master is choosier (never trades into a
+	#    tile where the standing threat outweighs it).
+	if best_atk != null and best_atk["score"] > W["atk_floor"] \
+			and not (unit["is_master"] and (best_atk["score"] < 8 or threat_at(threat, best_atk["dest"].x, best_atk["dest"].y) > unit["hp"] * 0.6)):
+		return {"kind": "attack", "dest": best_atk["dest"], "target_id": best_atk["target_id"], "ab": best_atk["ab"]}
+
+	# 6. Move-only. Non-masters advance on the enemy master (shaped by cover/threat);
+	#    the master drifts toward the nearest unowned spire, else holds safe ground.
+	var best_step: Variant = null
+	var best_score := -INF
+	var unowned: Array[Vector2i] = []
+	for t in state.map["towers"]:
+		var c: Variant = state.cell_at(t.x, t.y)
+		if c == null or c.get("owner", -1) != unit["owner"]:
+			unowned.append(t)
+	for k in reach:
+		var node: Dictionary = reach[k]
+		var np := Vector2i(node["q"], node["r"])
+		var tdef: int = Terrain.TERRAIN[state.cell_at(np.x, np.y)["terrain"]]["def"]
+		var s: float = tdef * W["terrain_def"] - threat_at(threat, np.x, np.y) * (W["threat_hurt"] if unit["is_master"] else W["threat_safe"])
+		if unit["is_master"]:
+			if not unowned.is_empty():
+				var d_tower := 9999
+				for t in unowned:
+					d_tower = mini(d_tower, Hex.distance(np, t))
+				s -= d_tower * 0.8
+		else:
+			s -= Hex.distance(np, Vector2i(enemy_master["q"], enemy_master["r"])) * W["approach"]
+		if s > best_score:
+			best_score = s
+			best_step = np
+	if best_step != null:
+		return {"kind": "move", "dest": best_step}
+	return {"kind": "wait"}
