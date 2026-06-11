@@ -45,6 +45,7 @@ func _initialize() -> void:
 	_test_abilities_data()
 	_test_attack_status()
 	_test_instant_abilities()
+	_test_blink()
 	print("\n== %d passed, %d failed ==" % [_passed, _failed])
 	quit(1 if _failed > 0 else 0)
 
@@ -645,6 +646,33 @@ func _test_attack_status() -> void:
 	Status.add_status(d5, "ward", 1)
 	Combat.resolve_attack(gs5, a5, d5, "burn", 2)
 	_ok(not Status.has_status(d5, "burn"), "attack-status: warded hit applies no status")
+
+func _test_blink() -> void:
+	var gs := _flat_state(11, 11)
+	var hexwisp := gs.spawn_unit("hexwisp", 0, 5, 5)   # flying blinker
+	var tg := AbilityResolve.blink_targets(gs, hexwisp)
+	# in range (<=4): a tile 3 away is a target; 5 away is not; the own tile is not.
+	_ok(tg.has("8,5"), "blink: tile 3 away is a target")          # distance 3
+	_ok(not tg.has("10,5"), "blink: tile 5 away out of range")    # distance 5
+	_ok(not tg.has("5,5"), "blink: own tile excluded")
+	# occupied tiles are excluded.
+	gs.spawn_unit("cinderling", 1, 7, 5)
+	_ok(not AbilityResolve.blink_targets(gs, hexwisp).has("7,5"), "blink: occupied tile excluded")
+	# water blocks landing for everyone (even flyers); mountain only for non-flyers.
+	var gw := _flat_state(11, 11)
+	gw.cell_at(6, 5)["terrain"] = "water"
+	gw.cell_at(6, 6)["terrain"] = "mountain"
+	var flyer := gw.spawn_unit("hexwisp", 0, 5, 5)        # flying
+	var tg2 := AbilityResolve.blink_targets(gw, flyer)
+	_ok(not tg2.has("6,5"), "blink: water never landable")
+	_ok(tg2.has("6,6"), "blink: flyer may land on mountain")
+	var gg := _flat_state(11, 11)
+	gg.cell_at(6, 6)["terrain"] = "mountain"
+	var ground := gg.spawn_unit("runeward", 0, 5, 5)      # non-flyer (would be ward, but fine for blink targeting)
+	_ok(not AbilityResolve.blink_targets(gg, ground).has("6,6"), "blink: non-flyer cannot land on mountain")
+	# do_blink teleports.
+	AbilityResolve.do_blink(hexwisp, 8, 5)
+	_eq(Vector2i(hexwisp["q"], hexwisp["r"]), Vector2i(8, 5), "blink: teleported")
 
 func _instant(key: String) -> Dictionary:
 	return {"key": key}   # resolve_instant only reads ab["key"]
