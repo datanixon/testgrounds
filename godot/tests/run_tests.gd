@@ -8,6 +8,7 @@ const Terrain = preload("res://data/terrain.gd")
 const Maps = preload("res://data/maps.gd")
 const Campaign = preload("res://data/campaign.gd")
 const MapGen = preload("res://core/map_gen.gd")
+const BoardLib = preload("res://scenes/board/board.gd")
 
 var _passed := 0
 var _failed := 0
@@ -18,6 +19,7 @@ func _initialize() -> void:
 	_test_rng()
 	_test_data()
 	_test_map_gen()
+	_test_board()
 	print("\n== %d passed, %d failed ==" % [_passed, _failed])
 	quit(1 if _failed > 0 else 0)
 
@@ -130,3 +132,9 @@ func _test_map_gen() -> void:
 	for i in range(m2["towers"].size()):
 		for j in range(i + 1, m2["towers"].size()):
 			_ok(HexLib.distance(m2["towers"][i], m2["towers"][j]) >= 2, "mapgen: towers >=2 apart")
+
+func _test_board() -> void:
+	_eq(BoardLib.terrain_color("plain"), Color("#3a5a3e"), "board: plain color")
+	_eq(BoardLib.terrain_color("water"), Color("#264a78"), "board: water color")
+	_eq(BoardLib.terrain_color("castle"), Color("#9a8a52"), "board: castle color")
+	_eq(BoardLib.hex_corners(Vector2.ZERO).size(), 6, "board: 6 corners")
