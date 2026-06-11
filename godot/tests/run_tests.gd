@@ -19,6 +19,7 @@ const Status = preload("res://core/status.gd")
 const WeatherData = preload("res://data/weather.gd")
 const Weather = preload("res://core/weather.gd")
 const Combat = preload("res://core/combat.gd")
+const Abilities = preload("res://data/abilities.gd")
 
 var _passed := 0
 var _failed := 0
@@ -40,6 +41,7 @@ func _initialize() -> void:
 	_test_combat()
 	_test_resolve()
 	_test_turn()
+	_test_abilities_data()
 	print("\n== %d passed, %d failed ==" % [_passed, _failed])
 	quit(1 if _failed > 0 else 0)
 
@@ -580,3 +582,22 @@ func _test_turn() -> void:
 	gsw.end_turn()   # -> player 1; no countdown (only ticks on the player-0 boundary)
 	gsw.end_turn()   # -> player 0; turns_left 1 -> 0 -> re-roll
 	_ok(gsw.weather["turns_left"] >= 4, "turn: weather re-rolled when counter expired")
+
+func _test_abilities_data() -> void:
+	_eq(Abilities.ABILITIES.size(), 12, "abilities: 12 entries")
+	_eq(Abilities.ABILITIES["ignite"]["target"], "enemy", "abilities: ignite is enemy-target")
+	_eq(Abilities.ABILITIES["ignite"]["status"], "burn", "abilities: ignite burns")
+	_eq(Abilities.ABILITIES["ignite"]["status_turns"], 2, "abilities: ignite 2 turns")
+	_eq(Abilities.ABILITIES["healPulse"]["target"], "none", "abilities: heal is instant")
+	_eq(Abilities.ABILITIES["blink"]["target"], "tile", "abilities: blink is tile-target")
+	_eq(Abilities.ABILITIES["quake"]["cd"], 4, "abilities: quake cd 4")
+	# ability_for: reads the unit's type ability; evolved shaves cd by 1 (min 1).
+	var cinder := Units.make_unit(1, "cinderling", 0, 0, 0)   # ability ignite (cd 3), not evolved
+	var ab: Variant = Abilities.ability_for(cinder)
+	_eq(ab["key"], "ignite", "ability_for: cinderling -> ignite")
+	_eq(ab["cd"], 3, "ability_for: base cd")
+	var infern := Units.make_unit(2, "infernite", 0, 0, 0)    # evolved form, ability ignite
+	_eq(Abilities.ability_for(infern)["cd"], 2, "ability_for: evolved cd-1")
+	# master has no ability (type_key "master" not in UNIT_TYPES).
+	var m := Units.make_master(3, 0, 0, 0)
+	_eq(Abilities.ability_for(m), null, "ability_for: master has none")
