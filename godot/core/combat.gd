@@ -55,38 +55,59 @@ static func forecast_battle(state, attacker: Dictionary, defender: Dictionary) -
 static func state_distance(a: Dictionary, b: Dictionary) -> int:
 	return Hex.distance(Vector2i(a["q"], a["r"]), Vector2i(b["q"], b["r"]))
 
-## resolve_attack — INLINE battle (no cutaway). Primary swing, then a counter if the
-## defender survives and the attacker is within the defender's range. Jitter and the
-## counter 0.8x are drawn from state.rng. `apply_status`/`status_turns` (M5 abilities)
-## apply to the defender ONLY on the primary swing and ONLY if it survives — the
-## counter never inflicts a status. Mirrors beginBattle + applySwing, minus the
-## animation/float/log side effects (those return with the M8 battle scene + M7 HUD).
 static func resolve_attack(state, attacker: Dictionary, defender: Dictionary, apply_status := "", status_turns := 0) -> void:
+	var atk_hp_before: int = attacker["hp"]
+	var def_hp_before: int = defender["hp"]
+	var atk_max: int = attacker["max_hp"]
+	var def_max: int = defender["max_hp"]
+	var terrain := "plain"
+	var dcell: Variant = state.cell_at(defender["q"], defender["r"])
+	if dcell != null:
+		terrain = dcell["terrain"]
 	var a1: Dictionary = compute_damage(state, attacker, defender)
-	_apply_hit(state, attacker, defender, _jitter(state, a1["base"]), apply_status, status_turns)
+	var primary: Dictionary = _apply_hit(state, attacker, defender, _jitter(state, a1["base"]), apply_status, status_turns)
+	var status_rec: Variant = null
+	if apply_status != "" and not primary["absorbed"] and not primary["killed"]:
+		status_rec = {"key": apply_status, "turns": status_turns}
+	var counter := {"happened": false, "dmg": 0, "absorbed": false, "killed": false}
 	if defender["hp"] > 0:
 		var d: int = state_distance(attacker, defender)
 		if d >= 1 and d <= defender["range"]:
 			var a2: Dictionary = compute_damage(state, defender, attacker)
 			var counter_dmg: int = maxi(1, roundi(_jitter(state, a2["base"]) * 0.8))
-			_apply_hit(state, defender, attacker, counter_dmg)
+			var cres: Dictionary = _apply_hit(state, defender, attacker, counter_dmg)
+			counter = {"happened": true, "dmg": cres["dmg"], "absorbed": cres["absorbed"], "killed": cres["killed"]}
+	state.battle_log.append({
+		"attacker": _combatant_view(attacker), "defender": _combatant_view(defender),
+		"atk_hp_before": atk_hp_before, "atk_max_hp": atk_max,
+		"def_hp_before": def_hp_before, "def_max_hp": def_max,
+		"primary": primary, "counter": counter, "status": status_rec, "terrain": terrain,
+	})
 	state.check_win_condition()
+
+## _combatant_view — the presentation-facing slice of a unit for a battle record (no live refs).
+static func _combatant_view(u: Dictionary) -> Dictionary:
+	return {
+		"type_key": u["type_key"], "name": u["name"], "element": u["element"],
+		"sprite": u["sprite"], "owner": u["owner"], "attack": u["attack"],
+		"is_master": u.get("is_master", false),
+	}
 
 ## _jitter — apply the JS ±1 spread (base-1 / base / base+1), floored at 1, via state.rng.
 static func _jitter(state, base: int) -> int:
 	return maxi(1, base + state.rng.below(3) - 1)
 
-## _apply_hit — one swing: ward absorbs (consumed, no damage/xp/status); else deal
-## `dmg`, award `dmg` (+kill bonus) XP to `src`, leave death detection to hp <= 0, and
-## apply `status` to a surviving `dst` (empty string = none). `_state` is unused now;
-## reserved for M8 float/log emission without a signature change.
-static func _apply_hit(_state, src: Dictionary, dst: Dictionary, dmg: int, status := "", status_turns := 0) -> void:
+## _apply_hit — one swing: ward absorbs (consumed, no damage/xp/status); else deal `dmg`,
+## award XP (+kill bonus) to `src`, apply a surviving-defender status. Returns the outcome
+## {dmg, absorbed, killed} so resolve_attack can record the battle. Mirrors applySwing.
+static func _apply_hit(_state, src: Dictionary, dst: Dictionary, dmg: int, status := "", status_turns := 0) -> Dictionary:
 	if Status.has_status(dst, "ward"):
 		dst["status"].erase("ward")
-		return
+		return {"dmg": 0, "absorbed": true, "killed": false}
 	dst["hp"] -= dmg
 	var killed: bool = dst["hp"] <= 0
 	var xp_amt: int = dmg + (Units.KILL_XP_BONUS if killed else 0)
 	Units.gain_xp(src, xp_amt)
 	if status != "" and dst["hp"] > 0:
 		Status.add_status(dst, status, status_turns)
+	return {"dmg": dmg, "absorbed": false, "killed": killed}

@@ -21,6 +21,7 @@ var weather: Dictionary = {}  # {key, turns_left}
 var map_def: Dictionary = {}  # the active map def (for its weather_table)
 var winner: int = -1          # -1 none; else the winning owner
 var difficulty := "normal"    # AI weight profile (easy/normal/hard); difficulty-select UI is M9
+var battle_log: Array = []   # M8: per-battle snapshots appended by Combat.resolve_attack, drained by the presentation cutaway
 
 func _new_id() -> int:
 	var n := _next_id

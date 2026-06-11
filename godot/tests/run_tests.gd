@@ -57,6 +57,7 @@ func _initialize() -> void:
 	_test_ai_summons()
 	_test_ai_turn()
 	_test_ui_queries()
+	_test_battle_record()
 	print("\n== %d passed, %d failed ==" % [_passed, _failed])
 	quit(1 if _failed > 0 else 0)
 
@@ -1014,3 +1015,53 @@ func _test_ui_queries() -> void:
 	for o in opts:
 		_eq(o["disabled"], o["cost"] > 8, "ui: summon option disabled iff cost exceeds MP")
 		_ok(String(o["label"]).ends_with("MP"), "ui: summon label ends in MP")
+
+func _test_battle_record() -> void:
+	# A plain attack records one snapshot with the right dmg/kill/terrain and counter.
+	var gs := _combat_state()
+	var atk := gs.spawn_unit("cinderling", 0, 2, 3)   # pyro, power 5
+	var foe := gs.spawn_unit("galewisp", 1, 3, 3)       # zephyr, adjacent (pyro>zephyr)
+	Combat.resolve_attack(gs, atk, foe)
+	_eq(gs.battle_log.size(), 1, "record: one battle logged")
+	var rec: Dictionary = gs.battle_log[0]
+	_eq(rec["attacker"]["type_key"], "cinderling", "record: attacker type")
+	_eq(rec["defender"]["type_key"], "galewisp", "record: defender type")
+	_ok(rec["primary"]["dmg"] >= 1, "record: primary dealt damage")
+	_eq(rec["def_hp_before"], 10, "record: defender pre-HP captured")  # galewisp max_hp 10
+	_eq(rec["terrain"], "plain", "record: defender terrain")
+	_ok(rec["counter"].has("happened"), "record: counter block present")
+	# A lethal primary records killed + no counter.
+	var gk := _combat_state()
+	var killer := gk.spawn_unit("geomaul", 0, 2, 3)     # power 9
+	var prey := gk.spawn_unit("galewisp", 1, 3, 3)
+	prey["hp"] = 2
+	Combat.resolve_attack(gk, killer, prey)
+	var rk: Dictionary = gk.battle_log[0]
+	_ok(rk["primary"]["killed"], "record: lethal primary flagged killed")
+	_eq(rk["counter"]["happened"], false, "record: dead defender does not counter")
+	# A warded defender records absorbed + no status, and survives.
+	var gw := _combat_state()
+	var hitter := gw.spawn_unit("cinderling", 0, 2, 3)
+	var warded := gw.spawn_unit("stoneward", 1, 3, 3)
+	Status.add_status(warded, "ward", 2)
+	Combat.resolve_attack(gw, hitter, warded, "burn", 2)
+	var rw: Dictionary = gw.battle_log[0]
+	_ok(rw["primary"]["absorbed"], "record: ward absorbs primary")
+	_eq(rw["status"], null, "record: absorbed swing applies no status")
+	# An enemy-ability hit on a surviving defender records the applied status.
+	var gstat := _combat_state()
+	var burner := gstat.spawn_unit("cinderling", 0, 2, 3)
+	var victim := gstat.spawn_unit("stoneward", 1, 3, 3)   # tanky, survives
+	Combat.resolve_attack(gstat, burner, victim, "burn", 2)
+	var rs: Dictionary = gstat.battle_log[0]
+	_ok(rs["status"] != null and rs["status"]["key"] == "burn", "record: surviving defender takes the status")
+	# atk_hp_before is the attacker's PRE-swing HP (validated via a counter that wounds it).
+	var gc := _combat_state()
+	var sw := gc.spawn_unit("stoneward", 0, 2, 3)     # range 1
+	var gw2 := gc.spawn_unit("galewisp", 1, 3, 3)      # range 2 → counters at distance 1
+	var sw_hp0: int = sw["hp"]
+	Combat.resolve_attack(gc, sw, gw2)
+	var rc: Dictionary = gc.battle_log[0]
+	_ok(rc["counter"]["happened"], "record: ranged defender counters the adjacent attacker")
+	_eq(rc["atk_hp_before"], sw_hp0, "record: atk_hp_before is pre-swing HP (not post-counter)")
+	_ok(sw["hp"] < sw_hp0, "record: attacker actually took counter damage (so the field is meaningful)")
