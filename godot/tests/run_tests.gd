@@ -13,6 +13,7 @@ const UnitTypes = preload("res://data/unit_types.gd")
 const Units = preload("res://core/units.gd")
 const GameState = preload("res://core/game_state.gd")
 const Pathfinding = preload("res://core/pathfinding.gd")
+const Elements = preload("res://data/elements.gd")
 
 var _passed := 0
 var _failed := 0
@@ -27,6 +28,7 @@ func _initialize() -> void:
 	_test_unit_types()
 	_test_units_state()
 	_test_pathfinding()
+	_test_elements()
 	print("\n== %d passed, %d failed ==" % [_passed, _failed])
 	quit(1 if _failed > 0 else 0)
 
@@ -301,3 +303,21 @@ func _test_pathfinding() -> void:
 		if HexLib.distance(path[i - 1], path[i]) != 1:
 			contiguous = false
 	_ok(contiguous, "path: each step is one hex")
+
+func _test_elements() -> void:
+	_eq(Elements.ELEMENT.size(), 5, "elements: 5 elements")
+	_eq(Elements.ELEMENT["pyro"]["short"], "PYR", "elements: pyro short")
+	# Matrix: pyro strong vs zephyr (1.3), weak vs hydro (0.7), neutral vs self (1.0).
+	_eq(Elements.ELEM_MATRIX["pyro"]["zephyr"], 1.3, "elements: pyro>zephyr")
+	_eq(Elements.ELEM_MATRIX["pyro"]["hydro"], 0.7, "elements: pyro<hydro")
+	_eq(Elements.ELEM_MATRIX["pyro"]["pyro"], 1.0, "elements: pyro=pyro")
+	_eq(Elements.ELEM_MATRIX["arcane"]["pyro"], 1.1, "elements: arcane>all 1.1")
+	_eq(Elements.ELEM_MATRIX["arcane"]["arcane"], 1.0, "elements: arcane=arcane")
+	# Every element has a row and column against every element.
+	for a in Elements.ELEMENT:
+		_eq(Elements.ELEM_MATRIX[a].size(), 5, "elements: %s full row" % a)
+	# Affinity
+	_eq(Elements.AFFINITY_MULT, 1.2, "elements: affinity mult")
+	_ok(Elements.affinity_for("pyro", "hill") != null, "elements: pyro empowered on hill")
+	_eq(Elements.affinity_for("pyro", "water"), null, "elements: pyro not on water")
+	_ok(Elements.affinity_for("arcane", "tower") != null, "elements: arcane on tower")
