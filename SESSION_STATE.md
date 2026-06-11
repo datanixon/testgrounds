@@ -17,16 +17,24 @@ new session, then the linked docs as needed.
 
 ## Next session — start here
 
-**UPDATE (2026-06-10): Port is UNDERWAY on branch `godot-port`. M1 + M2 COMPLETE**
+**UPDATE (2026-06-10): Port is UNDERWAY on branch `godot-port`. M1 + M2 + M3 COMPLETE**
 — M1 skeleton + headless test harness + hex math core; M2 bit-exact Mulberry32 RNG
 + data tables (terrain/maps/campaign) + deterministic `generateMap` port (seed 7041
-reproduces the JS c1 layout exactly) + placeholder hex render. 68 tests green,
-render visually verified. **Next: M3 (units + movement).** Resume with:
+reproduces the JS c1 layout exactly) + placeholder hex render; M3 unit data table
+(`unit_types.gd`: 20 types + SUMMON_LIST + MASTER_TEMPLATE), unit factories +
+`GameState` (single source of truth + queries + `new_skirmish`), `pathfinding.gd`
+(Dijkstra reachable + attack targets + path; pure, takes GameState; float costs for
+the M4 modifier seam), and interactive placeholder tokens + click-to-select/move
+(`scenes/match/units_layer.gd`, `overlay.gd`, rewritten `main.gd`). **139 tests green.**
+Board interaction needs windowed visual confirmation (headless can't render).
+**Next: M4 (combat resolution + status engine + weather — logic + forecast).** Resume with:
 - `git checkout godot-port`
 - Tests: `pwsh -ExecutionPolicy Bypass -File godot/tests/run_tests.ps1` (green = `== N passed, 0 failed ==`, EXIT 0). Windowed: `godot godot` (standard, non-.NET build).
-- Tracker: `ROADMAP_GODOT.md`. Docs: `docs/superpowers/specs/2026-06-10-wraithspire-godot-port-design.md` (+ `-art-brief.md`); plans `docs/superpowers/plans/2026-06-10-wraithspire-godot-m{1,2}-*.md`.
+- Tracker: `ROADMAP_GODOT.md`. Docs: `docs/superpowers/specs/2026-06-10-wraithspire-godot-port-design.md` (+ `-art-brief.md`); plans `docs/superpowers/plans/2026-06-10-wraithspire-godot-m{1,2,3}-*.md`.
 - Engine: standard Godot 4.6.3 build for the GDScript phase; Mono build + .NET 9 SDK retained for the C# hotspot (AI scorer). `godot`/`godot_console` PATH aliases point at the standard build.
-- M3 needs its own plan (writing-plans, one per milestone); execution mode subagent-driven (implementer + spec + quality review per task).
+- M4 needs its own plan (writing-plans, one per milestone); execution mode subagent-driven (implementer + spec + quality review per task) worked well for M3.
+- M3 deferred to M4+ (data fields already carried): XP/level/evolve, combat (`computeDamage`), statuses, weather, turn flow (`endTurn` + MP regen + heals), AI. `effective_move` in `pathfinding.gd` is the documented seam where M4 adds slow/skitter/weather move modifiers. M3 has no `acted`/turn gate yet — any current-player unit can be reselected/re-moved freely.
+- M4 coverage TODOs flagged by the M3 final review: test `reconstruct_path` for a destination NOT in reach (expect `[]`); test `compute_attack_targets` from a projected (post-move) tile ≠ the unit's own; add a direct `effective_move` test once it has modifier branches; test that a 0-HP blocker does not block pathing.
 
 The original port-planning steps below are now historical (kept for reference):
 
