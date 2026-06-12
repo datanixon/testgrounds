@@ -1140,11 +1140,15 @@ func _draw() -> void:
 	BattleSprites.draw_unit(self, {"owner": _state.winner, "is_master": true, "sprite": "archon"}, CW / 2, CH / 2 - 40, 1, "idle", float(_frame))
 	draw_string(fnt, Vector2(CW / 2 - 350, CH / 2 + 80), text, HORIZONTAL_ALIGNMENT_CENTER, 700, 56, col)
 	var st: Dictionary = _state.stats
+	# towers/castles are stored as Array[Vector2i] coords; ownership lives on the
+	# CELL (cell.owner), not the tower entry — so look up each tower's cell.
 	var towers := [0, 0]
 	for t in _state.map.get("towers", []):
-		var o: int = t.get("owner", -1)
-		if o == 0 or o == 1:
-			towers[o] += 1
+		var tcell = _state.cell_at(t.x, t.y)
+		if tcell != null:
+			var o: int = tcell.get("owner", -1)
+			if o == 0 or o == 1:
+				towers[o] += 1
 	draw_string(fnt, Vector2(CW / 2 - 300, CH / 2 + 116), "Turns elapsed: %d     Battles fought: %d" % [_state.turn, st["battles"]], HORIZONTAL_ALIGNMENT_CENTER, 600, 14, Pal.INK_DIM)
 	# two-column stat table
 	var cx0 := CW / 2; var colL := cx0 - 90; var colR := cx0 + 90; var top := CH / 2 + 140
