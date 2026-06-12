@@ -14,5 +14,5 @@ reference. ROADMAP2 Phases 2–8 are deferred to their own specs post-parity.
 - [x] M6 — AI (threat map + decision tree + summon economy)
 - [x] M7 — HUD/UI as Control nodes
 - [x] M8 — Battle cutaway scene
-- [ ] M9 — Title + gameover + save/load + maps + campaign → parity
+- [x] M9 — Title + gameover + save/load + maps + campaign → **PARITY REACHED**
 - [ ] M10 — Art + audio pass (real sprites swap in)

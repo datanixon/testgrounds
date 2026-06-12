@@ -57,9 +57,39 @@ self-buff refresh; menu clamp uses real panel size). **396 tests green; both gat
 review = SHIP** (one re-entrancy fix: `_busy` guard on `_on_end_turn`).
 Determinism unchanged (normal/hard zero-RNG; only easy draws `state.rng`; `compute_damage` pure).
 **Accepted M8 divergences:** board updates under the cutaway (not at impact frames); AI movement not
-animated (only battles replay). **Next: M9 (title + gameover + save/load + difficulty-select + campaign = PARITY).**
+animated (only battles replay).
 
->>> PICK UP HERE (M9 — parity: title/gameover/save/difficulty/campaign) <<<
+**UPDATE (2026-06-11): M9 COMPLETE — PARITY REACHED.** The Godot port now matches the JS reference.
+M9 = Router + Session split: thin `scenes/main.gd` router swaps screen scenes on `session.screen`
+(title/campaign/story/play/gameover); the old match controller moved verbatim to `scenes/match/
+match_scene.gd` (class MatchScene; `init(state,session)`; AI branch reads `state.is_ai[current_player]`
+not the old `==1` hardcode; autosave at end-of-turn; battle-scene toggle skips the cutaway; one-shot
+`_end_match` emits `match_ended`). New `core/session.gd` (class Session) = app state (screen/settings/
+difficulty/map_index/campaign_progress/story_index/has_save) + `start_skirmish`/`start_campaign`/
+`on_match_won`(progression, capped non-regressing, persists+deletes save)/`return_to_title`. New
+`core/save_game.gd` (pure `to_dict`/`from_dict` round-trip harness-tested + `user://wraithspire_save.json`
+I/O; **map_def serialized** — closes the JS resumed-campaign-weather gap; **JSON int→float re-coercion**
+in from_dict is load-bearing — without it `stats["lost"][owner]` crashes on first resumed battle).
+New `core/settings_store.gd` (`user://wraithspire_settings.json`; merge type/range-validates; campaign_progress
+clamped). New `data/palette.gd` (Pal chrome colors). Five procedural screens ported 1:1 from the JS render
+fns (`scenes/{title,campaign,story,gameover}/*.gd`): synthwave title w/ map+difficulty+campaign+continue,
+campaign mission list (unlock by progress), story intro (fade-in), gameover (winner banner + stats summary
++ campaign verdict). Settings overlay (`scenes/hud/settings_panel.gd`) + gear button in top_bar (music/sfx
+vol persisted but INERT until M10 audio; battle-scene toggle LIVE). Match stats (`summoned`/`lost`/`battles`)
+added to GameState for the gameover summary. **453 tests green; both gates verified per task; whole-milestone
+opus review = end-to-end SOUND.** KEY GOTCHA learned: Control screens need keyboard (Enter/ESC) handled in
+`_unhandled_input`, NOT `_gui_input` (which only fires keys when the Control has focus); mouse stays in
+`_gui_input`. **Accepted M9 divergences:** music/sfx sliders inert until M10; `lost` stat counts combat
+deaths only (AoE-ability kills uncounted); `map_def` serialized (improvement over JS); resume-mid-AI-turn
+re-kick (JS loadGame) intentionally omitted — autosave only fires after the AI's synchronous turn hands
+back, so saves always capture the human's turn.
+**REMAINING MANUAL STEP:** windowed full-loop visual verification (`godot --path godot`) — headless can't
+render. Checklist: title→pick map/difficulty→skirmish→win→gameover→title (no CONTINUE); end a turn→quit→
+relaunch→CONTINUE resumes; CAMPAIGN→mission 1→story→play→win→mission 2 unlocked; gear→toggle BATTLE SCENE
+OFF→battle resolves instantly. **Next: M10 (art + audio — real sprites swap in; wire music/sfx settings).**
+After M10, ROADMAP2 Phases 2–8 get their own post-parity specs.
+
+>>> PICK UP HERE (M10 — art + audio pass) — or do the M9 windowed visual pass first <<<
 - **Tracker:** `ROADMAP_GODOT.md` — M1–M8 ✅; next `- [ ] M9 — ...`. M9 needs its own spec (brainstorming) + plan (writing-plans). M9 is the PARITY-completing milestone (after it the port matches the JS reference; ROADMAP2 Phases 2–8 then get their own specs).
 - **M9 scope (port the JS sec. 5/13/14 + save blob):** the `screen` router (title/play/battle/gameover — `GameState` is currently always in "play"); title screen (synthwave sun + perspective grid, "new game"/difficulty pick) + gameover screen (archon silhouette, victory); the **difficulty-select UI** + the **player/isAI table** (M6 hardcoded AI to player 1 — generalize here: `GameState.difficulty` already exists; add per-player isAI so `_on_end_turn` reads the table instead of `current_player == 1`); **save/load** to `user://wraithspire_save.json` (versioned blob: units incl. cd/status/level/xp/evolved, weather, board/seed, turn, players, captured towers — design spec "Save / load"; optionally serialize `map_def` to fix the JS resumed-campaign-weather gap); **campaign** (CAMPAIGN data already ported in `data/campaign.gd`; scenario list + progression). Also the **battle-scene on/off setting** (JS `STATE.settings.battleScene`) deferred from M8 — a settings toggle that skips the cutaway.
 - **Carry-forwards/notes:** M6 AI is hardcoded to player 1 in `main.gd` `_on_end_turn` — M9 replaces that with the player/isAI table. `GameState.difficulty` defaults "normal"; the title difficulty pick sets it. M8 left no polish debt (the 3 M7 items were folded in).
