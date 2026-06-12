@@ -15,4 +15,4 @@ reference. ROADMAP2 Phases 2–8 are deferred to their own specs post-parity.
 - [x] M7 — HUD/UI as Control nodes
 - [x] M8 — Battle cutaway scene
 - [x] M9 — Title + gameover + save/load + maps + campaign → **PARITY REACHED**
-- [ ] M10 — Art + audio pass (real sprites swap in)
+- [~] M10 — Art + audio pass — **AUDIO DONE** (procedural synth + SFX, settings wired); **ART pending** (44 sprites, gated on asset generation from the art brief)

@@ -89,7 +89,33 @@ relaunch→CONTINUE resumes; CAMPAIGN→mission 1→story→play→win→mission
 OFF→battle resolves instantly. **Next: M10 (art + audio — real sprites swap in; wire music/sfx settings).**
 After M10, ROADMAP2 Phases 2–8 get their own post-parity specs.
 
->>> PICK UP HERE (M10 — art + audio pass) — or do the M9 windowed visual pass first <<<
+**UPDATE (2026-06-11): M10 split into AUDIO + ART. AUDIO COMPLETE** on branch
+`godot-m10-art-audio` (off main @ df06f61). Decomposed because art needs 44 generated sprite
+PNGs (asset dependency, unlike any code milestone) while audio is pure code. M10 Audio = port of
+the JS Web-Audio synth (game.js sec.15) using generated waveform streams + native Godot bus FX:
+pure `data/tracks.gd` (6 TRACKS verbatim) + `core/music_seq.gd` (`events_for_step` reproducing
+`musicTick`'s note selection + `gen_wave`, harness-tested), `autoload/audio.gd` (Audio singleton:
+Music/SFX buses w/ AudioEffectReverb+LowPass, generated AudioStreamWAV waveforms, 24+8
+AudioStreamPlayer voice pool w/ Tween envelopes + per-player kill-before-reuse, Timer(0.17s)
+sequencer, beep/fanfare/duck/cycle_track/set_*_vol/apply_settings), registered in project.godot.
+Wired the inert M9 vol settings + added MUSIC ON/OFF + TRACK cycler to the settings overlay;
+battle cutaway ducks music; per-event SFX (summon/attack/capture/ability/win-fanfare/menu).
+`SettingsStore` gained `music_on`/`track_index`. **761 tests green; both gates per task;
+whole-milestone opus review = end-to-end SOUND.** KEY GOTCHA: a harness `--script` run does NOT
+load autoloads, so any script FORCE-PRELOADED by run_tests.gd (only `board.gd` + `battle_scene.gd`)
+must reach the autoload via `get_node_or_null("/root/Audio")`, NOT bare `Audio.` (which fails parse);
+class_name scenes that are only lazily registered (match/title/settings) use bare `Audio.` fine.
+Accepted divergences: native reverb (not the JS delay network); single-bus reverb send; approximated
+bass filter-sweep + drums; seeded noise; desktop autostart (no browser gesture gate); UI-click SFX
+unified to 0.06/0.15 (JS settings click was 0.12/0.18); level-up/evolve chime DEFERRED (no level-up
+signal exists yet — carry-forward). **REMAINING:** windowed AUDIBLE verification (`godot --path godot`)
+— headless has only a dummy audio driver. Then the only remaining port work is **M10 ART** (generate
+44 sprites from `docs/superpowers/specs/2026-06-10-wraithspire-art-brief.md`, then a short engine
+integration behind the fixed `battle_sprites`/board-token signatures + team ring/frame + faction-ID
+method) — its own spec+plan when assets exist. After that, ROADMAP2 Phases 2–8 get post-parity specs.
+
+>>> PICK UP HERE (M10 windowed audible check, then M10 ART — needs sprite assets first) <<<
+Previous handoff (M9, historical):
 - **Tracker:** `ROADMAP_GODOT.md` — M1–M8 ✅; next `- [ ] M9 — ...`. M9 needs its own spec (brainstorming) + plan (writing-plans). M9 is the PARITY-completing milestone (after it the port matches the JS reference; ROADMAP2 Phases 2–8 then get their own specs).
 - **M9 scope (port the JS sec. 5/13/14 + save blob):** the `screen` router (title/play/battle/gameover — `GameState` is currently always in "play"); title screen (synthwave sun + perspective grid, "new game"/difficulty pick) + gameover screen (archon silhouette, victory); the **difficulty-select UI** + the **player/isAI table** (M6 hardcoded AI to player 1 — generalize here: `GameState.difficulty` already exists; add per-player isAI so `_on_end_turn` reads the table instead of `current_player == 1`); **save/load** to `user://wraithspire_save.json` (versioned blob: units incl. cd/status/level/xp/evolved, weather, board/seed, turn, players, captured towers — design spec "Save / load"; optionally serialize `map_def` to fix the JS resumed-campaign-weather gap); **campaign** (CAMPAIGN data already ported in `data/campaign.gd`; scenario list + progression). Also the **battle-scene on/off setting** (JS `STATE.settings.battleScene`) deferred from M8 — a settings toggle that skips the cutaway.
 - **Carry-forwards/notes:** M6 AI is hardcoded to player 1 in `main.gd` `_on_end_turn` — M9 replaces that with the player/isAI table. `GameState.difficulty` defaults "normal"; the title difficulty pick sets it. M8 left no polish debt (the 3 M7 items were folded in).
