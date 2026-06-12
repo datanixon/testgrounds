@@ -56,6 +56,9 @@ func play(record: Dictionary) -> void:
 	visible = true
 	set_process(true)
 	queue_redraw()
+	var _audio := get_node_or_null("/root/Audio")
+	if _audio != null:
+		_audio.duck(0.35)
 
 func _has_counter() -> bool:
 	return _rec.get("counter", {}).get("happened", false)
@@ -80,6 +83,9 @@ func _process(delta: float) -> void:
 			if _phase == "done":
 				set_process(false)
 				visible = false
+				var _audio := get_node_or_null("/root/Audio")
+				if _audio != null:
+					_audio.duck(1.0)
 				finished.emit()
 				return
 	queue_redraw()
