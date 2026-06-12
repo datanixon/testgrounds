@@ -27,6 +27,7 @@ const AI = preload("res://core/ai.gd")
 const UiQueries = preload("res://core/ui_queries.gd")
 const SaveGame = preload("res://core/save_game.gd")
 const SettingsStore = preload("res://core/settings_store.gd")
+const Session = preload("res://core/session.gd")
 
 var _passed := 0
 var _failed := 0
@@ -65,6 +66,7 @@ func _initialize() -> void:
 	_test_new_campaign()
 	_test_save()
 	_test_settings()
+	_test_session()
 	print("\n== %d passed, %d failed ==" % [_passed, _failed])
 	quit(1 if _failed > 0 else 0)
 
@@ -1203,3 +1205,41 @@ func _test_settings() -> void:
 	_eq(bad["music_vol"], 0.6, "settings: merge rejects non-number music_vol")
 	var over := SettingsStore.merge(d, {"campaign_progress": 999})
 	_eq(over["campaign_progress"], Campaign.CAMPAIGN.size() - 1, "settings: campaign_progress clamped to last mission")
+
+func _test_session() -> void:
+	var s := Session.new()
+	# defaults
+	_eq(s.screen, "title", "session: starts on title")
+	_eq(s.difficulty, "normal", "session: default difficulty")
+	# start a skirmish: builds a live state on the selected map/difficulty
+	s.map_index = 1
+	s.difficulty = "hard"
+	s.start_skirmish()
+	_eq(s.screen, "play", "session: skirmish -> play")
+	_ok(s.state != null, "session: skirmish builds a state")
+	_eq(s.state.difficulty, "hard", "session: skirmish AI difficulty from pref")
+	_eq(s.state.campaign_index, -1, "session: skirmish is not a campaign")
+	_eq(s.state.is_ai, [false, true], "session: is_ai table")
+	# start a campaign mission
+	s.start_campaign(0)
+	_eq(s.screen, "play", "session: campaign -> play")
+	_eq(s.state.campaign_index, 0, "session: campaign index tagged")
+	_eq(s.difficulty, "hard", "session: campaign did NOT overwrite skirmish pref")
+	# progression rule: P0 wins mission 0 -> progress advances to 1
+	s.campaign_progress = 0
+	s.on_match_won(0)   # state.campaign_index is 0, winner 0
+	_eq(s.campaign_progress, 1, "session: win advances campaign_progress")
+	# a loss does not advance; progress never regresses
+	s.start_campaign(0)
+	s.campaign_progress = 2
+	s.on_match_won(1)   # AI won
+	_eq(s.campaign_progress, 2, "session: AI win leaves progress unchanged")
+	# cap at last mission
+	var last: int = Campaign.CAMPAIGN.size() - 1
+	s.start_campaign(last)
+	s.campaign_progress = last
+	s.on_match_won(0)
+	_eq(s.campaign_progress, last, "session: progress capped at last mission")
+	# return_to_title clears the campaign tag
+	s.return_to_title()
+	_eq(s.screen, "title", "session: return_to_title")
