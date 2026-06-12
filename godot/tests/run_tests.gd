@@ -1213,6 +1213,17 @@ func _test_settings() -> void:
 	_eq(bad["music_vol"], 0.6, "settings: merge rejects non-number music_vol")
 	var over := SettingsStore.merge(d, {"campaign_progress": 999})
 	_eq(over["campaign_progress"], Campaign.CAMPAIGN.size() - 1, "settings: campaign_progress clamped to last mission")
+	# M10: music_on default true, track_index default 0, clamped to track range
+	var dd := SettingsStore.defaults()
+	_eq(dd.get("music_on"), true, "settings: default music_on")
+	_eq(dd.get("track_index"), 0, "settings: default track_index")
+	var m2 := SettingsStore.merge(dd, {"music_on": false, "track_index": 3})
+	_eq(m2["music_on"], false, "settings: merge music_on")
+	_eq(m2["track_index"], 3, "settings: merge track_index")
+	var m3 := SettingsStore.merge(dd, {"track_index": 99})
+	_eq(m3["track_index"], Tracks.TRACKS.size() - 1, "settings: track_index clamped to last")
+	var m4 := SettingsStore.merge(dd, {"music_on": "yes"})
+	_eq(m4["music_on"], true, "settings: bad music_on keeps default")
 
 func _test_session() -> void:
 	var s := Session.new()

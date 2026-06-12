@@ -8,6 +8,7 @@ extends RefCounted
 const Maps = preload("res://data/maps.gd")
 const AiProfiles = preload("res://data/ai_profiles.gd")
 const Campaign = preload("res://data/campaign.gd")
+const Tracks = preload("res://data/tracks.gd")
 
 const SETTINGS_PATH := "user://wraithspire_settings.json"
 
@@ -15,6 +16,7 @@ static func defaults() -> Dictionary:
 	return {
 		"music_vol": 0.6, "sfx_vol": 0.6, "battle_scene": true,
 		"difficulty": "normal", "map_index": 0, "campaign_progress": 0,
+		"music_on": true, "track_index": 0,
 	}
 
 ## merge — fold a (possibly untrusted) saved blob onto defaults, accepting only
@@ -34,6 +36,10 @@ static func merge(base: Dictionary, saved: Dictionary) -> Dictionary:
 			out["map_index"] = mi
 	if typeof(saved.get("campaign_progress")) == TYPE_FLOAT or typeof(saved.get("campaign_progress")) == TYPE_INT:
 		out["campaign_progress"] = clampi(int(saved["campaign_progress"]), 0, Campaign.CAMPAIGN.size() - 1)
+	if typeof(saved.get("music_on")) == TYPE_BOOL:
+		out["music_on"] = saved["music_on"]
+	if typeof(saved.get("track_index")) == TYPE_FLOAT or typeof(saved.get("track_index")) == TYPE_INT:
+		out["track_index"] = clampi(int(saved["track_index"]), 0, Tracks.TRACKS.size() - 1)
 	return out
 
 # ---- file I/O ----
