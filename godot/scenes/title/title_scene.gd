@@ -121,6 +121,7 @@ func _unhandled_input(event: InputEvent) -> void:
 func _gui_input(event: InputEvent) -> void:
 	if not (event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT):
 		return
+	Audio.beep(620.0, 0.06, "triangle", 0.15)
 	var p: Vector2 = event.position
 	for m in _map_rects():
 		if (m["r"] as Rect2).has_point(p):

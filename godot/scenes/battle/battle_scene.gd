@@ -59,6 +59,7 @@ func play(record: Dictionary) -> void:
 	var _audio := get_node_or_null("/root/Audio")
 	if _audio != null:
 		_audio.duck(0.35)
+		_audio.beep(150.0, 0.08, "square", 0.18)
 
 func _has_counter() -> bool:
 	return _rec.get("counter", {}).get("happened", false)
@@ -78,6 +79,9 @@ func _process(delta: float) -> void:
 			if _phase == "aCharge" or _phase == "cCharge":
 				flash = 1.0
 				shake = 6.0
+				var _audio2 := get_node_or_null("/root/Audio")
+				if _audio2 != null:
+					_audio2.beep(170.0, 0.08, "square", 0.18)
 			_phase = next_phase(_phase, _has_counter())
 			_frame = 0
 			if _phase == "done":

@@ -95,11 +95,13 @@ func _set_vol(key: String, v: float) -> void:
 		Audio.set_music_vol(v)
 	elif key == "sfx_vol":
 		Audio.set_sfx_vol(v)
+	Audio.beep(660.0, 0.06, "triangle", 0.15)
 	_refresh()
 
 func _set_bs(on: bool) -> void:
 	session.settings["battle_scene"] = on
 	SettingsStore.save_blob(session.settings)
+	Audio.beep(660.0, 0.06, "triangle", 0.15)
 	_refresh()
 
 func _set_music_on(on: bool) -> void:
@@ -109,12 +111,14 @@ func _set_music_on(on: bool) -> void:
 		Audio.start_music()
 	else:
 		Audio.stop_music()
+	Audio.beep(660.0, 0.06, "triangle", 0.15)
 	_refresh()
 
 func _cycle_track() -> void:
 	Audio.cycle_track()
 	session.settings["track_index"] = Audio.track_index
 	SettingsStore.save_blob(session.settings)
+	Audio.beep(660.0, 0.06, "triangle", 0.15)
 	_refresh()
 
 func _refresh() -> void:

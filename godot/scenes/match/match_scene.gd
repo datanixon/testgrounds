@@ -206,6 +206,7 @@ func _on_action_chosen(kind: String) -> void:
 			var cell = state.cell_at(unit["q"], unit["r"])
 			if cell != null and UiQueries.can_capture(state, unit, cell):
 				state.capture_tower(unit, cell)
+				Audio.beep(520.0, 0.12, "triangle", 0.18)
 			_commit(unit)
 		"summon":
 			summon_list.open(UiQueries.summon_options(state, unit), _hex_screen_pos(unit["q"], unit["r"]))
@@ -230,6 +231,7 @@ func _arm_ability(unit) -> void:
 		"none":
 			AbilityResolve.resolve_instant(state, unit, ab)
 			unit["cd"] = ab["cd"]
+			Audio.beep(700.0, 0.1, "triangle", 0.2)
 			# Skitter / Gale Rush grant a second move-only action: keep the unit selected
 			# with fresh (boosted) reach so the next reachable click moves it again, after
 			# which available_actions' second-move branch (Capture/Wait) opens. Other
@@ -268,6 +270,7 @@ func _on_summon_chosen(key: String) -> void:
 	unit["mp"] -= UnitTypes.UNIT_TYPES[key]["cost"]
 	var u := state.spawn_unit(key, unit["owner"], slot.x, slot.y)
 	u["acted"] = true
+	Audio.beep(660.0, 0.08, "triangle", 0.18)
 	summon_list.close()
 	_commit(unit)
 
@@ -393,6 +396,10 @@ func _end_match() -> void:
 	if _match_over:
 		return
 	_match_over = true
+	Audio.fanfare([
+		{"freq": 440.0, "dur": 0.2, "wave": "triangle", "gain": 0.25},
+		{"freq": 660.0, "dur": 0.3, "wave": "triangle", "gain": 0.25, "delay": 0.2},
+	])
 	if session != null:
 		session.on_match_won(state.winner)
 	match_ended.emit(state.winner)
