@@ -29,6 +29,7 @@ const SaveGame = preload("res://core/save_game.gd")
 const SettingsStore = preload("res://core/settings_store.gd")
 const Session = preload("res://core/session.gd")
 const Tracks = preload("res://data/tracks.gd")
+const MusicSeq = preload("res://core/music_seq.gd")
 
 var _passed := 0
 var _failed := 0
@@ -69,6 +70,8 @@ func _initialize() -> void:
 	_test_settings()
 	_test_session()
 	_test_tracks()
+	_test_music_seq()
+	_test_gen_wave()
 	print("\n== %d passed, %d failed ==" % [_passed, _failed])
 	quit(1 if _failed > 0 else 0)
 
@@ -82,6 +85,9 @@ func _ok(cond: bool, msg: String) -> void:
 
 func _eq(got: Variant, want: Variant, msg: String) -> void:
 	_ok(got == want, "%s  (got %s, want %s)" % [msg, str(got), str(want)])
+
+func _approx(got: float, want: float, msg: String) -> void:
+	_ok(absf(got - want) < 0.01, "%s  (got %f, want %f)" % [msg, got, want])
 
 # ---- tests ----
 func _test_harness_smoke() -> void:
@@ -1261,3 +1267,70 @@ func _test_tracks() -> void:
 		_eq(t["chords"].size(), 4, "tracks: 4 chords each")
 		_eq(t["arp"].size(), 16, "tracks: 16-step arp each")
 		_eq(t["lead"].size(), 4, "tracks: 4 lead bars each")
+
+func _test_music_seq() -> void:
+	# step 0, track 0 (bar 0 = Am root 110): kick + hat(accent? beat0%4==0 -> 0.06) + bass + arp + pad(6) ; lead bar0 has no s==0
+	var e0 := MusicSeq.events_for_step(0, 0)
+	var kinds0 := {}
+	for e in e0:
+		kinds0[e["kind"]] = kinds0.get(e["kind"], 0) + 1
+	_eq(kinds0.get("kick", 0), 1, "seq: step0 has a kick")
+	_eq(kinds0.get("hat", 0), 1, "seq: step0 has a hat")
+	_eq(kinds0.get("bass", 0), 1, "seq: step0 has a bass")
+	_eq(kinds0.get("synth", 0), 1 + 6, "seq: step0 arp(1) + pad(6) synths")  # arp + 3 saw + 3 sine
+	# bass freq on the downbeat == chord root
+	for e in e0:
+		if e["kind"] == "bass":
+			_approx(e["freq"], 110.0, "seq: step0 bass = root 110")
+	# step 4: snare + hat(beat4%4==0 ->0.06) + bass-walk(fifth*0.5) + arp; lead bar0 s==4 -> 440
+	var e4 := MusicSeq.events_for_step(4, 0)
+	var kinds4 := {}
+	for e in e4:
+		kinds4[e["kind"]] = kinds4.get(e["kind"], 0) + 1
+	_eq(kinds4.get("snare", 0), 1, "seq: step4 snare")
+	_ok(kinds4.get("kick", 0) == 0, "seq: step4 no kick")
+	var has_lead := false
+	for e in e4:
+		if e["kind"] == "synth" and absf(e["freq"] - 440.0) < 0.01:
+			has_lead = true
+	_ok(has_lead, "seq: step4 lead note 440")
+	# step 2: hat accent (beat2%4==2 -> 0.10), arp only among drums; no kick/snare/bass
+	var e2 := MusicSeq.events_for_step(2, 0)
+	var hat_gain := -1.0
+	var has_bass2 := false
+	for e in e2:
+		if e["kind"] == "hat":
+			hat_gain = e["gain"]
+		if e["kind"] == "bass":
+			has_bass2 = true
+	_approx(hat_gain, 0.10, "seq: step2 hat accent gain 0.10")
+	_ok(not has_bass2, "seq: step2 no bass")
+	# odd step 1: no drums, just arp (beat%2==1 -> no hat)
+	var e1 := MusicSeq.events_for_step(1, 0)
+	var only := {}
+	for e in e1:
+		only[e["kind"]] = only.get(e["kind"], 0) + 1
+	_eq(only.get("hat", 0), 0, "seq: step1 no hat (odd beat)")
+	_eq(only.get("synth", 0), 1, "seq: step1 arp only")
+	# bar rollover: step 16 is bar 1 (chord index 1). track0 bar1 root = 87.31
+	var e16 := MusicSeq.events_for_step(16, 0)
+	for e in e16:
+		if e["kind"] == "bass":
+			_approx(e["freq"], 87.31, "seq: step16 bass = bar1 root 87.31")
+
+func _test_gen_wave() -> void:
+	var sq := MusicSeq.gen_wave("square", 200)
+	_eq(sq.size(), 200, "gen_wave: length 200")
+	_approx(sq[10], 1.0, "gen_wave: square first half +1")
+	_approx(sq[120], -1.0, "gen_wave: square second half -1")
+	var sine := MusicSeq.gen_wave("sine", 200)
+	_approx(sine[0], 0.0, "gen_wave: sine starts at 0")
+	_approx(sine[50], 1.0, "gen_wave: sine quarter +1")
+	var saw := MusicSeq.gen_wave("sawtooth", 200)
+	_ok(saw[0] < saw[100] and saw[100] < saw[199], "gen_wave: saw rises")
+	var tri := MusicSeq.gen_wave("triangle", 200)
+	_approx(tri[50], 1.0, "gen_wave: triangle peak at quarter")
+	# all bounded to ±1
+	for w in ["square", "triangle", "sawtooth", "sine"]:
+		for s in MusicSeq.gen_wave(w, 64):
+			_ok(s >= -1.0001 and s <= 1.0001, "gen_wave: %s bounded" % w)
