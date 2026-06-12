@@ -28,6 +28,7 @@ const UiQueries = preload("res://core/ui_queries.gd")
 const SaveGame = preload("res://core/save_game.gd")
 const SettingsStore = preload("res://core/settings_store.gd")
 const Session = preload("res://core/session.gd")
+const Tracks = preload("res://data/tracks.gd")
 
 var _passed := 0
 var _failed := 0
@@ -67,6 +68,7 @@ func _initialize() -> void:
 	_test_save()
 	_test_settings()
 	_test_session()
+	_test_tracks()
 	print("\n== %d passed, %d failed ==" % [_passed, _failed])
 	quit(1 if _failed > 0 else 0)
 
@@ -1243,3 +1245,19 @@ func _test_session() -> void:
 	# return_to_title clears the campaign tag
 	s.return_to_title()
 	_eq(s.screen, "title", "session: return_to_title")
+
+func _test_tracks() -> void:
+	_eq(Tracks.TRACKS.size(), 6, "tracks: 6 tracks")
+	var t0: Dictionary = Tracks.TRACKS[0]
+	_eq(t0["name"], "WRAITHSPIRE FRONTIER", "tracks: t0 name")
+	_eq(t0["chords"].size(), 4, "tracks: t0 has 4 chords")
+	_eq(t0["chords"][0], {"root": 110.00, "third": 130.81, "fifth": 164.81}, "tracks: t0 Am chord")
+	_eq(t0["arp"], [0, 1, 2, 1, 0, 2, 1, 2, 0, 1, 2, 1, 0, 2, 1, 2], "tracks: t0 arp")
+	_eq(t0["arp"].size(), 16, "tracks: arp is 16 steps")
+	_eq(t0["lead"][0][0], {"s": 4, "hz": 440.0}, "tracks: t0 lead bar0 note0")
+	_eq(Tracks.TRACKS[5]["name"], "HEX STORM", "tracks: t5 name")
+	# every track: 4 chords, 16-step arp, 4 lead bars
+	for t in Tracks.TRACKS:
+		_eq(t["chords"].size(), 4, "tracks: 4 chords each")
+		_eq(t["arp"].size(), 16, "tracks: 16-step arp each")
+		_eq(t["lead"].size(), 4, "tracks: 4 lead bars each")
