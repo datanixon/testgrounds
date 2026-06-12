@@ -4,6 +4,7 @@ extends Control
 ## Built in code (no .tscn). Emits end_turn_pressed; main.gd refreshes via refresh(state).
 
 signal end_turn_pressed
+signal settings_pressed
 
 const PLAYER_NAMES := ["AZURE", "CRIMSON"]
 
@@ -30,6 +31,15 @@ func _ready() -> void:
 	_button.offset_bottom = 32
 	_button.pressed.connect(func(): end_turn_pressed.emit())
 	add_child(_button)
+	var gear := Button.new()
+	gear.text = "⚙"
+	gear.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	gear.offset_left = -150
+	gear.offset_top = 4
+	gear.offset_right = -118
+	gear.offset_bottom = 32
+	gear.pressed.connect(func(): settings_pressed.emit())
+	add_child(gear)
 
 func refresh(state) -> void:
 	if state == null or _label == null:

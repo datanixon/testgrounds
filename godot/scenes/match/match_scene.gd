@@ -26,6 +26,7 @@ const ActionMenuScript = preload("res://scenes/hud/action_menu.gd")
 const SummonListScript = preload("res://scenes/hud/summon_list.gd")
 const BattleSceneScript = preload("res://scenes/battle/battle_scene.gd")
 const SaveGame = preload("res://core/save_game.gd")
+const SettingsPanelScript = preload("res://scenes/hud/settings_panel.gd")
 
 var state: GameState
 var session = null   # set by init(); used for the battle-scene setting + on_match_won
@@ -39,6 +40,7 @@ var top_bar: TopBarScript
 var info_card: InfoCardScript
 var action_menu: ActionMenuScript
 var summon_list: SummonListScript
+var settings_panel = null
 var selected = null
 var armed = null   # {ab: Dictionary, kind: String, targets: Dictionary} when an enemy/tile ability is armed
 var undo_snapshot = null   # {unit, q, r} — the pre-move position, live until the action commits
@@ -86,6 +88,9 @@ func _ready() -> void:
 	summon_list.back.connect(_on_summon_back)
 	battle_scene = BattleSceneScript.new()
 	hud.add_child(battle_scene)
+	settings_panel = SettingsPanelScript.new()
+	hud.add_child(settings_panel)
+	top_bar.settings_pressed.connect(func(): settings_panel.open(session))
 
 func _unhandled_input(event: InputEvent) -> void:
 	if _busy:
