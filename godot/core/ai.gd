@@ -254,6 +254,7 @@ static func decide_unit_action(state, unit: Dictionary, threat: Dictionary, enem
 				s -= d_tower * 0.8
 		else:
 			s -= Hex.distance(np, Vector2i(enemy_master["q"], enemy_master["r"])) * W["approach"]
+		s += relic_tile_bonus(state, np.x, np.y)
 		if s > best_score:
 			best_score = s
 			best_step = np
@@ -369,6 +370,13 @@ static func _score_type(k: String, enemies: Array, terr_frac: Dictionary, my_arm
 	s -= same * 4.0
 	return s
 
+## relic_tile_bonus — a small move-scoring nudge for ending on a relic tile.
+static func relic_tile_bonus(state, q: int, r: int) -> float:
+	for rl in state.map.get("relics", []):
+		if rl["q"] == q and rl["r"] == r:
+			return 3.0
+	return 0.0
+
 ## take_turn — run the current player's entire AI turn synchronously (combat is inline
 ## in M6; the battle-scene awaiting returns at M8 as a coroutine). For each non-acted unit
 ## (masters last), decide and apply an action; then run the summon economy. Does NOT call
@@ -401,6 +409,7 @@ static func _apply_action(state, unit: Dictionary, action: Dictionary) -> void:
 		"attack":
 			unit["q"] = action["dest"].x
 			unit["r"] = action["dest"].y
+			state.pick_up_relic(unit)
 			var target: Variant = _unit_by_id(state, action["target_id"])
 			if target == null:
 				return
@@ -415,12 +424,14 @@ static func _apply_action(state, unit: Dictionary, action: Dictionary) -> void:
 		"capture":
 			unit["q"] = action["dest"].x
 			unit["r"] = action["dest"].y
+			state.pick_up_relic(unit)
 			var cell: Variant = state.cell_at(action["dest"].x, action["dest"].y)
 			if cell != null and cell["terrain"] == "tower" and cell.get("owner", -1) != unit["owner"]:
 				state.capture_tower(unit, cell)
 		"move":
 			unit["q"] = action["dest"].x
 			unit["r"] = action["dest"].y
+			state.pick_up_relic(unit)
 		"wait":
 			pass
 

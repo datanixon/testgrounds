@@ -80,6 +80,7 @@ func _initialize() -> void:
 	_test_relic_spawn()
 	_test_relic_pickup()
 	_test_relic_consumables()
+	_test_ai_relic_nudge()
 	print("\n== %d passed, %d failed ==" % [_passed, _failed])
 	quit(1 if _failed > 0 else 0)
 
@@ -1529,3 +1530,30 @@ func _test_relic_consumables() -> void:
 	victim["hp"] = 1
 	Combat.resolve_attack(gs, killer, victim)
 	_ok(victim["hp"] <= 0, "consumable: no phoenix second time -> dead")
+
+func _test_ai_relic_nudge() -> void:
+	# relic_tile_bonus is a small pure helper: >0 when the tile holds an un-owned relic
+	var gs := GameState.new_skirmish(Maps.MAPS[0], 7041)
+	gs.map["relics"] = [{"q": 4, "r": 4, "relic": "atk_charm"}]
+	_ok(AI.relic_tile_bonus(gs, 4, 4) > 0.0, "ai: relic tile scored positively")
+	_eq(AI.relic_tile_bonus(gs, 0, 0), 0.0, "ai: non-relic tile no bonus")
+	# _apply_action "attack" case: unit relocates to dest and picks up the relic there
+	var ga := _flat_state(7, 7)
+	ga.weather = {"key": "clear", "turns_left": 5}
+	ga.map["relics"] = [{"q": 3, "r": 3, "relic": "swift"}]
+	var attacker := ga.spawn_unit("cinderling", 1, 1, 3)   # player 1, starts at (1,3)
+	var prey := ga.spawn_unit("galewisp", 0, 4, 3)          # player 0, at (4,3) — adjacent to (3,3)
+	var atk_action := {"kind": "attack", "dest": Vector2i(3, 3), "target_id": prey["id"], "ab": null}
+	AI._apply_action(ga, attacker, atk_action)
+	_eq(attacker["relic"], "swift", "ai: attack relocation picks up relic on dest tile")
+	_eq(ga.map["relics"].size(), 0, "ai: attack relocation clears relic tile")
+	# _apply_action "capture" case: unit relocates to tower and picks up the relic there
+	var gc := _flat_state(7, 7)
+	gc.map["towers"] = [Vector2i(3, 3)]
+	gc.cell_at(3, 3)["terrain"] = "tower"
+	gc.map["relics"] = [{"q": 3, "r": 3, "relic": "vital"}]
+	var grabber := gc.spawn_unit("cinderling", 1, 2, 3)   # player 1
+	var cap_action := {"kind": "capture", "dest": Vector2i(3, 3)}
+	AI._apply_action(gc, grabber, cap_action)
+	_eq(grabber["relic"], "vital", "ai: capture relocation picks up relic on dest tile")
+	_eq(gc.map["relics"].size(), 0, "ai: capture relocation clears relic tile")
