@@ -30,6 +30,7 @@ const SettingsStore = preload("res://core/settings_store.gd")
 const Session = preload("res://core/session.gd")
 const Tracks = preload("res://data/tracks.gd")
 const MusicSeq = preload("res://core/music_seq.gd")
+const Sprites = preload("res://core/sprites.gd")
 
 var _passed := 0
 var _failed := 0
@@ -72,6 +73,7 @@ func _initialize() -> void:
 	_test_tracks()
 	_test_music_seq()
 	_test_gen_wave()
+	_test_sprites()
 	print("\n== %d passed, %d failed ==" % [_passed, _failed])
 	quit(1 if _failed > 0 else 0)
 
@@ -1345,3 +1347,18 @@ func _test_gen_wave() -> void:
 	for w in ["square", "triangle", "sawtooth", "sine"]:
 		for s in MusicSeq.gen_wave(w, 64):
 			_ok(s >= -1.0001 and s <= 1.0001, "gen_wave: %s bounded" % w)
+
+func _test_sprites() -> void:
+	# every distinct sprite id in UNIT_TYPES resolves a non-null token + battle texture
+	for key in UnitTypes.UNIT_TYPES:
+		var sid: String = UnitTypes.UNIT_TYPES[key]["sprite"]
+		_ok(Sprites.token(sid, 0) is Texture2D, "sprites: token %s loads" % sid)
+		_ok(Sprites.battle(sid, 0) is Texture2D, "sprites: battle %s loads" % sid)
+	# archon resolves for both factions, token + battle
+	_ok(Sprites.token("archon", 0) is Texture2D, "sprites: archon azure token")
+	_ok(Sprites.token("archon", 1) is Texture2D, "sprites: archon crimson token")
+	_ok(Sprites.battle("archon", 0) is Texture2D, "sprites: archon azure battle")
+	_ok(Sprites.battle("archon", 1) is Texture2D, "sprites: archon crimson battle")
+	# archon art differs per faction; neutral monster art does NOT depend on owner
+	_ok(Sprites.battle("archon", 0) != Sprites.battle("archon", 1), "sprites: archon faction split")
+	_ok(Sprites.token("imp", 0) == Sprites.token("imp", 1), "sprites: neutral monster owner-independent")
