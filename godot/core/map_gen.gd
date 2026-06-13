@@ -11,6 +11,7 @@ extends RefCounted
 
 const Hex = preload("res://core/hex.gd")
 const Rng = preload("res://core/rng.gd")
+const Relics = preload("res://data/relics.gd")
 
 static func generate(seed: int, def: Dictionary) -> Dictionary:
 	var rng := Rng.new(seed)
@@ -109,7 +110,32 @@ static func generate(seed: int, def: Dictionary) -> Dictionary:
 		towers.append(cp)
 		placed += 1
 
-	return {"cols": cols, "rows": rows, "cells": cells, "castles": castles, "towers": towers}
+	# Relics: plain cells, >=3 from castles, >=2 from towers and other relics. Each
+	# tile rolls a relic id from the pool. Deterministic via the seeded rng.
+	var relics: Array = []
+	var rcount: int = int(def.get("relics", 0))
+	var rguard := 0
+	while relics.size() < rcount and rguard < 800:
+		rguard += 1
+		var rc: Variant = _pick(cells, order, rng)
+		if rc == null or rc["terrain"] != "plain":
+			continue
+		var rp := Vector2i(rc["q"], rc["r"])
+		if Hex.distance(rp, pa) < 3 or Hex.distance(rp, pb) < 3:
+			continue
+		var clash := false
+		for t in towers:
+			if Hex.distance(t, rp) < 2:
+				clash = true
+				break
+		for er in relics:
+			if Hex.distance(Vector2i(er["q"], er["r"]), rp) < 2:
+				clash = true
+				break
+		if clash:
+			continue
+		relics.append({"q": rc["q"], "r": rc["r"], "relic": Relics.POOL[rng.below(Relics.POOL.size())]})
+	return {"cols": cols, "rows": rows, "cells": cells, "castles": castles, "towers": towers, "relics": relics}
 
 static func _pick(cells: Dictionary, order: Array, rng: Rng) -> Variant:
 	return cells.get(Hex.key(order[rng.below(order.size())]))

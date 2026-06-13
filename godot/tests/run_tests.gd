@@ -77,6 +77,7 @@ func _initialize() -> void:
 	_test_sprites()
 	_test_relics_data()
 	_test_relic_effects()
+	_test_relic_spawn()
 	print("\n== %d passed, %d failed ==" % [_passed, _failed])
 	quit(1 if _failed > 0 else 0)
 
@@ -1435,3 +1436,21 @@ func _test_relics_data() -> void:
 	# every POOL id is a real relic
 	for id in Relics.POOL:
 		_ok(Relics.RELICS.has(id), "relics: POOL id %s defined" % id)
+
+func _test_relic_spawn() -> void:
+	var def := {"key": "t", "name": "T", "cols": 12, "rows": 10, "seed": 7041,
+		"mountains": 2, "lakes": 1, "forests": 8, "hills": 6, "towers": 3, "relics": 3}
+	var m := MapGen.generate(7041, def)
+	_ok(m.has("relics"), "spawn: map has relics list")
+	_eq(m["relics"].size(), 3, "spawn: placed def.relics count")
+	for r in m["relics"]:
+		var cell = m["cells"]["%d,%d" % [r["q"], r["r"]]]
+		_eq(cell["terrain"], "plain", "spawn: relic on plain tile")
+		_ok(Relics.RELICS.has(r["relic"]), "spawn: valid relic id")
+	# determinism: same seed+def -> identical relic layout
+	var m2 := MapGen.generate(7041, def)
+	_eq(m2["relics"], m["relics"], "spawn: deterministic for fixed seed")
+	# zero relics when unspecified
+	var def0 := {"key": "z", "name": "Z", "cols": 10, "rows": 8, "seed": 5,
+		"mountains": 1, "lakes": 1, "forests": 4, "hills": 4, "towers": 2}
+	_eq(MapGen.generate(5, def0)["relics"].size(), 0, "spawn: no relics key -> 0")
