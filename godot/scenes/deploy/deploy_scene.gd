@@ -118,7 +118,9 @@ func _gui_input(event: InputEvent) -> void:
 			_reset_armed = true
 		queue_redraw()
 		return
-	_reset_armed = false
+	if _reset_armed:
+		_reset_armed = false
+		queue_redraw()
 	for row in _row_rects():
 		if (row["r"] as Rect2).has_point(pos):
 			var rid: int = int(roster[row["index"]]["roster_id"])

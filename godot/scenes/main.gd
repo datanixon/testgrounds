@@ -204,6 +204,7 @@ func _on_deploy_begin(picked_entries: Array) -> void:
 	_go("play")
 
 func _on_deploy_back() -> void:
+	session.state = null
 	_go("campaign")
 
 func _on_match_ended(_winner: int) -> void:
