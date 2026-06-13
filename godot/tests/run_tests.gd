@@ -1056,6 +1056,7 @@ func _test_battle_record() -> void:
 	Combat.resolve_attack(gs, atk, foe)
 	_eq(gs.battle_log.size(), 1, "record: one battle logged")
 	var rec: Dictionary = gs.battle_log[0]
+	_eq(rec["attacker_pos"], Vector2i(2, 3), "record: attacker position captured")
 	_eq(rec["attacker"]["type_key"], "cinderling", "record: attacker type")
 	_eq(rec["defender"]["type_key"], "galewisp", "record: defender type")
 	_ok(rec["primary"]["dmg"] >= 1, "record: primary dealt damage")

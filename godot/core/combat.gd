@@ -85,6 +85,7 @@ static func resolve_attack(state, attacker: Dictionary, defender: Dictionary, ap
 			counter = {"happened": true, "dmg": cres["dmg"], "absorbed": cres["absorbed"], "killed": cres["killed"]}
 	state.battle_log.append({
 		"attacker": _combatant_view(attacker), "defender": _combatant_view(defender),
+		"attacker_pos": Vector2i(attacker["q"], attacker["r"]),
 		"atk_hp_before": atk_hp_before, "atk_max_hp": atk_max,
 		"def_hp_before": def_hp_before, "def_max_hp": def_max,
 		"primary": primary, "counter": counter, "status": status_rec, "terrain": terrain,
