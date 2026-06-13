@@ -100,6 +100,7 @@ func _initialize() -> void:
 	_test_roster_basic()
 	_test_roster_reconcile()
 	_test_roster_migrate()
+	_test_roster_roundtrip()
 	print("\n== %d passed, %d failed ==" % [_passed, _failed])
 	quit(1 if _failed > 0 else 0)
 
@@ -1968,3 +1969,25 @@ func _test_roster_migrate() -> void:
 	_eq(m4[3]["roster_id"], 4, "migrate: fourth id 4")
 	# Over-progress is clamped to the grant table size.
 	_eq((RosterStore.migrate(9)["roster"] as Array).size(), 4, "migrate(9): clamped to 4")
+
+func _test_roster_roundtrip() -> void:
+	# A migrated roster survives JSON stringify -> parse -> _validate, with all
+	# numeric fields re-coerced from float back to int.
+	var blob := RosterStore.migrate(4)
+	var parsed = JSON.parse_string(JSON.stringify(blob))
+	var v = RosterStore._validate(parsed)
+	_ok(v != null, "roundtrip: valid blob validates")
+	_eq((v["roster"] as Array).size(), 4, "roundtrip: 4 entries preserved")
+	_eq(v["next_roster_id"], 5, "roundtrip: next_roster_id preserved")
+	var e0: Dictionary = v["roster"][0]
+	_eq(typeof(e0["roster_id"]), TYPE_INT, "roundtrip: roster_id re-coerced to int")
+	_eq(typeof(e0["level"]), TYPE_INT, "roundtrip: level re-coerced to int")
+	_eq(typeof(e0["max_hp"]), TYPE_INT, "roundtrip: max_hp re-coerced to int")
+	_eq(typeof(v["next_roster_id"]), TYPE_INT, "roundtrip: next_roster_id int")
+	_eq(e0["type_key"], "stoneward", "roundtrip: type_key preserved")
+	# Garbage / wrong-version blobs are rejected (loader falls back to migrate).
+	_eq(RosterStore._validate("not a dict"), null, "roundtrip: non-dict rejected")
+	_eq(RosterStore._validate({"v": 1, "roster": []}), null, "roundtrip: wrong version rejected")
+	_eq(RosterStore._validate({"v": 2}), null, "roundtrip: missing roster rejected")
+	_eq(RosterStore._validate({"v": 2, "roster": []}), null, "roundtrip: missing next_roster_id rejected")
+	_eq(RosterStore._validate({"v": 2, "next_roster_id": 1, "roster": [{}]}), null, "roundtrip: entry missing roster_id rejected")

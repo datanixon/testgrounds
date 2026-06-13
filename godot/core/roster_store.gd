@@ -112,3 +112,59 @@ static func _build_veteran(type_key: String, level: int) -> Dictionary:
 		for _i in range(level - 1):
 			Units.apply_level_growth(u)
 	return u
+
+# ---- load validation + file I/O (thin; only _validate is unit-tested) ----
+
+# Validate + re-coerce a parsed blob (JSON turns ints into floats). Returns a
+# clean blob, or null if the blob is not a usable v:2 roster.
+static func _validate(parsed) -> Variant:
+	if typeof(parsed) != TYPE_DICTIONARY:
+		return null
+	if int(parsed.get("v", 0)) != 2:
+		return null
+	if typeof(parsed.get("roster")) != TYPE_ARRAY:
+		return null
+	if not parsed.has("next_roster_id"):
+		return null
+	var out := {"v": 2, "roster": [], "next_roster_id": int(parsed.get("next_roster_id", 1))}
+	for e in parsed["roster"]:
+		if typeof(e) != TYPE_DICTIONARY:
+			return null
+		if not e.has("roster_id"):
+			return null
+		var entry := {"roster_id": int(e.get("roster_id", 0))}
+		for k in _CARRY_STR:
+			entry[k] = String(e.get(k, ""))
+		for k in _CARRY_INT:
+			entry[k] = int(e.get(k, 0))
+		for k in _CARRY_BOOL:
+			entry[k] = bool(e.get(k, false))
+		(out["roster"] as Array).append(entry)
+	return out
+
+static func load_or_init(progress: int) -> Dictionary:
+	if FileAccess.file_exists(SLOT_PATH):
+		var f := FileAccess.open(SLOT_PATH, FileAccess.READ)
+		if f != null:
+			var txt := f.get_as_text()
+			f.close()
+			var v = _validate(JSON.parse_string(txt))
+			if v != null:
+				return v
+	var blob := migrate(progress)
+	save(blob)
+	return blob
+
+static func save(blob: Dictionary) -> void:
+	var f := FileAccess.open(SLOT_PATH, FileAccess.WRITE)
+	if f == null:
+		return
+	f.store_string(JSON.stringify(blob))
+	f.close()
+
+static func reset() -> void:
+	if FileAccess.file_exists(SLOT_PATH):
+		DirAccess.remove_absolute(SLOT_PATH)
+
+static func probe() -> bool:
+	return FileAccess.file_exists(SLOT_PATH)
