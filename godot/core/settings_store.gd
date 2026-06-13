@@ -16,7 +16,7 @@ static func defaults() -> Dictionary:
 	return {
 		"music_vol": 0.6, "sfx_vol": 0.6, "battle_scene": true,
 		"difficulty": "normal", "map_index": 0, "campaign_progress": 0,
-		"music_on": true, "track_index": 0,
+		"music_on": true, "track_index": 0, "fog": false,
 	}
 
 ## merge — fold a (possibly untrusted) saved blob onto defaults, accepting only
@@ -28,6 +28,8 @@ static func merge(base: Dictionary, saved: Dictionary) -> Dictionary:
 			out[key] = clampf(float(saved[key]), 0.0, 1.0)
 	if typeof(saved.get("battle_scene")) == TYPE_BOOL:
 		out["battle_scene"] = saved["battle_scene"]
+	if typeof(saved.get("fog")) == TYPE_BOOL:
+		out["fog"] = saved["fog"]
 	if AiProfiles.DIFFICULTIES.has(saved.get("difficulty")):
 		out["difficulty"] = saved["difficulty"]
 	if typeof(saved.get("map_index")) == TYPE_FLOAT or typeof(saved.get("map_index")) == TYPE_INT:

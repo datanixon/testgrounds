@@ -86,6 +86,7 @@ func _initialize() -> void:
 	_test_veilstone()
 	_test_fog_state()
 	_test_ai_fog()
+	_test_fog_settings()
 	print("\n== %d passed, %d failed ==" % [_passed, _failed])
 	quit(1 if _failed > 0 else 0)
 
@@ -1643,3 +1644,10 @@ func _test_ai_fog() -> void:
 	gs.fog = false
 	var tn := AI.build_threat_map(gs, 0)
 	_ok(tn.get("0,1", 0) > 0, "ai fog off: all enemies threaten (baseline)")
+
+func _test_fog_settings() -> void:
+	_eq(SettingsStore.defaults()["fog"], false, "settings: fog defaults off")
+	var merged := SettingsStore.merge(SettingsStore.defaults(), {"fog": true})
+	_eq(merged["fog"], true, "settings: fog merges from a valid blob")
+	var bad := SettingsStore.merge(SettingsStore.defaults(), {"fog": "yes"})
+	_eq(bad["fog"], false, "settings: non-bool fog rejected")
