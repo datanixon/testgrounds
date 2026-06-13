@@ -78,6 +78,7 @@ func _initialize() -> void:
 	_test_relics_data()
 	_test_relic_effects()
 	_test_relic_spawn()
+	_test_relic_pickup()
 	print("\n== %d passed, %d failed ==" % [_passed, _failed])
 	quit(1 if _failed > 0 else 0)
 
@@ -1454,3 +1455,38 @@ func _test_relic_spawn() -> void:
 	var def0 := {"key": "z", "name": "Z", "cols": 10, "rows": 8, "seed": 5,
 		"mountains": 1, "lakes": 1, "forests": 4, "hills": 4, "towers": 2}
 	_eq(MapGen.generate(5, def0)["relics"].size(), 0, "spawn: no relics key -> 0")
+
+func _test_relic_pickup() -> void:
+	var gs := GameState.new_skirmish(Maps.MAPS[0], 7041)
+	gs.map["relics"] = [{"q": 3, "r": 3, "relic": "atk_charm"}]
+	var u := gs.spawn_unit("cinderling", 0, 3, 3)
+	# equip into empty slot
+	_eq(gs.pick_up_relic(u), "atk_charm", "pickup: returns equipped id")
+	_eq(u["relic"], "atk_charm", "pickup: unit equips")
+	_eq(gs.map["relics"].size(), 0, "pickup: tile cleared on empty-slot equip")
+	# swap: dropping old back onto the tile
+	gs.map["relics"] = [{"q": 3, "r": 3, "relic": "swift"}]
+	_eq(gs.pick_up_relic(u), "swift", "pickup: swap returns new id")
+	_eq(u["relic"], "swift", "pickup: unit now holds new")
+	_eq(gs.map["relics"].size(), 1, "pickup: old relic dropped on tile")
+	_eq(gs.map["relics"][0]["relic"], "atk_charm", "pickup: dropped relic is the old one")
+	# vital tops up hp on equip
+	gs.map["relics"] = [{"q": 4, "r": 4, "relic": "vital"}]
+	var w := gs.spawn_unit("cinderling", 0, 4, 4)
+	var hp0: int = w["hp"]
+	gs.pick_up_relic(w)
+	_eq(w["hp"], hp0 + 4, "pickup: vital tops up hp by 4")
+	# ley_crystal: master applies MP + tile cleared; non-master leaves it
+	gs.map["relics"] = [{"q": 5, "r": 5, "relic": "ley_crystal"}]
+	var grunt := gs.spawn_unit("cinderling", 0, 5, 5)
+	_eq(gs.pick_up_relic(grunt), "", "pickup: non-master leaves ley_crystal")
+	_eq(gs.map["relics"].size(), 1, "pickup: ley tile remains for non-master")
+	var master = gs.master_of(0)
+	master["q"] = 5; master["r"] = 5
+	var mp0: int = master["mp"]
+	_eq(gs.pick_up_relic(master), "ley_crystal", "pickup: master takes ley")
+	_eq(master["mp"], mini(master["max_mp"], mp0 + 6), "pickup: ley grants +6 mp (capped)")
+	_eq(master["relic"], "", "pickup: ley never equips")
+	_eq(gs.map["relics"].size(), 0, "pickup: ley tile cleared")
+	# no relic on tile -> ""
+	_eq(gs.pick_up_relic(u), "", "pickup: empty tile -> ''")

@@ -3,6 +3,8 @@ extends Control
 ## Bottom-left unit info card: stats for the selected/hovered unit. show_unit(unit)
 ## fills it and makes it visible; clear() hides it. Built in code (no .tscn).
 
+const Relics = preload("res://data/relics.gd")
+
 var _label: Label
 
 func _ready() -> void:
@@ -27,10 +29,14 @@ func show_unit(unit) -> void:
 	if unit.has("status") and not unit["status"].is_empty():
 		statuses = "  [" + ", ".join(PackedStringArray(unit["status"].keys())) + "]"
 	var cd_txt: String = ("  CD %d" % unit["cd"]) if unit.get("cd", 0) > 0 else ""
-	_label.text = "%s  (%s)\nHP %d/%d   ATK %d   DEF %d\nMOV %d   RNG %d   LV %d%s%s" % [
+	var relic_id: String = unit.get("relic", "")
+	var relic_txt: String = ""
+	if relic_id != "" and Relics.RELICS.has(relic_id):
+		relic_txt = "\nRelic: " + Relics.RELICS[relic_id]["name"]
+	_label.text = "%s  (%s)\nHP %d/%d   ATK %d   DEF %d\nMOV %d   RNG %d   LV %d%s%s%s" % [
 		unit["name"], unit["element"],
 		unit["hp"], unit["max_hp"], unit["power"], unit["def"],
-		unit["move"], unit["range"], unit["level"], cd_txt, statuses,
+		unit["move"], unit["range"], unit["level"], cd_txt, statuses, relic_txt,
 	]
 	visible = true
 

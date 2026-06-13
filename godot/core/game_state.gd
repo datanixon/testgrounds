@@ -92,6 +92,37 @@ func capture_tower(unit: Dictionary, cell: Dictionary) -> void:
 func effective_max_hp(unit: Dictionary) -> int:
 	return Relics.max_hp(unit)
 
+## pick_up_relic — if a relic sits on `unit`'s tile, resolve pickup and return the
+## relic id taken (or "" if none / left). Ley Crystal: master-only, applies MP and
+## clears the tile. Others: equip; a full slot drops the old relic back onto the tile.
+func pick_up_relic(unit: Dictionary) -> String:
+	var relics: Array = map.get("relics", [])
+	var idx := -1
+	for i in relics.size():
+		if relics[i]["q"] == unit["q"] and relics[i]["r"] == unit["r"]:
+			idx = i
+			break
+	if idx < 0:
+		return ""
+	var rid: String = relics[idx]["relic"]
+	if not Relics.RELICS.has(rid):
+		return ""
+	if Relics.RELICS[rid].get("master_only", false):
+		if not unit.get("is_master", false):
+			return ""   # non-master leaves it
+		unit["mp"] = mini(unit["max_mp"], unit["mp"] + int(Relics.bonus(rid, "mp")))
+		relics.remove_at(idx)
+		return rid
+	var old: String = unit.get("relic", "")
+	unit["relic"] = rid
+	if int(Relics.bonus(rid, "max_hp")) > 0:
+		unit["hp"] = mini(effective_max_hp(unit), unit["hp"] + int(Relics.bonus(rid, "max_hp")))
+	if old != "":
+		relics[idx] = {"q": unit["q"], "r": unit["r"], "relic": old}   # swap: drop old
+	else:
+		relics.remove_at(idx)
+	return rid
+
 ## endTurn — advance one player's turn: lock the outgoing side, switch player, bump
 ## the round counter, regen the incoming master's MP (base + 2/owned-tower), tick
 ## statuses, unlock + heal + evolve the incoming units, and roll weather per round.

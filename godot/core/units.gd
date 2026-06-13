@@ -18,6 +18,7 @@ static func make_unit(id: int, type_key: String, owner: int, q: int, r: int) -> 
 		"level": 1, "xp": 0,
 		"acted": false, "is_master": false,
 		"cd": 0, "second_move": false,
+		"relic": "",
 	}
 
 static func make_master(id: int, owner: int, q: int, r: int) -> Dictionary:
@@ -33,6 +34,7 @@ static func make_master(id: int, owner: int, q: int, r: int) -> Dictionary:
 		"level": 1, "xp": 0,
 		"acted": false, "is_master": true,
 		"cd": 0, "second_move": false,
+		"relic": "",
 	}
 
 # ---- XP, leveling, evolution (port of game.js sec. 4 cont.) ----

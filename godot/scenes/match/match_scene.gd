@@ -30,6 +30,7 @@ const SettingsPanelScript = preload("res://scenes/hud/settings_panel.gd")
 
 var state: GameState
 var session = null   # set by init(); used for the battle-scene setting + on_match_won
+var board: BoardScript
 var overlay: Overlay
 var units_layer: UnitsLayer
 var cam: Camera2D
@@ -58,7 +59,7 @@ func init(p_state, p_session) -> void:
 func _ready() -> void:
 	# state was provided by init() before the node entered the tree.
 	# Draw order: board (bottom) -> overlay -> tokens (top).
-	var board := BoardScript.new()
+	board = BoardScript.new()
 	board.set_map(state.map)
 	add_child(board)
 	overlay = OverlayScript.new()
@@ -172,6 +173,12 @@ func _on_click(a: Vector2i) -> void:
 			selected["r"] = a.y
 			overlay.set_highlights({}, selected)
 			await _slide_unit(selected, from_px, to_px)
+			var got := state.pick_up_relic(selected)
+			if got != "":
+				Audio.beep(720.0, 0.08, "triangle", 0.2)
+				units_layer.set_state(state)
+				board.queue_redraw()
+				info_card.show_unit(selected)
 			_open_menu_for(selected)
 			return
 		if is_own_tile:

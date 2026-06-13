@@ -5,6 +5,7 @@ extends Node2D
 
 const Hex = preload("res://core/hex.gd")
 const Terrain = preload("res://data/terrain.gd")
+const Relics = preload("res://data/relics.gd")
 
 var map: Dictionary = {}
 
@@ -34,3 +35,12 @@ func _draw() -> void:
 		var outline := pts.duplicate()
 		outline.append(pts[0])
 		draw_polyline(outline, Color(0, 0, 0, 0.35), 1.0)
+	# Relic glyph pass: colored gem (circle) + glyph char on each relic tile.
+	for rl in map.get("relics", []):
+		if not Relics.RELICS.has(rl["relic"]):
+			continue
+		var rdef: Dictionary = Relics.RELICS[rl["relic"]]
+		var center := Hex.axial_to_pixel(Vector2i(rl["q"], rl["r"]))
+		draw_circle(center, 7.0, rdef["color"])
+		draw_circle(center, 7.0, Color(1, 1, 1, 0.35), false)
+		draw_string(ThemeDB.fallback_font, center + Vector2(-4.0, 5.0), rdef["glyph"], HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color.WHITE)
