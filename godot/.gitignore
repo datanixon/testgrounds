@@ -1,6 +1,10 @@
 # Godot 4 import cache
 .godot/
 
+# Real sprite art IS tracked — override the repo-root blanket `*.png` ignore.
+# (.import sidecars are tracked too; the .godot/ imported .ctex cache stays ignored.)
+!assets/sprites/*.png
+
 # .NET build artifacts (added only when a C# hotspot is approved)
 .mono/
 bin/
