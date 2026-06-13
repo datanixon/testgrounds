@@ -189,8 +189,32 @@ fog fill (no edge feathering); single-viewer fog (human side; no hotseat); first
 >>> REMAINING: windowed visual check (`godot --path godot`, needs display) per HANDOFF list; then
 FF-merge `godot-p3-fog`→main + push on user OK. <<<
 
->>> PICK UP HERE: ROADMAP2 Phase 4 (Content wave — evolutions, objectives, bosses, 2 maps incl. a
-fog-default skirmish map) — its own spec/plan. (Earlier: M10 + Phase 2 windowed checks still optional.) <<<
+**UPDATE (2026-06-13): ROADMAP2 PHASE 4 DECOMPOSED; 4.2 OBJECTIVES COMPLETE** on branch
+`godot-p4-objectives` (off main; NOT yet merged — awaiting user OK + windowed pass). Phase 4
+"content wave" split into 3 slices (4.1 evolutions + 4.3 bosses/maps carry a sprite-generation
+dependency; 4.2 objectives is pure code) — did 4.2 first. Spec/plan in
+`docs/superpowers/{specs,plans}/2026-06-13-wraithspire-objectives*`. New pure `core/objectives.gd`
+(`evaluate(state)->int` 0/1/-1 + `label(state)->String`; kinds survive(n)/seize(hex)/protect(unit_id)/
+rout; JSON-safe dict shapes; no game_state preload → no cycle). `GameState` gained `objective` +
+`objective_progress` (both SAVED) + helpers `unit_by_id`/`enemy_non_masters`; `check_win_condition`
+calls `Objectives.evaluate` AFTER the master-death loop (archon-kill precedence preserved);
+`new_skirmish` copies `def.get("objective")` + stamps `start_turn` (single copy point — campaign
+flows through new_skirmish). AI `weights()` post-processes per objective (survive→rush approach×1.5
+atk_floor 0; seize→hold threat+0.3; protect→pressure ×1.3; rout→none) — DUPLICATES before mutating
+(never touches const AI_PROFILES) and is a NO-OP when objective empty (determinism: all 15 _test_ai_*
++ a no-objective identity assert pass). seize evaluated immediately on move (`_apply_action` tail +
+match_scene `_on_click` move branch → `_finish_action`+`_end_match` if winner, `_match_over` guard).
+topbar appends `Objectives.label`. save round-trips objective+progress ({} for old blobs). DEMO:
+campaign mission 2 "Drowned Marches" map def carries `{"kind":"survive","turns":8}` (additive alt
+win; CAMPAIGN still size 4). **950 tests; both gates per task; opus whole-milestone review =
+merge-ready.** Accepted: AI reaction is weight-tweak only (no per-target hunt/garrison); rout uses a
+turn-2 guard; protect exercised by tests only (demo uses survive); gameover unchanged (winner still a
+player id). REMAINING: windowed pass (mission 2 → "Survive: x/8" topbar, hold 8 rounds → win) then
+FF-merge `godot-p4-objectives`→main + push on user OK.
+
+>>> PICK UP HERE: ROADMAP2 Phase 4 remaining slices — 4.1 evolutions (needs 8 new sprite PNGs
+generated+imported) and 4.3 bosses+maps (needs boss sprites; pairs with 4.2 objectives). Each its own
+spec/plan. (Earlier: M10 + Phase 2/3 windowed checks still optional.) <<<
 Previous handoff (M9, historical):
 - **Tracker:** `ROADMAP_GODOT.md` — M1–M8 ✅; next `- [ ] M9 — ...`. M9 needs its own spec (brainstorming) + plan (writing-plans). M9 is the PARITY-completing milestone (after it the port matches the JS reference; ROADMAP2 Phases 2–8 then get their own specs).
 - **M9 scope (port the JS sec. 5/13/14 + save blob):** the `screen` router (title/play/battle/gameover — `GameState` is currently always in "play"); title screen (synthwave sun + perspective grid, "new game"/difficulty pick) + gameover screen (archon silhouette, victory); the **difficulty-select UI** + the **player/isAI table** (M6 hardcoded AI to player 1 — generalize here: `GameState.difficulty` already exists; add per-player isAI so `_on_end_turn` reads the table instead of `current_player == 1`); **save/load** to `user://wraithspire_save.json` (versioned blob: units incl. cd/status/level/xp/evolved, weather, board/seed, turn, players, captured towers — design spec "Save / load"; optionally serialize `map_def` to fix the JS resumed-campaign-weather gap); **campaign** (CAMPAIGN data already ported in `data/campaign.gd`; scenario list + progression). Also the **battle-scene on/off setting** (JS `STATE.settings.battleScene`) deferred from M8 — a settings toggle that skips the cutaway.

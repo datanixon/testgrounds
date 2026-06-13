@@ -6,12 +6,15 @@ with "stop caveman" / "normal mode").
 
 ## Where things stand
 
-- **Canonical branch:** `main` @ `d17ab2f`. **Phase 3 (Fog of war) is COMPLETE on
-  branch `godot-p3-fog`** (off main), 919 harness tests green + headless boot clean +
-  opus whole-milestone review = merge-ready. **NOT yet merged/pushed** — awaiting the
-  user's OK to FF-merge to main (and the windowed visual pass below).
+- **Canonical branch:** `main` — has the COMPLETE Godot port (M1–M10), ROADMAP2 Phase 2
+  (Relics), **Phase 3 (Fog of war, merged)**, plus two windowed-test bug fixes (display/
+  stretch config + procedural-screen click hit-areas).
+- **In flight:** **ROADMAP2 Phase 4.2 (Objective framework) is COMPLETE on branch
+  `godot-p4-objectives`** (off main), 950 tests green + headless boot clean + opus
+  whole-milestone review = merge-ready. **NOT yet merged** — awaiting the user's OK to
+  FF-merge to main (and the windowed pass below).
 - **Done & on main:** the COMPLETE Godot port (M1–M10 — full JS-reference parity
-  + real art + audio) **plus ROADMAP2 Phase 2 (Relics)**.
+  + real art + audio) **plus ROADMAP2 Phase 2 (Relics) + Phase 3 (Fog of war)**.
 - The JS build at repo root (`index.html` + `game.js`) is the FROZEN reference —
   do not add features to it.
 
@@ -43,17 +46,36 @@ with "stop caveman" / "normal mode").
   `godot-m10-art-audio`, `godot-m10-art`, `godot-p2-relics`. Earlier ones too.
   Cleanup optional: `git branch -d <name>`.
 
-## Next work: merge Phase 3, then ROADMAP2 Phase 4 — Content wave
+## Next work: merge Phase 4.2, then the rest of Phase 4
 
-**First:** once the user OKs (and ideally after the windowed visual pass), FF-merge
-`godot-p3-fog` → `main` and push. Then check the Phase-3 boxes stay ticked.
+**First:** once the user OKs (and ideally after the windowed pass), FF-merge
+`godot-p4-objectives` → `main` and push.
 
-**Then Phase 4** per `ROADMAP2.md` (4.1–4.3): four new evolutions (hexwisp/runeward/
-frostmaw/duneskink) with map+battle sprites; objective framework (survive/seize/
-protect/rout beside archon-kill + topbar line + AI weight shifts); 2 boss monsters +
-2 new skirmish maps (one fog-default — the first fog-default *skirmish* map, deferred
-from Phase 3). Each gets its OWN spec (brainstorm) → plan (writing-plans) → subagent
-execution. Start a FRESH session for full context.
+**Phase 4 is decomposed into 3 slices** (each its own spec→plan→subagent build):
+- **4.2 Objective framework — DONE** on `godot-p4-objectives` (see below); the foundation
+  Phases 5 & 7 reuse.
+- **4.1 Evolutions** — 4 new evolved monsters (hexwisp/runeward/frostmaw/duneskink).
+  Mostly data, but **blocked on generating + importing 8 new sprite PNGs** (token+battle)
+  via the M10 art pipeline.
+- **4.3 Bosses + maps** — 2 boss monsters (**4 more sprites**, non-summonable) + 2 new
+  skirmish maps (one fog-default — the first fog-default *skirmish* map). Pairs with 4.2
+  objectives.
+
+### Phase 4.2 (Objectives) — what landed on `godot-p4-objectives`
+- Pure `core/objectives.gd` — `evaluate(state)->int` (0 player-0 wins / 1 player-0 loses /
+  -1 none) + `label(state)->String`; kinds `survive(n)` / `seize(hex)` / `protect(unit_id)`
+  / `rout`, beside the always-on archon-kill.
+- `GameState.objective` + `objective_progress` (both saved) + `unit_by_id` /
+  `enemy_non_masters`; `check_win_condition` calls `Objectives.evaluate` **after** the
+  master-death check (archon-kill precedence kept); `new_skirmish` copies the def objective.
+- Fair-ish AI: `weights()` post-processes per objective (rush/defend) — **duplicates before
+  mutating** the const profile, and a **no-op when there's no objective** (determinism
+  preserved). Seize evaluated immediately on move (human + AI). Topbar objective line.
+  Save round-trips it. Demo `survive(8)` on campaign mission 2.
+- **PENDING windowed check** (`godot --path godot`): Campaign → mission 2 → topbar
+  "Survive: x/8"; hold 8 rounds → win without killing the archon; archon-kill still wins;
+  no-objective skirmish unchanged.
+- Docs: `docs/superpowers/{specs,plans}/2026-06-13-wraithspire-objectives*`.
 
 ## Process (proven across M1–M10 + Phase 2)
 

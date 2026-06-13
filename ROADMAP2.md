@@ -100,9 +100,14 @@ Tag legend: `[model | effort]` routing hints, same rubric as v1.
 
 - [ ] 4.1 Four evolutions for hexwisp/runeward/frostmaw/duneskink: data +
   map & battle sprites (every base now evolves). [claude-sonnet-4-6 | medium]
-- [ ] 4.2 Objective framework: survive(n)/seize(hex)/protect(unit)/rout win
-  conditions beside archon-kill; topbar objective line; AI weight shifts per
-  objective. [claude-fable-5 | high]
+- [x] 4.2 Objective framework (Godot): pure `core/objectives.gd` (evaluate/label for
+  survive(n)/seize(hex)/protect(unit_id)/rout, beside always-on archon-kill);
+  `GameState.objective`/`objective_progress` + `unit_by_id`/`enemy_non_masters` +
+  `check_win_condition` hook (archon-death precedence kept) + `new_skirmish` copy;
+  rush/defend AI weight tweak (no-objective = byte-identical, determinism preserved);
+  seize evaluated on move (human + AI); topbar objective line; save round-trip; demo
+  survive objective on campaign mission 2. 950 tests; opus whole-milestone review =
+  merge-ready. [claude-fable-5 | high]
 - [ ] 4.3 Bosses + maps: 2 boss monsters (unique sprites/abilities, not
   summonable) + 2 new skirmish maps (one fog-default).
   [claude-sonnet-4-6 | medium]
