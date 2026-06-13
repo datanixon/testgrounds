@@ -326,12 +326,38 @@ Flow `story → deploy → play`, CAMPAIGN-ONLY (skirmish untouched).
   Final opus review = ready to merge (1 deferred test-coverage gap: commit test uses new_skirmish not
   new_campaign — formula is start-MP-agnostic, reconcile test covers new_campaign; balance = Phase 8).
 
->>> PICK UP HERE: FF-merge `godot-p5-2-deploy` → main + push on user OK. THEN Phase 5.3 (missions 5–8:
-defs with objectives/bosses/fog/weather skews + lore interstitials + campaign screen extension + their
-own deploy_slots — completes Phase 5; this is where rosters grow large so the paged deploy list matters),
-or the ART follow-ups (8 evo + 4 boss PNGs → import + remove pending_art), or Phase 6 (unlocks+records).
-NOTE for 5.3/later: bosses (pyre_colossus/storm_tyrant) + evolved forms still need art (engine-disc
-fallback until then). Use the `--shot` hook to validate UI. <<<
+(5.2 was FF-merged to main + pushed: 4d3ae83..50a4bf8.)
+
+**UPDATE (2026-06-13): ROADMAP2 PHASE 5.3 (MISSIONS 5–8, TITANS AWAKENED) DONE — PHASE 5 COMPLETE** on
+branch `godot-p5-3-missions` (off main; NOT yet merged — awaiting user OK). Final slice of Phase 5.
+Spec/plan: `docs/superpowers/{specs,plans}/2026-06-13-wraithspire-missions-5-8*`. Campaign extended 4→8
+missions (mostly data). Story: the Crimson Archon's fall cracks the old seals; the elemental titans wake.
+- `data/campaign.gd` CAMPAIGN 4→8: 4 hard scenarios — c5 The First Tremor (static rout objective,
+  Pyre Colossus+geomaul, heat weather), c6 The Storm Crown (seize enemy castle, Storm Tyrant+skyharrow,
+  gale), c7 The Last Refuge (protect a Runeward ally, fog:true, geomaul+skyharrow), c8 The Titanfall
+  (both titans, archon-kill finale, mixed weather). ai_mp_bonus 10/12/12/14; deploy_slots 5/5/6/6;
+  distinct seeds 52107/60733/71519/80021.
+- `core/game_state.gd` `new_campaign` gained TWO runtime objective builders (the only code; inserted
+  after the ai_summons loop, before return, null-guarded, mutually exclusive): `seize_enemy_castle` flag
+  → `gs.objective = {"kind":"seize","q":castles[1].x,"r":castles[1].y}` (enemy spire — always a real
+  cell, no offset-coord hazard); `protect_ally: <type_key>` flag → spawn that ally for player 0 near
+  master_0 (acted=false, ready turn 1) + `gs.objective = {"kind":"protect","unit_id":ally.id}`. These
+  OVERRIDE the map-def objective (m6/m7 omit a static one). Closes the Phase-4.2 "protect test-only" gap.
+- `scenes/campaign/campaign_scene.gd`: rows shrunk (h70→52, gap16→10, y170→150) to fit 8 in the 800px
+  canvas + per-row text baselines moved (+28→+22, +48→+42) + subtitle → "...and the war of titans after".
+- Objective spread now showcases all 4 kinds across the campaign (survive@m2, rout@m5, seize@m6,
+  protect@m7; archon-kill finale@m8). **1162 tests** (2 new `_test_missions_5_8` + `_test_missions_objectives`);
+  both gates green; `--shot campaign` verified (8 rows fit, no clipping). Subagent-driven (3 grinder/sonnet
+  TDD tasks + per-task spec+code review + opus whole-slice review = ready to merge, zero critical/important).
+  Review-added: mutual-exclusivity comment on the seize/protect flags. Rejected false positives
+  (acted=false correct for a player's pre-placed ally; castles[1] guaranteed by new_skirmish).
+
+>>> PICK UP HERE: FF-merge `godot-p5-3-missions` → main + push on user OK. PHASE 5 IS THEN COMPLETE
+(persistent war campaign: roster + deploy + permadeath + AI scaling + 8 missions). REMAINING ROADMAP2:
+Phase 6 (unlocks + records — fully art-free), Phase 7 (roguelite gauntlet — reuses 5.1 roster machinery),
+Phase 8 (balance/perf/docs closeout). ALSO STILL PENDING: ART — 8 evo PNGs (4.1) + 4 boss PNGs (4.3);
+engine-disc fallback holds until generated (the titan bosses + Runeward render as discs in the new
+missions until then). Use the `--shot` hook to validate UI. <<<
 Previous handoff (M9, historical):
 - **Tracker:** `ROADMAP_GODOT.md` — M1–M8 ✅; next `- [ ] M9 — ...`. M9 needs its own spec (brainstorming) + plan (writing-plans). M9 is the PARITY-completing milestone (after it the port matches the JS reference; ROADMAP2 Phases 2–8 then get their own specs).
 - **M9 scope (port the JS sec. 5/13/14 + save blob):** the `screen` router (title/play/battle/gameover — `GameState` is currently always in "play"); title screen (synthwave sun + perspective grid, "new game"/difficulty pick) + gameover screen (archon silhouette, victory); the **difficulty-select UI** + the **player/isAI table** (M6 hardcoded AI to player 1 — generalize here: `GameState.difficulty` already exists; add per-player isAI so `_on_end_turn` reads the table instead of `current_player == 1`); **save/load** to `user://wraithspire_save.json` (versioned blob: units incl. cd/status/level/xp/evolved, weather, board/seed, turn, players, captured towers — design spec "Save / load"; optionally serialize `map_def` to fix the JS resumed-campaign-weather gap); **campaign** (CAMPAIGN data already ported in `data/campaign.gd`; scenario list + progression). Also the **battle-scene on/off setting** (JS `STATE.settings.battleScene`) deferred from M8 — a settings toggle that skips the cutaway.

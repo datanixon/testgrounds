@@ -139,8 +139,14 @@ Tag legend: `[model | effort]` routing hints, same rubric as v1.
   `on_match_won` reconciles survivors into roster on campaign win (permadeath on
   death, untouched on loss); `deployed_roster_ids`+`roster_id` saved; per-mission
   `deploy_slots` (3/3/4/4). Campaign-only. 1112 tests. [claude-opus-4-8 | high]
-- [ ] 5.3 Missions 5–8: defs with objectives/bosses/fog/weather skews + lore
-  interstitials; campaign screen extended. [claude-opus-4-8 | high]
+- [x] 5.3 Missions 5–8 (titans-awakened arc): 4 hard scenarios in campaign.gd
+  (CAMPAIGN 4→8) — The First Tremor (rout/Pyre Colossus), The Storm Crown
+  (seize enemy castle/Storm Tyrant), The Last Refuge (protect Runeward/fog),
+  The Titanfall (both titans, archon-kill finale); ai_mp_bonus 10/12/12/14,
+  deploy_slots 5/5/6/6, weather/fog skews. `new_campaign` gained runtime
+  objective builders `seize_enemy_castle` (from castles[1]) + `protect_ally`
+  (spawn ally + {protect,unit_id}); campaign screen shrunk to fit 8 rows +
+  titan subtitle. 1162 tests. [claude-opus-4-8 | high]
 
 ## Phase 6 — Unlocks + records
 

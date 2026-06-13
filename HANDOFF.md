@@ -6,17 +6,18 @@ with "stop caveman" / "normal mode").
 
 ## Where things stand
 
-- **Canonical branch:** `main` — has the COMPLETE Godot port (M1–M10), ROADMAP2 Phase 2
-  (Relics), Phase 3 (Fog), Phase 4.2 (Objectives), Phase 4.1 (Evolutions — DATA),
-  Phase 4.3 (Bosses + maps — DATA), **Phase 5.1 (Campaign roster layer — `core/roster_store.gd`,
-  merged eff563e..4d3ae83)**, and a family of screenshot-found visual fixes — all merged. 1067 tests green.
-- **In flight:** **Phase 5.2 (Deploy screen + survivors + AI scaling) — DONE on branch `godot-p5-2-deploy`**
-  (off main, NOT merged — awaiting user OK to FF-merge). `core/deploy.gd` + `scenes/deploy/deploy_scene.gd`:
-  `story → deploy → play` veteran picker (campaign-only), survivors reconcile into the roster on a campaign
-  win (permadeath on death/loss=replay), AI opening MP scales with the deployed army value, per-mission
-  `deploy_slots`. 1112 tests; both gates green; per-task + opus whole-slice reviews done. Details in
-  `SESSION_STATE.md`. NEXT after merge = Phase 5.3 (missions 5–8) / art follow-ups / Phase 6.
-- **ART PENDING** (unchanged) — Phase 4.1: 8 PNGs; Phase 4.3: 4 PNGs. See below.
+- **Canonical branch:** `main` — has the COMPLETE Godot port (M1–M10), ROADMAP2 Phase 2 (Relics),
+  Phase 3 (Fog), Phase 4 (Objectives + Evolutions-data + Bosses/maps-data), **Phase 5.1 (roster layer)
+  + Phase 5.2 (deploy + survivors + AI scaling)** (merged 4d3ae83..50a4bf8), and screenshot-found visual
+  fixes — all merged. 1112 tests green.
+- **In flight:** **Phase 5.3 (Missions 5–8, "Titans Awakened") — DONE on branch `godot-p5-3-missions`**
+  (off main, NOT merged — awaiting user OK to FF-merge). **Completes Phase 5.** Campaign 4→8 missions
+  (rout/seize/protect/archon-kill spread, both bosses, fog/weather skews); `new_campaign` gained
+  `seize_enemy_castle` + `protect_ally` runtime objective builders; campaign screen fits 8 rows. 1162
+  tests; both gates green; per-task + opus whole-slice reviews done. Details in `SESSION_STATE.md`.
+  NEXT after merge = Phase 6 (unlocks+records, art-free) / Phase 7 (gauntlet) / art follow-ups.
+- **ART PENDING** (unchanged) — Phase 4.1: 8 evo PNGs; Phase 4.3: 4 boss PNGs (the titan bosses +
+  Runeward render as engine discs in the new missions until generated). See below.
 - **ART PENDING** — Phase 4.1: 8 PNGs (Hexlord/Sigilwarden/Glaciamaw/Dunestalker); Phase 4.3:
   4 PNGs (Pyre Colossus/Storm Tyrant). Generation prompts in the respective spec appendices
   (`docs/superpowers/specs/2026-06-13-wraithspire-{evolutions,bosses-maps}-design.md`). Loader
