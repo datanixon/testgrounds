@@ -124,9 +124,14 @@ Tag legend: `[model | effort]` routing hints, same rubric as v1.
 
 ## Phase 5 — Persistent war campaign
 
-- [ ] 5.1 Roster layer: campaign roster storage ("wraithspire.campaign.v2"),
-  survivor carry (level/xp/evolved/relic), permadeath, v1 progress → acts 1–4
-  mapping. [claude-opus-4-8 | high]
+- [x] 5.1 Roster layer: pure `core/roster_store.gd` (campaign.v2 slot
+  `user://wraithspire_campaign.json`) — full-snapshot entries (level/xp/evolved/
+  relic + grown stats), `reconcile` (veteran carry + permadeath), `migrate`
+  (v1 progress → 1 starter veteran/cleared act: stoneward L2 / tidekin L3 /
+  earthbreaker L4 / hexlord L5), `load_or_init`/`save`/`reset`/`probe` + JSON
+  int/bool re-coercion guard. Data-only; live wiring (deploy/win-reconcile/AI
+  scaling) is 5.2; mission-unlock progress stays in settings. 1067 tests.
+  [claude-opus-4-8 | high]
 - [ ] 5.2 Deploy screen + scaling: pre-mission veteran picker (slot caps),
   survivors join roster on win, AI opening strength scales with roster value.
   [claude-opus-4-8 | high]

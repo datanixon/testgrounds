@@ -23,10 +23,12 @@ Two builds:
 | Phase 4.2 — Objective framework | ✅ done, on `main` | — |
 | Phase 4.1 — Evolutions (**data**) | ✅ done, on `main` | — |
 | Phase 4.1 — Evolutions (**art**) | ⏳ pending 8 sprite PNGs | needs user-generated art |
-| Phase 4.3 — Bosses + maps | ⬜ not started (needs sprites) | — |
-| Phases 5–8 (campaign, unlocks/records, gauntlet, balance) | ⬜ not started | `ROADMAP2.md` |
+| Phase 4.3 — Bosses + maps (**data**) | ✅ done, on `main` | — |
+| Phase 4.3 — Bosses (**art**) | ⏳ pending 4 sprite PNGs | needs user-generated art |
+| Phase 5.1 — Campaign roster layer | ✅ done, on `godot-p5-1-roster` (awaiting merge) | `core/roster_store.gd` |
+| Phase 5.2–5.3, 6–8 | ⬜ not started | `ROADMAP2.md` |
 
-Test suite: **978 harness asserts green** on `main`.
+Test suite: **1067 harness asserts green** on `godot-p5-1-roster` (998 on `main`).
 
 ## Visual bug fixes merged to `main` (found via screenshots)
 
@@ -50,6 +52,29 @@ Four evolved forms — `Hexlord` (Hexwisp+), `Sigilwarden` (Runeward+), `Glaciam
 (Frostmaw+), `Dunestalker` (Duneskink+) — in `data/unit_types.gd` with `evolves_to`
 wiring. Evolution mechanic unchanged; evolved forms non-summonable (evolution-only).
 `UNIT_TYPES` 20→24. **Art still pending** (8 PNGs — see below).
+
+## Phase 5.1 — Campaign roster layer (on `godot-p5-1-roster`, awaiting merge)
+
+Pure `core/roster_store.gd` (`class_name RosterStore`) — the persistence layer for
+the Fire-Emblem-style persistent campaign. Data-only: no live game wiring yet
+(deploy screen, win-reconcile call sites, AI scaling = Phase 5.2).
+- **Storage:** `user://wraithspire_campaign.json` (the `campaign.v2` slot), blob
+  `{v:2, roster:[...], next_roster_id}`. Roster only — mission-unlock progress stays
+  in `settings.campaign_progress` (single source of truth; deliberate divergence from
+  the spec's "one slot").
+- **Full-snapshot entries:** `roster_id` (permanent monotonic UID), `type_key`,
+  name/element/sprite/attack, `flying`+`evolved` (bool), `level`/`xp`, grown
+  `max_hp/power/def/move/range`, `relic`. Transient fields stripped.
+- **`reconcile(blob, living_units, deployed_ids)`** — post-win carry + permadeath:
+  deployed survivor → update entry; deployed dead → cull; fresh summon survivor →
+  add. Pure (deep-copies the blob). *5.2 must stamp `roster_id` on deployed units.*
+- **`migrate(progress)`** — 1 starter veteran per cleared act, built via the real
+  `Units` progression path: stoneward L2 / tidekin L3 / geomaul→earthbreaker L4 /
+  hexwisp→hexlord L5 (the L≥4 grants evolve). New v2 players start empty.
+- **I/O:** `load_or_init`/`save`/`reset`/`probe` + `_validate` (JSON int/bool
+  re-coercion; rejects non-dict / wrong-version / missing required keys → falls back
+  to `migrate`). 1067 tests; headless boot clean. Spec/plan:
+  `docs/superpowers/{specs,plans}/2026-06-13-wraithspire-roster-layer*`.
 
 ## Pending art (blocks 4.1 visuals + all of 4.3)
 

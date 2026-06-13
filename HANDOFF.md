@@ -1,20 +1,23 @@
 # Session Handoff — Wraithspire Godot port
 
-Last session end: 2026-06-11. Read this, then `SESSION_STATE.md` (full running
+Last session end: 2026-06-13. Read this, then `SESSION_STATE.md` (full running
 handoff) for depth. Caveman chat mode was active last session (cosmetic; toggle
 with "stop caveman" / "normal mode").
 
 ## Where things stand
 
 - **Canonical branch:** `main` — has the COMPLETE Godot port (M1–M10), ROADMAP2 Phase 2
-  (Relics), Phase 3 (Fog), Phase 4.2 (Objectives), **Phase 4.1 (Evolutions — DATA)**, and
-  a family of screenshot-found visual fixes (display/stretch; procedural-screen + top_bar +
-  settings + battle-cutaway size-0 Control bugs; camera board-bounds clamping) — all merged.
-  978 tests green.
-- **In flight:** **Phase 4.3 (Bosses + maps) — DATA DONE on branch `godot-p4-3-bosses-maps`**
-  (off main, NOT merged): 2 new skirmish maps (Mistveil Hollow fog-default + Ashfall Basin),
-  2 bosses (Pyre Colossus, Storm Tyrant — non-summonable, reuse abilities), Pyre Colossus
-  demo'd in mission 4. 998 tests. **Boss art (4 PNGs) PENDING.**
+  (Relics), Phase 3 (Fog), Phase 4.2 (Objectives), Phase 4.1 (Evolutions — DATA),
+  **Phase 4.3 (Bosses + maps — DATA, merged: commits 203b005→eff563e)**, and a family of
+  screenshot-found visual fixes (display/stretch; procedural-screen + top_bar + settings +
+  battle-cutaway size-0 Control bugs; camera board-bounds clamping) — all merged. 998 tests green.
+- **In flight:** **Phase 5.1 (Campaign roster layer) — DONE on branch `godot-p5-1-roster`**
+  (off main, NOT merged — awaiting user OK to FF-merge). Pure `core/roster_store.gd`: campaign.v2
+  slot file, full-snapshot veteran entries (level/xp/evolved/relic + grown stats), `reconcile`
+  (carry + permadeath), `migrate` (v1 progress → 1 starter veteran/cleared act), file I/O + JSON
+  re-coercion. DATA-ONLY — live wiring (deploy/win-reconcile/AI scaling) is Phase 5.2. 1067 tests;
+  both gates green; per-task + opus whole-slice reviews done. Details in `SESSION_STATE.md`.
+- **ART PENDING** (unchanged) — Phase 4.1: 8 PNGs; Phase 4.3: 4 PNGs. See below.
 - **ART PENDING** — Phase 4.1: 8 PNGs (Hexlord/Sigilwarden/Glaciamaw/Dunestalker); Phase 4.3:
   4 PNGs (Pyre Colossus/Storm Tyrant). Generation prompts in the respective spec appendices
   (`docs/superpowers/specs/2026-06-13-wraithspire-{evolutions,bosses-maps}-design.md`). Loader

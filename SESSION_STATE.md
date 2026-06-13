@@ -254,9 +254,45 @@ now has 6 stems (4 evo + 2 boss). 998 tests; both gates; title `--shot` confirms
 PENDING** — 4 PNGs (pyre_colossus/storm_tyrant token+battle), prompt in spec appendix; same import +
 remove-pending_art follow-up as 4.1.
 
->>> PICK UP HERE: merge `godot-p4-3-bosses-maps` on user OK; then Phase 4.1+4.3 ART follow-ups (user
-generates the 8+4 PNGs → import + remove pending_art) and/or Phase 5 (persistent campaign) / Phase 6
-(unlocks+records, fully art-free). Use the `--shot` hook to validate. <<<
+(4.3 was subsequently FF-merged to main — its commits 203b005→eff563e are on main HEAD; 998 on main.)
+
+**UPDATE (2026-06-13): ROADMAP2 PHASE 5.1 (CAMPAIGN ROSTER LAYER) DONE** on branch `godot-p5-1-roster`
+(off main; NOT yet merged — awaiting user OK). First slice of Phase 5 (persistent war campaign), which
+is decomposed into 5.1 roster layer (this) → 5.2 deploy screen + AI scaling → 5.3 missions 5–8.
+Spec/plan: `docs/superpowers/{specs,plans}/2026-06-13-wraithspire-roster-layer*`. DATA-ONLY slice — no
+live game wiring (deploy, win-reconcile call sites, AI scaling all = 5.2). New pure
+`core/roster_store.gd` (class_name RosterStore extends RefCounted), modeled on SaveGame/SettingsStore:
+- Storage `user://wraithspire_campaign.json` (the campaign.v2 slot), blob `{v:2, roster:[], next_roster_id}`.
+  ROSTER ONLY — mission-unlock progress stays in `settings.campaign_progress` (single source of truth;
+  deliberate divergence from the spec's "roster + progress in one slot"; `migrate` reads progress as an arg).
+- Full-snapshot entries (user chose full-snapshot over recompute-on-deploy): `roster_id` (permanent
+  monotonic UID, never reused — why clear/remove keep next_roster_id), type_key, name/element/sprite/attack,
+  `_CARRY_BOOL`=[flying, evolved] (evolved carried verbatim — drives the -1 ability cd; NOT re-derived),
+  level/xp, grown max_hp/power/def/move/range, relic. Transient fields (id/owner/q/r/hp/acted/cd/
+  second_move/is_master) stripped.
+- `reconcile(blob, living_units, deployed_ids)` = post-win carry+permadeath core (PURE — deep-copies blob):
+  deployed survivor (unit carries roster_id) → update entry; deployed dead (absent from living) → cull
+  (permadeath); fresh summon survivor (no roster_id) → add. **5.2 CONTRACT: deploy must stamp roster_id
+  onto deployed units' dicts**, else reconcile mis-classifies them.
+- `migrate(progress)` = v1 campaign_progress → 1 starter veteran per cleared act, built through the real
+  `Units` path (make_unit → set level → evolve_unit if level≥EVOLVE_LEVEL & has evolves_to, else
+  apply_level_growth ×(level-1)): GRANT = stoneward L2 / tidekin L3 / geomaul→earthbreaker L4 /
+  hexwisp→hexlord L5. Clamped to 4. New v2 players (progress 0) start EMPTY.
+- I/O: load_or_init(progress) (valid file → load; else migrate+save, file-presence = migrate-once gate),
+  save, reset (campaign-screen reset button = 5.2), probe; `_validate` does JSON int/bool re-coercion
+  (the SaveGame float gotcha) + rejects non-dict / v≠2 / missing roster / missing next_roster_id / entry
+  missing roster_id → loader falls back to migrate.
+- **1067 tests** (5 new `_test_roster_*`); both gates green (harness + headless boot clean). Subagent-driven
+  build (4 grinder/sonnet tasks, verbatim TDD) + per-task spec+code review + opus whole-slice review.
+  Review-found + fixed: roster_id-permanence doc; test crash-on-failure hardening; **evolved-flag drop**
+  (was lost in entries → would kill the -1 cd on deployed evolved veterans → fixed via _CARRY_BOOL);
+  strict reject of corrupt blobs missing identity keys; spec entry-schema gap (evolved) documented.
+
+>>> PICK UP HERE: FF-merge `godot-p5-1-roster` → main + push on user OK. THEN options: Phase 5.2 (deploy
+screen + survivors-join-on-win wiring [calls RosterStore.reconcile] + AI opening-strength scaling — the
+first art-free slice that makes 5.1 player-visible), or the ART follow-ups (user generates 8 evo + 4 boss
+PNGs → import + remove pending_art), or Phase 6 (unlocks+records). 5.2 is the natural next step (it wires
+in the roster module just built). Use the `--shot` hook to validate UI. <<<
 Previous handoff (M9, historical):
 - **Tracker:** `ROADMAP_GODOT.md` — M1–M8 ✅; next `- [ ] M9 — ...`. M9 needs its own spec (brainstorming) + plan (writing-plans). M9 is the PARITY-completing milestone (after it the port matches the JS reference; ROADMAP2 Phases 2–8 then get their own specs).
 - **M9 scope (port the JS sec. 5/13/14 + save blob):** the `screen` router (title/play/battle/gameover — `GameState` is currently always in "play"); title screen (synthwave sun + perspective grid, "new game"/difficulty pick) + gameover screen (archon silhouette, victory); the **difficulty-select UI** + the **player/isAI table** (M6 hardcoded AI to player 1 — generalize here: `GameState.difficulty` already exists; add per-player isAI so `_on_end_turn` reads the table instead of `current_player == 1`); **save/load** to `user://wraithspire_save.json` (versioned blob: units incl. cd/status/level/xp/evolved, weather, board/seed, turn, players, captured towers — design spec "Save / load"; optionally serialize `map_def` to fix the JS resumed-campaign-weather gap); **campaign** (CAMPAIGN data already ported in `data/campaign.gd`; scenario list + progression). Also the **battle-scene on/off setting** (JS `STATE.settings.battleScene`) deferred from M8 — a settings toggle that skips the cutaway.
