@@ -31,6 +31,7 @@ const Session = preload("res://core/session.gd")
 const Tracks = preload("res://data/tracks.gd")
 const MusicSeq = preload("res://core/music_seq.gd")
 const Sprites = preload("res://core/sprites.gd")
+const Relics = preload("res://data/relics.gd")
 
 var _passed := 0
 var _failed := 0
@@ -74,6 +75,7 @@ func _initialize() -> void:
 	_test_music_seq()
 	_test_gen_wave()
 	_test_sprites()
+	_test_relics_data()
 	print("\n== %d passed, %d failed ==" % [_passed, _failed])
 	quit(1 if _failed > 0 else 0)
 
@@ -1362,3 +1364,30 @@ func _test_sprites() -> void:
 	# archon art differs per faction; neutral monster art does NOT depend on owner
 	_ok(Sprites.battle("archon", 0) != Sprites.battle("archon", 1), "sprites: archon faction split")
 	_ok(Sprites.token("imp", 0) == Sprites.token("imp", 1), "sprites: neutral monster owner-independent")
+
+func _test_relics_data() -> void:
+	_eq(Relics.RELICS.size(), 9, "relics: 9 defined")
+	_eq(Relics.bonus("atk_charm", "atk"), 2, "relics: atk_charm +2 atk")
+	_eq(Relics.bonus("vital", "max_hp"), 4, "relics: vital +4 hp")
+	_eq(Relics.bonus("swift", "move"), 1, "relics: swift +1 move")
+	_eq(Relics.bonus("farsight", "range"), 1, "relics: farsight +1 range")
+	_eq(Relics.bonus("regenring", "regen"), 2, "relics: regenring +2")
+	_eq(Relics.bonus("thorncharm", "counter"), 2, "relics: thorncharm +2 counter")
+	_eq(Relics.bonus("nonsense", "atk"), 0, "relics: unknown id -> 0")
+	_eq(Relics.bonus("atk_charm", "move"), 0, "relics: missing key -> 0")
+	_ok(Relics.is_passive("atk_charm") and not Relics.is_consumable("atk_charm"), "relics: atk_charm passive")
+	_ok(Relics.is_consumable("phoenix") and not Relics.is_passive("phoenix"), "relics: phoenix consumable")
+	_ok(Relics.RELICS["ley_crystal"].get("master_only", false), "relics: ley_crystal master_only")
+	# unit_bonus reads unit.relic
+	_eq(Relics.unit_bonus({"relic": "atk_charm"}, "atk"), 2, "relics: unit_bonus reads relic")
+	_eq(Relics.unit_bonus({"relic": ""}, "atk"), 0, "relics: no relic -> 0")
+	_eq(Relics.unit_bonus({}, "atk"), 0, "relics: missing relic key -> 0")
+	# max_hp + effective_range helpers
+	_eq(Relics.max_hp({"max_hp": 12, "relic": "vital"}), 16, "relics: max_hp adds vital")
+	_eq(Relics.max_hp({"max_hp": 12, "relic": ""}), 12, "relics: max_hp base")
+	_eq(Relics.effective_range({"range": 1, "relic": "farsight"}), 2, "relics: farsight 1->2")
+	_eq(Relics.effective_range({"range": 2, "relic": "farsight"}), 2, "relics: range capped at 2")
+	_eq(Relics.effective_range({"range": 1, "relic": ""}), 1, "relics: base range")
+	# every POOL id is a real relic
+	for id in Relics.POOL:
+		_ok(Relics.RELICS.has(id), "relics: POOL id %s defined" % id)
