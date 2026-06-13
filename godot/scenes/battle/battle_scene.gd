@@ -97,7 +97,7 @@ func _process(delta: float) -> void:
 func _draw() -> void:
 	if _rec.is_empty():
 		return
-	var sz := size
+	var sz := get_viewport_rect().size   # parent is a CanvasLayer, so `size` stays (0,0); use the real viewport
 	var ox := _ox
 	var oy := _oy
 	# Reveal/letterbox: bars shrink in during intro, grow back during outro.

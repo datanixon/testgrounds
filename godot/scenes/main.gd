@@ -43,6 +43,19 @@ func _run_shot(target: String) -> void:
 		"mission2":
 			session.start_campaign(1)
 			_route()
+		"battle":
+			session.start_skirmish()
+			_route()
+			await get_tree().create_timer(0.3).timeout
+			_current.battle_scene.play({
+				"attacker": {"type_key": "cinderling", "name": "Cinderling", "element": "pyro", "sprite": "imp", "owner": 0, "attack": "melee", "is_master": false},
+				"defender": {"type_key": "galewisp", "name": "Galewisp", "element": "zephyr", "sprite": "wisp", "owner": 1, "attack": "spark", "is_master": false},
+				"attacker_pos": Vector2i(0, 0),
+				"atk_hp_before": 12, "atk_max_hp": 12, "def_hp_before": 10, "def_max_hp": 10,
+				"primary": {"dmg": 6, "absorbed": false, "killed": false},
+				"counter": {"happened": true, "dmg": 3, "absorbed": false, "killed": false},
+				"status": null, "terrain": "plain",
+			})
 		_:
 			pass   # title: capture the booted screen
 	await get_tree().create_timer(0.9).timeout
