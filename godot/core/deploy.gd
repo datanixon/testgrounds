@@ -39,3 +39,21 @@ static func ai_scale_mp(value: int) -> int:
 
 static func slots_for(scenario: Dictionary) -> int:
 	return int(scenario.get("deploy_slots", DEFAULT_SLOTS))
+
+# Place the chosen veterans on the board near the player master, record their
+# roster_ids on the state, and bump the AI master's MP by the scaled army value.
+static func commit(state, entries: Array) -> void:
+	var m0 = state.master_of(0)
+	for e in entries:
+		if m0 == null:
+			break
+		var slot = AI.find_summon_slot(state, m0)
+		if slot == null:
+			break   # board full near the master; place what fits
+		var u := unit_from_entry(e, state._new_id(), 0, slot.x, slot.y)
+		state.units.append(u)
+		state.deployed_roster_ids.append(int(e["roster_id"]))
+	var m1 = state.master_of(1)
+	if m1 != null:
+		var extra := ai_scale_mp(roster_value(entries))
+		m1["mp"] = clampi(m1["mp"] + extra, mini(4, m1["max_mp"]), m1["max_mp"])

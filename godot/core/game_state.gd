@@ -35,6 +35,7 @@ var is_ai: Array[bool] = [false, true]   # M9: per-player AI flag (replaces the 
 var campaign_index: int = -1             # M9: -1 skirmish; else CAMPAIGN index
 var match_difficulty: String = "normal"  # M9: difficulty in force THIS match (campaign sets its own w/o touching prefs)
 var stats: Dictionary = {"summoned": [0, 0], "lost": [0, 0], "battles": 0}  # M9: gameover summary
+var deployed_roster_ids: Array[int] = []   # roster_ids of veterans deployed this match (Phase 5.2); SAVED
 
 func _new_id() -> int:
 	var n := _next_id
@@ -220,6 +221,7 @@ static func new_skirmish(def: Dictionary, seed: int) -> GameState:
 	gs.stats = {"summoned": [0, 0], "lost": [0, 0], "battles": 0}
 	gs.objective = def.get("objective", {}).duplicate(true)
 	gs.objective_progress = {"start_turn": gs.turn}
+	gs.deployed_roster_ids = []
 	return gs
 
 ## new_campaign — like new_skirmish but for a CAMPAIGN scenario: generates the

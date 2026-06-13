@@ -103,6 +103,7 @@ func _initialize() -> void:
 	_test_roster_migrate()
 	_test_roster_roundtrip()
 	_test_deploy_helpers()
+	_test_deploy_commit()
 	print("\n== %d passed, %d failed ==" % [_passed, _failed])
 	quit(1 if _failed > 0 else 0)
 
@@ -2029,3 +2030,28 @@ func _test_deploy_helpers() -> void:
 	# slots_for: explicit vs default.
 	_eq(Deploy.slots_for({"deploy_slots": 5}), 5, "deploy: explicit slots")
 	_eq(Deploy.slots_for({}), 3, "deploy: default slots 3")
+
+func _test_deploy_commit() -> void:
+	var def: Dictionary = Campaign.CAMPAIGN[0]["map"]
+	var gs := GameState.new_skirmish(def, def["seed"])
+	var m1_mp0: int = gs.master_of(1)["mp"]
+	var m1_maxmp: int = gs.master_of(1)["max_mp"]
+	var n0: int = gs.units.size()
+	var entries := [
+		{"roster_id": 1, "type_key": "stoneward", "name": "Stoneward", "element": "terra", "sprite": "golem", "attack": "melee", "relic": "", "flying": false, "evolved": false, "level": 2, "xp": 0, "max_hp": 30, "power": 7, "def": 6, "move": 2, "range": 1},
+		{"roster_id": 2, "type_key": "tidekin", "name": "Tidekin", "element": "hydro", "sprite": "merfolk", "attack": "melee", "relic": "", "flying": false, "evolved": false, "level": 3, "xp": 0, "max_hp": 26, "power": 8, "def": 4, "move": 4, "range": 1},
+	]
+	Deploy.commit(gs, entries)
+	_eq(gs.units.size(), n0 + 2, "deploy commit: 2 veterans placed")
+	_eq(gs.deployed_roster_ids, [1, 2], "deploy commit: deployed ids recorded")
+	var found := 0
+	for u in gs.alive_units(0):
+		if int(u.get("roster_id", -1)) in [1, 2]:
+			found += 1
+			_eq(u["owner"], 0, "deploy commit: veteran owner 0")
+			_eq(u["hp"], u["max_hp"], "deploy commit: veteran at full hp")
+			_eq(u["acted"], false, "deploy commit: veteran ready turn 1")
+	_eq(found, 2, "deploy commit: both veterans alive on player 0")
+	_eq(gs.stats["summoned"][0], 0, "deploy commit: summoned stat NOT bumped")
+	# AI mp bumped by ai_scale_mp(roster_value): stoneward 8 + tidekin 7 = 15 -> 15/10 = 1.
+	_eq(gs.master_of(1)["mp"], clampi(m1_mp0 + 1, mini(4, m1_maxmp), m1_maxmp), "deploy commit: AI mp scaled +1")
