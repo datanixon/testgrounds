@@ -89,6 +89,7 @@ func _initialize() -> void:
 	_test_ai_fog()
 	_test_ai_fog_approach()
 	_test_objectives()
+	_test_objective_win()
 	_test_fog_settings()
 	print("\n== %d passed, %d failed ==" % [_passed, _failed])
 	quit(1 if _failed > 0 else 0)
@@ -1718,3 +1719,34 @@ func _test_objectives() -> void:
 	gl.turn = 4
 	_eq(Objectives.label(gl), "Survive: 3/8", "obj: survive label")
 	_eq(Objectives.label(_flat_state(3, 3)), "", "obj: no objective -> empty label")
+
+func _test_objective_win() -> void:
+	# An objective win sets winner=0 with both masters alive.
+	var gs := GameState.new_skirmish(Maps.MAPS[0], 42)
+	gs.objective = {"kind": "rout"}
+	gs.turn = 2   # enemy has no non-masters yet -> rout met (past the turn-1 guard)
+	gs.check_win_condition()
+	_eq(gs.winner, 0, "obj-win: rout sets winner 0")
+	# Archon-kill still takes precedence and still works with no objective.
+	var g2 := GameState.new_skirmish(Maps.MAPS[0], 42)
+	g2.master_of(1)["hp"] = 0
+	g2.check_win_condition()
+	_eq(g2.winner, 0, "obj-win: archon-kill still wins")
+	# protect-fail sets winner=1.
+	var g3 := GameState.new_skirmish(Maps.MAPS[0], 42)
+	var ally := g3.spawn_unit("cinderling", 0, 3, 3)
+	g3.objective = {"kind": "protect", "unit_id": ally["id"]}
+	g3.check_win_condition()
+	_eq(g3.winner, -1, "obj-win: protect alive -> no winner")
+	ally["hp"] = 0
+	g3.check_win_condition()
+	_eq(g3.winner, 1, "obj-win: protect dead -> player loses")
+	# new_skirmish copies the def objective + stamps start_turn.
+	var def := (Maps.MAPS[0] as Dictionary).duplicate(true)
+	def["objective"] = {"kind": "survive", "turns": 5}
+	var g4 := GameState.new_skirmish(def, 42)
+	_eq(g4.objective.get("kind"), "survive", "obj-win: new_skirmish copies objective")
+	_eq(int(g4.objective_progress.get("start_turn", -1)), 1, "obj-win: start_turn stamped")
+	# A def with no objective -> empty (skirmish stays archon-kill).
+	var g5 := GameState.new_skirmish(Maps.MAPS[0], 42)
+	_eq(g5.objective, {}, "obj-win: no def objective -> empty")

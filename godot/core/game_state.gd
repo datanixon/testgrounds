@@ -13,6 +13,7 @@ const Status = preload("res://core/status.gd")
 const AILib = preload("res://core/ai.gd")  # M9: new_campaign AI opener; ai.gd does NOT preload game_state.gd — no cycle
 const Relics = preload("res://data/relics.gd")
 const Vision = preload("res://core/vision.gd")
+const Objectives = preload("res://core/objectives.gd")
 
 var map: Dictionary = {}              # the generate() result: cols, rows, cells, castles, towers
 var units: Array[Dictionary] = []
@@ -97,6 +98,7 @@ func spawn_master(owner: int, q: int, r: int) -> Dictionary:
 	return u
 
 ## checkWinCondition — if a player's master is dead, the other player wins.
+## Also evaluates the active objective (if any) after the archon-kill check.
 func check_win_condition() -> void:
 	if winner != -1:
 		return   # already decided
@@ -104,6 +106,9 @@ func check_win_condition() -> void:
 		if master_of(owner) == null:
 			winner = 1 - owner
 			return
+	var ow := Objectives.evaluate(self)
+	if ow != -1:
+		winner = ow
 
 ## captureTower — flip a tower's ownership to the capturing unit's side.
 func capture_tower(unit: Dictionary, cell: Dictionary) -> void:
@@ -213,6 +218,8 @@ static func new_skirmish(def: Dictionary, seed: int) -> GameState:
 	gs.current_player = 0
 	gs.turn = 1
 	gs.stats = {"summoned": [0, 0], "lost": [0, 0], "battles": 0}
+	gs.objective = def.get("objective", {}).duplicate(true)
+	gs.objective_progress = {"start_turn": gs.turn}
 	return gs
 
 ## new_campaign — like new_skirmish but for a CAMPAIGN scenario: generates the
