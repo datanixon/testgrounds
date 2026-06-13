@@ -246,4 +246,19 @@ static func new_campaign(scenario: Dictionary, index: int) -> GameState:
 			if slot == null:
 				break
 			gs.spawn_unit(k, 1, slot.x, slot.y)
+	# Runtime-built objectives (override the map def's). seize_enemy_castle and
+	# protect_ally are mutually exclusive — one objective per mission; if both were
+	# set, protect would win below.
+	if scenario.get("seize_enemy_castle", false):
+		var c1: Vector2i = gs.map["castles"][1]
+		gs.objective = {"kind": "seize", "q": c1.x, "r": c1.y}
+	var ally_key: String = scenario.get("protect_ally", "")
+	if ally_key != "":
+		var m0 = gs.master_of(0)
+		if m0 != null:
+			var slot = AILib.find_summon_slot(gs, m0)
+			if slot != null:
+				var ally := gs.spawn_unit(ally_key, 0, slot.x, slot.y)
+				ally["acted"] = false
+				gs.objective = {"kind": "protect", "unit_id": ally["id"]}
 	return gs

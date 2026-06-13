@@ -107,6 +107,7 @@ func _initialize() -> void:
 	_test_deploy_save()
 	_test_deploy_reconcile_on_win()
 	_test_missions_5_8()
+	_test_missions_objectives()
 	print("\n== %d passed, %d failed ==" % [_passed, _failed])
 	quit(1 if _failed > 0 else 0)
 
@@ -2137,3 +2138,41 @@ func _test_missions_5_8() -> void:
 	_ok("pyre_colossus" in Campaign.CAMPAIGN[7]["ai_summons"] and "storm_tyrant" in Campaign.CAMPAIGN[7]["ai_summons"], "m8 summons both titans")
 	_eq(Campaign.CAMPAIGN[5].get("seize_enemy_castle", false), true, "m6: seize_enemy_castle flag")
 	_eq(Campaign.CAMPAIGN[6].get("protect_ally", ""), "runeward", "m7: protect_ally runeward")
+
+func _test_missions_objectives() -> void:
+	# m5: static rout objective survives into the state; boss pre-placed for AI.
+	var g5 := GameState.new_campaign(Campaign.CAMPAIGN[4], 4)
+	_eq(g5.objective.get("kind", ""), "rout", "m5 state: rout objective")
+	var has_boss := false
+	for u in g5.units:
+		if u["owner"] == 1 and u["type_key"] == "pyre_colossus":
+			has_boss = true
+	_eq(has_boss, true, "m5 state: pyre_colossus pre-placed for AI")
+	# m6: seize objective built from the enemy castle.
+	var g6 := GameState.new_campaign(Campaign.CAMPAIGN[5], 5)
+	_eq(g6.objective.get("kind", ""), "seize", "m6 state: seize objective")
+	var c1: Vector2i = g6.map["castles"][1]
+	_eq(g6.objective["q"], c1.x, "m6: seize q = enemy castle q")
+	_eq(g6.objective["r"], c1.y, "m6: seize r = enemy castle r")
+	var m1 = g6.master_of(1)
+	_eq(Vector2i(m1["q"], m1["r"]), c1, "m6: enemy master spawns on the seize hex")
+	# m7: protect ally spawned for player 0; objective points at it; evaluate alive vs dead.
+	var g7 := GameState.new_campaign(Campaign.CAMPAIGN[6], 6)
+	_eq(g7.objective.get("kind", ""), "protect", "m7 state: protect objective")
+	var pid: int = int(g7.objective["unit_id"])
+	var ally = g7.unit_by_id(pid)
+	_ok(ally != null, "m7: protect ally exists")
+	_eq(ally["owner"], 0, "m7: protect ally is player 0")
+	_eq(ally["type_key"], "runeward", "m7: protect ally is runeward")
+	_eq(ally["is_master"], false, "m7: protect ally not a master")
+	_eq(Objectives.evaluate(g7), -1, "m7: protect undecided while ally lives")
+	ally["hp"] = 0
+	_eq(Objectives.evaluate(g7), 1, "m7: player loses if ally dies")
+	# m8: no objective (archon-kill finale); both titans pre-placed for AI.
+	var g8 := GameState.new_campaign(Campaign.CAMPAIGN[7], 7)
+	_eq(g8.objective.is_empty(), true, "m8 state: no objective (archon-kill)")
+	var titans := 0
+	for u in g8.units:
+		if u["owner"] == 1 and (u["type_key"] == "pyre_colossus" or u["type_key"] == "storm_tyrant"):
+			titans += 1
+	_eq(titans, 2, "m8 state: both titans pre-placed for AI")
