@@ -2,7 +2,7 @@ class_name Relics
 extends RefCounted
 ## ROADMAP2 Phase 2 — relic table + pure stat helpers. Effects flow through the
 ## existing stat functions (compute_damage/effective_move/range/max_hp/regen), so
-## forecast + AI inherit them. 6 passive + 3 consumable. (Veilstone -> Phase 3.)
+## forecast + AI inherit them. 7 passive + 3 consumable. (Veilstone: +1 vision under fog.)
 
 const RELICS := {
 	"atk_charm":   {"name": "Atk Charm",     "kind": "passive",    "glyph": "A", "color": Color("#e0662e"), "atk": 2},
@@ -17,7 +17,7 @@ const RELICS := {
 	"veilstone":   {"name": "Veilstone",     "kind": "passive",    "glyph": "E", "color": Color("#8888cc"), "vision": 1},
 }
 
-## Ids eligible to spawn on the map (all 9; map-gen rolls from this).
+## Ids eligible to spawn on the map (all 10; map-gen rolls from this).
 const POOL := ["atk_charm", "vital", "swift", "farsight", "regenring", "thorncharm", "phoenix", "warhorn", "ley_crystal", "veilstone"]
 
 static func is_passive(id: String) -> bool:

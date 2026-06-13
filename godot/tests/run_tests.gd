@@ -83,6 +83,7 @@ func _initialize() -> void:
 	_test_relic_consumables()
 	_test_ai_relic_nudge()
 	_test_vision()
+	_test_veilstone()
 	print("\n== %d passed, %d failed ==" % [_passed, _failed])
 	quit(1 if _failed > 0 else 0)
 
@@ -1593,3 +1594,13 @@ func _test_vision() -> void:
 	_ok(not vt.has("8,5"), "vision: owned tower not radius 3")     # dist 3
 	gt.cell_at(8, 8)["owner"] = 1
 	_ok(not Vision.compute(gt, 0).has("8,8"), "vision: enemy tower grants no vision")
+
+func _test_veilstone() -> void:
+	_ok(Relics.RELICS.has("veilstone"), "veilstone: defined")
+	_eq(Relics.RELICS["veilstone"]["kind"], "passive", "veilstone: passive")
+	_eq(Relics.bonus("veilstone", "vision"), 1, "veilstone: +1 vision")
+	_ok("veilstone" in Relics.POOL, "veilstone: in spawn pool")
+	var u := Units.make_unit(1, "cinderling", 0, 0, 0)
+	_eq(Relics.unit_bonus(u, "vision"), 0, "veilstone: no relic -> 0 vision bonus")
+	u["relic"] = "veilstone"
+	_eq(Relics.unit_bonus(u, "vision"), 1, "veilstone: equipped -> +1")
