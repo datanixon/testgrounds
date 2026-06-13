@@ -114,7 +114,34 @@ signal exists yet — carry-forward). **REMAINING:** windowed AUDIBLE verificati
 integration behind the fixed `battle_sprites`/board-token signatures + team ring/frame + faction-ID
 method) — its own spec+plan when assets exist. After that, ROADMAP2 Phases 2–8 get post-parity specs.
 
->>> PICK UP HERE (M10 windowed audible check, then M10 ART — needs sprite assets first) <<<
+**UPDATE (2026-06-11): M10 ART COMPLETE — THE PORT IS DONE.** On branch `godot-m10-art`
+(off main). The 44 generated sprites (12 base + 8 evolved monsters × token+battle, faction-NEUTRAL
+element-colored, + 2 bespoke archons) were imported + committed (PNG + .import; root `.gitignore`
+has a blanket `*.png` so `godot/.gitignore` whitelists `!assets/sprites/*.png`). New
+`core/sprites.gd` (class Sprites): cached `token(id,owner)`/`battle(id,owner)` → Texture2D,
+resolving `res://assets/sprites/<stem>_<token|battle>.png`; archon stem splits azure/crimson by
+owner, monsters neutral; does NOT cache load-misses (asset-gated-safe). `unit_node._draw` keeps the
+team-colored base disc (faction ID) + HP bar + status pips, draws the token texture over it (removed
+the procedural element circle + master pip + dead ELEMENT_COLORS). `BattleSprites.draw_unit` (614→62
+lines): same signature, keeps bob/lunge + facing-mirror (via `draw_set_transform` scale.x=facing,
+reset to identity after — no transform leak into battle_scene's later HP-bar/popup/letterbox draws),
+draws `Sprites.battle` bottom-centered at the ground line with a team-colored backing glow ellipse +
+ground shadow (battle faction ID); all 22 procedural `_draw_<sprite>`/`_draw_archon`/`_draw_generic`/
+`_p` deleted, `Elements` preload dropped, `_pal`+`SCALE` kept. `_test_sprites` guards all 20 sprite
+ids + archon×owner load as Texture2D (807 green). Faction-ID method FINALIZED: engine ring (board) +
+frame/glow (battle); archons bespoke. **Both gates per task; whole-milestone opus review = end-to-end
+SOUND.** Accepted: single-pose portraits + bob/lunge motion; attack FX (battle_fx) stay procedural;
+PORTRAIT_H=320 fixed (fits title/gameover archons too); the idle bob is a near-static leftover from
+the procedural era (pre-existing, harmless). **REMAINING:** windowed VISUAL verification
+(`godot --path godot`) — headless can't render: board tokens (creature on team disc), battle portraits
+(attacker right / defender mirrored, team glow), bespoke archons, attack FX + HP bars intact.
+
+**THE GODOT PORT IS COMPLETE** — M1–M10 done: full JS-reference parity (combat/abilities/AI/weather/
+campaign/save/title/gameover) with real art + audio. Next = ROADMAP2 Phases 2–8 (relics, fog, content
+wave, persistent campaign, etc.) — each gets its OWN post-parity spec (brainstorm → plan → build),
+re-planned as Godot work (NOT built in the frozen JS reference).
+
+>>> PICK UP HERE: M10 windowed visual check (optional), then ROADMAP2 Phase 2 (needs its own spec) <<<
 Previous handoff (M9, historical):
 - **Tracker:** `ROADMAP_GODOT.md` — M1–M8 ✅; next `- [ ] M9 — ...`. M9 needs its own spec (brainstorming) + plan (writing-plans). M9 is the PARITY-completing milestone (after it the port matches the JS reference; ROADMAP2 Phases 2–8 then get their own specs).
 - **M9 scope (port the JS sec. 5/13/14 + save blob):** the `screen` router (title/play/battle/gameover — `GameState` is currently always in "play"); title screen (synthwave sun + perspective grid, "new game"/difficulty pick) + gameover screen (archon silhouette, victory); the **difficulty-select UI** + the **player/isAI table** (M6 hardcoded AI to player 1 — generalize here: `GameState.difficulty` already exists; add per-player isAI so `_on_end_turn` reads the table instead of `current_player == 1`); **save/load** to `user://wraithspire_save.json` (versioned blob: units incl. cd/status/level/xp/evolved, weather, board/seed, turn, players, captured towers — design spec "Save / load"; optionally serialize `map_def` to fix the JS resumed-campaign-weather gap); **campaign** (CAMPAIGN data already ported in `data/campaign.gd`; scenario list + progression). Also the **battle-scene on/off setting** (JS `STATE.settings.battleScene`) deferred from M8 — a settings toggle that skips the cutaway.
