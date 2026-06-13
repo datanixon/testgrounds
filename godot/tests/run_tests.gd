@@ -86,6 +86,7 @@ func _initialize() -> void:
 	_test_veilstone()
 	_test_fog_state()
 	_test_ai_fog()
+	_test_ai_fog_approach()
 	_test_fog_settings()
 	print("\n== %d passed, %d failed ==" % [_passed, _failed])
 	quit(1 if _failed > 0 else 0)
@@ -1645,6 +1646,23 @@ func _test_ai_fog() -> void:
 	gs.fog = false
 	var tn := AI.build_threat_map(gs, 0)
 	_ok(tn.get("0,1", 0) > 0, "ai fog off: all enemies threaten (baseline)")
+
+func _test_ai_fog_approach() -> void:
+	# Under fog, a non-master must not beeline to a hidden enemy master — it falls back to
+	# the enemy's always-visible home castle. With fog off (or master visible) it targets
+	# the master's live tile.
+	var gs := _flat_state(11, 11)
+	gs.map["castles"] = [Vector2i(0, 5), Vector2i(10, 5)]   # [owner0 castle, owner1 castle]
+	var ai_unit := gs.spawn_unit("cinderling", 1, 8, 8)     # AI (owner 1) grunt, sight 3
+	var enemy_master := gs.spawn_master(0, 1, 1)            # enemy master, far from (8,8)
+	gs.fog = false
+	_eq(AI.approach_target(gs, ai_unit, enemy_master), Vector2i(1, 1), "ai approach: fog off -> master tile")
+	gs.fog = true
+	_eq(AI.approach_target(gs, ai_unit, enemy_master), Vector2i(0, 5), "ai approach: hidden master -> enemy castle")
+	# Move the grunt adjacent to the master so it is visible again -> target the master.
+	ai_unit["q"] = 2
+	ai_unit["r"] = 1
+	_eq(AI.approach_target(gs, ai_unit, enemy_master), Vector2i(1, 1), "ai approach: visible master -> master tile")
 
 func _test_fog_settings() -> void:
 	_eq(SettingsStore.defaults()["fog"], false, "settings: fog defaults off")

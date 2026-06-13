@@ -186,6 +186,19 @@ static func _unit_at_key(state, key: String):
 			return u
 	return null
 
+## approach_target — the tile a non-master advances toward in the move-only branch.
+## Normally the enemy master's live position; but under fog, if the AI cannot SEE the
+## enemy master, it must not beeline to a hidden unit — it falls back to the enemy's
+## (always-visible) home castle. Keeps the AI fair without making it passive.
+static func approach_target(state, unit: Dictionary, enemy_master: Dictionary) -> Vector2i:
+	var t := Vector2i(enemy_master["q"], enemy_master["r"])
+	if state.fog and not Vision.compute(state, unit["owner"]).has(Hex.key(t)):
+		var castles: Array = state.map.get("castles", [])
+		var ei: int = 1 - int(unit["owner"])
+		if ei >= 0 and ei < castles.size():
+			return castles[ei]
+	return t
+
 ## decide_unit_action — the scored decision tree for one unit. Returns an action dict
 ## (see the plan header for shapes). Pure: reads state + helpers, mutates nothing.
 ## Order: confirmed kill -> wounded retreat -> instant ability -> capture -> plain
@@ -245,6 +258,7 @@ static func decide_unit_action(state, unit: Dictionary, threat: Dictionary, enem
 		var c: Variant = state.cell_at(t.x, t.y)
 		if c == null or c.get("owner", -1) != unit["owner"]:
 			unowned.append(t)
+	var approach := approach_target(state, unit, enemy_master)
 	for k in reach:
 		var node: Dictionary = reach[k]
 		var np := Vector2i(node["q"], node["r"])
@@ -257,7 +271,7 @@ static func decide_unit_action(state, unit: Dictionary, threat: Dictionary, enem
 					d_tower = mini(d_tower, Hex.distance(np, t))
 				s -= d_tower * 0.8
 		else:
-			s -= Hex.distance(np, Vector2i(enemy_master["q"], enemy_master["r"])) * W["approach"]
+			s -= Hex.distance(np, approach) * W["approach"]
 		s += relic_tile_bonus(state, np.x, np.y)
 		if s > best_score:
 			best_score = s
