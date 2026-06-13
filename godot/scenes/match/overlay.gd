@@ -14,6 +14,7 @@ const BoardLib = preload("res://scenes/board/board.gd")
 var reachable: Dictionary = {}
 var armed: Dictionary = {}
 var selected: Variant = null
+var fogged: Dictionary = {}
 
 func set_highlights(reach: Dictionary, sel) -> void:
 	reachable = reach
@@ -22,6 +23,10 @@ func set_highlights(reach: Dictionary, sel) -> void:
 
 func set_armed(tiles: Dictionary) -> void:
 	armed = tiles
+	queue_redraw()
+
+func set_fog(tiles: Dictionary) -> void:
+	fogged = tiles
 	queue_redraw()
 
 func clear_all() -> void:
@@ -37,6 +42,7 @@ func _fill(tiles: Dictionary, col: Color) -> void:
 		draw_colored_polygon(BoardLib.hex_corners(Hex.axial_to_pixel(p)), col)
 
 func _draw() -> void:
+	_fill(fogged, Color(0.02, 0.02, 0.06, 0.55))
 	_fill(reachable, Color(0.4, 0.7, 1.0, 0.28))
 	_fill(armed, Color(1.0, 0.82, 0.30, 0.42))
 	if selected != null:
