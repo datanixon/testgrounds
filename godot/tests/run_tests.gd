@@ -99,6 +99,7 @@ func _initialize() -> void:
 	_test_fog_settings()
 	_test_roster_basic()
 	_test_roster_reconcile()
+	_test_roster_migrate()
 	print("\n== %d passed, %d failed ==" % [_passed, _failed])
 	quit(1 if _failed > 0 else 0)
 
@@ -1876,6 +1877,7 @@ func _test_roster_basic() -> void:
 	_eq(e["power"], 6, "entry: grown power kept")
 	_eq(e["relic"], "vital", "entry: relic kept")
 	_eq(e["flying"], false, "entry: flying kept")
+	_eq(e["evolved"], false, "entry: evolved defaults false")
 	_eq(e.has("q"), false, "entry: q stripped")
 	_eq(e.has("hp"), false, "entry: hp stripped")
 	_eq(e.has("id"), false, "entry: id stripped")
@@ -1937,3 +1939,32 @@ func _test_roster_reconcile() -> void:
 	_eq(has_b, false, "reconcile: dead vet B culled (permadeath)")
 	_eq(fresh_entry.is_empty(), false, "reconcile: fresh survivor added")
 	_ok(int(fresh_entry.get("roster_id", -1)) >= 3, "reconcile: fresh survivor got a new id")
+
+func _test_roster_migrate() -> void:
+	_eq((RosterStore.migrate(0)["roster"] as Array).size(), 0, "migrate(0): empty roster")
+	var m1: Array = RosterStore.migrate(1)["roster"]
+	_eq(m1.size(), 1, "migrate(1): one veteran")
+	_eq(m1[0]["type_key"], "stoneward", "migrate(1): stoneward")
+	_eq(m1[0]["level"], 2, "migrate(1): level 2")
+	_eq(m1[0]["relic"], "", "migrate: no relic granted")
+	_eq(m1[0]["evolved"], false, "migrate(1): stoneward not evolved")
+	var m2: Array = RosterStore.migrate(2)["roster"]
+	_eq(m2.size(), 2, "migrate(2): two veterans")
+	_eq(m2[1]["type_key"], "tidekin", "migrate(2): second is tidekin")
+	_eq(m2[1]["level"], 3, "migrate(2): tidekin level 3")
+	var m3: Array = RosterStore.migrate(3)["roster"]
+	_eq(m3.size(), 3, "migrate(3): three veterans")
+	_eq(m3[2]["type_key"], "earthbreaker", "migrate(3): geomaul migrated as earthbreaker")
+	_eq(m3[2]["level"], 4, "migrate(3): level 4")
+	_eq(m3[2]["evolved"], true, "migrate(3): earthbreaker evolved flag carried")
+	var m4: Array = RosterStore.migrate(4)["roster"]
+	_eq(m4.size(), 4, "migrate(4): four veterans")
+	_eq(m4[3]["type_key"], "hexlord", "migrate(4): hexwisp migrated as hexlord")
+	_eq(m4[3]["level"], 5, "migrate(4): level 5")
+	_eq(m4[3]["flying"], true, "migrate(4): hexlord flies")
+	_eq(m4[3]["evolved"], true, "migrate(4): hexlord evolved flag carried")
+	# Roster ids are sequential starting at 1.
+	_eq(m4[0]["roster_id"], 1, "migrate: first id 1")
+	_eq(m4[3]["roster_id"], 4, "migrate: fourth id 4")
+	# Over-progress is clamped to the grant table size.
+	_eq((RosterStore.migrate(9)["roster"] as Array).size(), 4, "migrate(9): clamped to 4")

@@ -13,6 +13,7 @@ const SLOT_PATH := "user://wraithspire_campaign.json"
 # Non-transient unit fields stored verbatim in a roster entry (full snapshot).
 const _CARRY_STR := ["type_key", "name", "element", "sprite", "attack", "relic"]
 const _CARRY_INT := ["level", "xp", "max_hp", "power", "def", "move", "range"]
+const _CARRY_BOOL := ["flying", "evolved"]
 
 # ---- pure roster editors ----
 # `roster_id` is a permanent monotonic UID assigned from `next_roster_id`; it is
@@ -28,7 +29,8 @@ static func entry_from_unit(unit: Dictionary, roster_id: int) -> Dictionary:
 		e[k] = String(unit.get(k, ""))
 	for k in _CARRY_INT:
 		e[k] = int(unit.get(k, 0))
-	e["flying"] = bool(unit.get("flying", false))
+	for k in _CARRY_BOOL:
+		e[k] = bool(unit.get(k, false))
 	return e
 
 static func add_entry(blob: Dictionary, unit: Dictionary) -> int:
@@ -76,3 +78,37 @@ static func _update_entry(blob: Dictionary, roster_id: int, unit: Dictionary) ->
 		if int(arr[i]["roster_id"]) == roster_id:
 			arr[i] = entry_from_unit(unit, roster_id)
 			return
+
+# ---- migration: v1 campaign_progress -> starter roster ----
+
+# One veteran per cleared act: [type_key, level]. Acts 1..4 (index 0..3).
+# geomaul@4 and hexwisp@5 cross EVOLVE_LEVEL, so they migrate as their evolved
+# forms (earthbreaker / hexlord) via Units.evolve_unit.
+const GRANT := [
+	["stoneward", 2],
+	["tidekin", 3],
+	["geomaul", 4],
+	["hexwisp", 5],
+]
+
+static func migrate(progress: int) -> Dictionary:
+	var blob := new_roster()
+	var n := clampi(progress, 0, GRANT.size())
+	for i in n:
+		add_entry(blob, _build_veteran(GRANT[i][0], GRANT[i][1]))
+	return blob
+
+# Build a veteran through the game's own progression path so it is rule-
+# consistent with a naturally leveled unit. apply_level_growth bumps stats but
+# not level; evolve_unit reads unit["level"] and recomputes stats from the
+# evolved base + (level-1) growth. The two paths are mutually exclusive.
+static func _build_veteran(type_key: String, level: int) -> Dictionary:
+	var u := Units.make_unit(0, type_key, 0, 0, 0)
+	u["level"] = level
+	u["xp"] = 0
+	if level >= Units.EVOLVE_LEVEL and UnitTypes.UNIT_TYPES[type_key].has("evolves_to"):
+		Units.evolve_unit(u)
+	else:
+		for _i in range(level - 1):
+			Units.apply_level_growth(u)
+	return u
