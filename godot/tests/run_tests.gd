@@ -105,6 +105,7 @@ func _initialize() -> void:
 	_test_deploy_helpers()
 	_test_deploy_commit()
 	_test_deploy_save()
+	_test_deploy_reconcile_on_win()
 	print("\n== %d passed, %d failed ==" % [_passed, _failed])
 	quit(1 if _failed > 0 else 0)
 
@@ -2071,3 +2072,42 @@ func _test_deploy_save() -> void:
 			vet = u
 	_ok(vet != null, "deploy save: deployed unit kept its roster_id")
 	_eq(typeof(vet["roster_id"]), TYPE_INT, "deploy save: roster_id re-coerced to int")
+
+func _test_deploy_reconcile_on_win() -> void:
+	RosterStore.reset()   # start from a clean campaign.v2 slot
+	# Seed a roster with two deployed veterans (ids assigned 1, 2).
+	var seed_blob := RosterStore.new_roster()
+	var vet := {"type_key": "stoneward", "name": "Stoneward", "element": "terra", "sprite": "golem", "attack": "melee", "relic": "", "flying": false, "evolved": false, "max_hp": 30, "power": 7, "def": 6, "move": 2, "range": 1, "level": 2, "xp": 0}
+	var rid1 := RosterStore.add_entry(seed_blob, vet)   # 1
+	var rid2 := RosterStore.add_entry(seed_blob, vet)   # 2
+	RosterStore.save(seed_blob)
+	# A finished campaign match: vet 1 survived (leveled to 3 + grabbed a relic), vet 2 died.
+	var s := Session.new()
+	s.campaign_progress = 0
+	s.state = GameState.new_campaign(Campaign.CAMPAIGN[0], 0)
+	s.state.deployed_roster_ids.append(rid1)
+	s.state.deployed_roster_ids.append(rid2)
+	var alive_vet := Deploy.unit_from_entry({"roster_id": rid1, "type_key": "stoneward", "name": "Stoneward", "element": "terra", "sprite": "golem", "attack": "melee", "relic": "vital", "flying": false, "evolved": false, "max_hp": 34, "power": 8, "def": 7, "move": 2, "range": 1, "level": 3, "xp": 1}, s.state._new_id(), 0, 0, 0)
+	s.state.units.append(alive_vet)
+	s.state.winner = 0
+	s.on_match_won(0)
+	var arr: Array = RosterStore.load_or_init(0)["roster"]
+	var e1 := {}
+	var has2 := false
+	var master_in_roster := false
+	for e in arr:
+		if int(e["roster_id"]) == rid1:
+			e1 = e
+		elif int(e["roster_id"]) == rid2:
+			has2 = true
+		if e.get("type_key") == "master":
+			master_in_roster = true
+	_eq(e1.is_empty(), false, "reconcile-win: surviving vet retained")
+	_eq(e1.get("level"), 3, "reconcile-win: surviving vet leveled to 3")
+	_eq(e1.get("relic"), "vital", "reconcile-win: surviving vet relic carried")
+	_eq(has2, false, "reconcile-win: dead vet culled (permadeath)")
+	_eq(master_in_roster, false, "reconcile-win: master never joins the roster")
+	# Slot caps come from the scenario defs.
+	_eq(Deploy.slots_for(Campaign.CAMPAIGN[0]), 3, "deploy: mission 1 cap 3")
+	_eq(Deploy.slots_for(Campaign.CAMPAIGN[2]), 4, "deploy: mission 3 cap 4")
+	RosterStore.reset()   # cleanup the slot file

@@ -10,6 +10,7 @@ const Maps = preload("res://data/maps.gd")
 const Campaign = preload("res://data/campaign.gd")
 const SettingsStore = preload("res://core/settings_store.gd")
 const SaveGame = preload("res://core/save_game.gd")
+const RosterStore = preload("res://core/roster_store.gd")
 
 var screen: String = "title"          # title | campaign | story | play | gameover
 var settings: Dictionary = SettingsStore.defaults()
@@ -54,6 +55,14 @@ func start_campaign(index: int) -> void:
 ## progress on a player-0 mission win (capped, never regressing) and persists it.
 func on_match_won(winner: int) -> void:
 	if state != null and state.campaign_index >= 0 and winner == 0:
+		# survivors carry into the roster; deployed veterans that died are gone (permadeath)
+		var survivors: Array = []
+		for u in state.alive_units(0):
+			if not u.get("is_master", false):
+				survivors.append(u)
+		var blob := RosterStore.load_or_init(campaign_progress)
+		blob = RosterStore.reconcile(blob, survivors, state.deployed_roster_ids)
+		RosterStore.save(blob)
 		campaign_progress = mini(Campaign.CAMPAIGN.size() - 1, maxi(campaign_progress, state.campaign_index + 1))
 		persist_prefs()
 	SaveGame.delete()
