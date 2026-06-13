@@ -16,6 +16,7 @@ const Status = preload("res://core/status.gd")
 const Combat = preload("res://core/combat.gd")
 const Elements = preload("res://data/elements.gd")
 const UnitTypes = preload("res://data/unit_types.gd")
+const Vision = preload("res://core/vision.gd")
 
 ## weights — the active difficulty's weight profile (defaults to normal).
 static func weights(state) -> Dictionary:
@@ -26,7 +27,10 @@ static func weights(state) -> Dictionary:
 ## its power at most once per tile, separate enemies stack. Returns { "q,r": int }.
 static func build_threat_map(state, owner: int) -> Dictionary:
 	var threat := {}
+	var vis: Dictionary = Vision.compute(state, owner) if state.fog else {}
 	for e in state.alive_units(1 - owner):
+		if state.fog and not vis.has(Hex.key(Vector2i(e["q"], e["r"]))):
+			continue
 		var seen := {}
 		var reach := Pathfinding.compute_reachable(state, e)
 		for k in reach:
@@ -269,7 +273,12 @@ static func decide_unit_action(state, unit: Dictionary, threat: Dictionary, enem
 static func run_summons(state, master: Dictionary) -> void:
 	var owner: int = master["owner"]
 	var W := weights(state)
-	var enemies: Array = state.alive_units(1 - owner)
+	var enemies: Array = []
+	var vis_s: Dictionary = Vision.compute(state, owner) if state.fog else {}
+	for e in state.alive_units(1 - owner):
+		if state.fog and not vis_s.has(Hex.key(Vector2i(e["q"], e["r"]))):
+			continue
+		enemies.append(e)
 	var my_army: Array[Dictionary] = []
 	for u in state.alive_units(owner):
 		if not u["is_master"]:

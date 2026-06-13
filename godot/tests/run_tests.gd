@@ -85,6 +85,7 @@ func _initialize() -> void:
 	_test_vision()
 	_test_veilstone()
 	_test_fog_state()
+	_test_ai_fog()
 	print("\n== %d passed, %d failed ==" % [_passed, _failed])
 	quit(1 if _failed > 0 else 0)
 
@@ -1627,3 +1628,18 @@ func _test_fog_state() -> void:
 	# old blob without fog defaults to false.
 	blob.erase("fog")
 	_eq(SaveGame.from_dict(blob).fog, false, "fog state: missing fog defaults false")
+
+func _test_ai_fog() -> void:
+	# With fog on, build_threat_map ignores enemies the owner cannot see.
+	var gs := _flat_state(9, 9)
+	gs.spawn_unit("cinderling", 0, 4, 4)        # owner-0 vision source (sight 3)
+	gs.spawn_unit("cinderling", 1, 6, 4)        # visible enemy (dist 2 from the source)
+	gs.spawn_unit("cinderling", 1, 0, 0)        # hidden enemy (dist 8 — out of vision)
+	gs.fog = true
+	var tf := AI.build_threat_map(gs, 0)
+	_ok(tf.get("6,5", 0) > 0, "ai fog: visible enemy still threatens")
+	_eq(tf.get("0,1", 0), 0, "ai fog: hidden enemy contributes no threat")
+	# With fog off, the same hidden enemy IS counted (regression / determinism).
+	gs.fog = false
+	var tn := AI.build_threat_map(gs, 0)
+	_ok(tn.get("0,1", 0) > 0, "ai fog off: all enemies threaten (baseline)")
