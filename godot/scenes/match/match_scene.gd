@@ -46,6 +46,7 @@ var selected = null
 var armed = null   # {ab: Dictionary, kind: String, targets: Dictionary} when an enemy/tile ability is armed
 var undo_snapshot = null   # {unit, q, r} — the pre-move position, live until the action commits
 var _match_over := false   # one-shot guard so _end_match is idempotent
+var _viewer := 0   # the human side (non-AI); the board renders from its vision under fog
 
 const ZOOM_MIN := 0.5
 const ZOOM_MAX := 2.5
@@ -65,6 +66,10 @@ func _ready() -> void:
 	overlay = OverlayScript.new()
 	add_child(overlay)
 	units_layer = UnitsLayerScript.new()
+	_viewer = state.is_ai.find(false)
+	if _viewer < 0:
+		_viewer = 0
+	units_layer.viewer = _viewer
 	units_layer.set_state(state)
 	add_child(units_layer)
 	cam = Camera2D.new()
@@ -92,6 +97,7 @@ func _ready() -> void:
 	settings_panel = SettingsPanelScript.new()
 	hud.add_child(settings_panel)
 	top_bar.settings_pressed.connect(func(): settings_panel.open(session))
+	_refresh_fog()
 
 func _unhandled_input(event: InputEvent) -> void:
 	if _busy:
@@ -120,6 +126,7 @@ func _on_end_turn() -> void:
 		return
 	if state.winner != -1:
 		return
+	state.revealed.clear()
 	state.end_turn()
 	# Run the AI's whole turn synchronously if it's an AI player, replay its battles, then hand back.
 	if state.winner == -1 and state.is_ai[state.current_player]:
@@ -176,7 +183,7 @@ func _on_click(a: Vector2i) -> void:
 			var got := state.pick_up_relic(selected)
 			if got != "":
 				Audio.beep(720.0, 0.08, "triangle", 0.2)
-				units_layer.set_state(state)
+				_refresh_fog()
 				board.queue_redraw()
 				info_card.show_unit(selected)
 			_open_menu_for(selected)
@@ -222,7 +229,7 @@ func _on_action_chosen(kind: String) -> void:
 				unit["q"] = undo_snapshot["q"]
 				unit["r"] = undo_snapshot["r"]
 				undo_snapshot = null
-				units_layer.set_state(state)
+				_refresh_fog()
 				selected = unit
 				overlay.set_highlights(Pathfinding.compute_reachable(state, unit), unit)
 				info_card.show_unit(unit)
@@ -245,7 +252,7 @@ func _arm_ability(unit) -> void:
 			# instants (heal/quake/bulwark/ward) commit immediately.
 			if unit.get("second_move", false):
 				undo_snapshot = null
-				units_layer.set_state(state)
+				_refresh_fog()
 				selected = unit
 				overlay.set_highlights(Pathfinding.compute_reachable(state, unit), unit)
 				info_card.show_unit(unit)
@@ -295,8 +302,11 @@ func _play_battles() -> void:
 		return
 	var show: bool = session == null or session.settings.get("battle_scene", true)
 	if not show:
+		for rec in state.battle_log:
+			if state.fog and rec.has("attacker_pos"):
+				state.revealed[Hex.key(rec["attacker_pos"])] = true
 		state.battle_log.clear()   # combat already resolved; skip the animation
-		units_layer.set_state(state)
+		_refresh_fog()
 		if top_bar != null:
 			top_bar.refresh(state)
 		if state.winner != -1:
@@ -307,8 +317,10 @@ func _play_battles() -> void:
 		var rec: Dictionary = state.battle_log.pop_front()
 		battle_scene.play(rec)
 		await battle_scene.finished
+		if state.fog and rec.has("attacker_pos"):
+			state.revealed[Hex.key(rec["attacker_pos"])] = true
+		_refresh_fog()
 	_busy = false
-	units_layer.set_state(state)
 	if top_bar != null:
 		top_bar.refresh(state)
 	if state.winner != -1:
@@ -326,7 +338,7 @@ func _slide_unit(unit, from_px: Vector2, to_px: Vector2) -> void:
 		tw.tween_property(node, "position", to_px, 0.18)
 		await tw.finished
 	_busy = false
-	units_layer.set_state(state)
+	_refresh_fog()
 
 ## _unit_node_for — find the UnitNode bound to `unit` in the units layer (or null).
 func _unit_node_for(unit):
@@ -391,9 +403,25 @@ func _clear_selection() -> void:
 
 func _finish_action() -> void:
 	_clear_selection()
-	units_layer.set_state(state)
+	_refresh_fog()
 	if top_bar != null:
 		top_bar.refresh(state)
+
+## _refresh_fog — recompute the viewer's vision (when fog is on), push the dim overlay, and
+## rebuild the unit nodes (hiding enemies outside vision). Called on match start and after
+## every move/summon/death/turn. A no-op overlay when fog is off.
+func _refresh_fog() -> void:
+	units_layer.viewer = _viewer
+	if state.fog:
+		state.recompute_visibility(_viewer)
+		var fogged := {}
+		for k in state.map.get("cells", {}):
+			if not state.visibility.has(k):
+				fogged[k] = true
+		overlay.set_fog(fogged)
+	else:
+		overlay.set_fog({})
+	units_layer.set_state(state)
 
 ## _end_match — a winner was decided. Advance campaign progress + clear the
 ## autosave (via Session), then tell the router to show the gameover screen.
