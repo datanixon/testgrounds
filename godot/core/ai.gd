@@ -473,6 +473,7 @@ static func _apply_action(state, unit: Dictionary, action: Dictionary) -> void:
 			state.pick_up_relic(unit)
 		"wait":
 			pass
+	state.check_win_condition()
 
 static func _unit_by_id(state, id: int):
 	for u in state.units:

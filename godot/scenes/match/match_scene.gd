@@ -186,6 +186,11 @@ func _on_click(a: Vector2i) -> void:
 				_refresh_fog()
 				board.queue_redraw()
 				info_card.show_unit(selected)
+			state.check_win_condition()
+			if state.winner != -1:
+				_finish_action()
+				_end_match()
+				return
 			_open_menu_for(selected)
 			return
 		if is_own_tile:
