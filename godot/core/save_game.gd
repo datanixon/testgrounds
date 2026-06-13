@@ -40,6 +40,7 @@ static func to_dict(state) -> Dictionary:
 		"weather": state.weather.duplicate(true),
 		"map_def": state.map_def.duplicate(true),
 		"relics": (state.map.get("relics", []) as Array).duplicate(true),
+		"deployed_roster_ids": state.deployed_roster_ids.duplicate(),
 	}
 
 ## from_dict — rebuild a GameState from a blob, or null if invalid. Rebuilds the
@@ -79,7 +80,7 @@ static func from_dict(blob) -> GameState:
 		units.append(ud)
 	# JSON round-trip turns ints into floats in GDScript 4; re-coerce all numeric unit fields.
 	for ud in units:
-		for k in ["id", "owner", "q", "r", "hp", "max_hp", "move", "range", "power", "def", "level", "xp", "cd", "mp", "max_mp", "mp_regen"]:
+		for k in ["id", "owner", "q", "r", "hp", "max_hp", "move", "range", "power", "def", "level", "xp", "cd", "mp", "max_mp", "mp_regen", "roster_id"]:
 			if ud.has(k):
 				ud[k] = int(ud[k])
 	gs.units = units
@@ -110,6 +111,10 @@ static func from_dict(blob) -> GameState:
 	gs.fog = bool(blob.get("fog", false))
 	gs.objective = blob.get("objective", {})
 	gs.objective_progress = blob.get("objective_progress", {})
+	var dids: Array[int] = []
+	for x in blob.get("deployed_roster_ids", []):
+		dids.append(int(x))
+	gs.deployed_roster_ids = dids
 	return gs
 
 # ---- file I/O (thin; not unit-tested — the pure round-trip above is) ----

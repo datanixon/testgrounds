@@ -104,6 +104,7 @@ func _initialize() -> void:
 	_test_roster_roundtrip()
 	_test_deploy_helpers()
 	_test_deploy_commit()
+	_test_deploy_save()
 	print("\n== %d passed, %d failed ==" % [_passed, _failed])
 	quit(1 if _failed > 0 else 0)
 
@@ -2055,3 +2056,18 @@ func _test_deploy_commit() -> void:
 	_eq(gs.stats["summoned"][0], 0, "deploy commit: summoned stat NOT bumped")
 	# AI mp bumped by ai_scale_mp(roster_value): stoneward 8 + tidekin 7 = 15 -> 15/10 = 1.
 	_eq(gs.master_of(1)["mp"], clampi(m1_mp0 + 1, mini(4, m1_maxmp), m1_maxmp), "deploy commit: AI mp scaled +1")
+
+func _test_deploy_save() -> void:
+	var def: Dictionary = Campaign.CAMPAIGN[0]["map"]
+	var gs := GameState.new_skirmish(def, def["seed"])
+	Deploy.commit(gs, [{"roster_id": 7, "type_key": "stoneward", "name": "Stoneward", "element": "terra", "sprite": "golem", "attack": "melee", "relic": "", "flying": false, "evolved": false, "level": 2, "xp": 0, "max_hp": 30, "power": 7, "def": 6, "move": 2, "range": 1}])
+	var parsed = JSON.parse_string(JSON.stringify(SaveGame.to_dict(gs)))
+	var gs2 := SaveGame.from_dict(parsed)
+	_ok(gs2 != null, "deploy save: round-trips")
+	_eq(gs2.deployed_roster_ids, [7], "deploy save: deployed_roster_ids preserved")
+	var vet = null
+	for u in gs2.units:
+		if int(u.get("roster_id", -1)) == 7:
+			vet = u
+	_ok(vet != null, "deploy save: deployed unit kept its roster_id")
+	_eq(typeof(vet["roster_id"]), TYPE_INT, "deploy save: roster_id re-coerced to int")
