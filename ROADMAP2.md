@@ -113,8 +113,13 @@ Tag legend: `[model | effort]` routing hints, same rubric as v1.
   seize evaluated on move (human + AI); topbar objective line; save round-trip; demo
   survive objective on campaign mission 2. 950 tests; opus whole-milestone review =
   merge-ready. [claude-fable-5 | high]
-- [ ] 4.3 Bosses + maps: 2 boss monsters (unique sprites/abilities, not
-  summonable) + 2 new skirmish maps (one fog-default).
+- [~] 4.3 Bosses + maps — **DATA DONE** (Godot, branch `godot-p4-3-bosses-maps`):
+  2 new skirmish maps (Mistveil Hollow `fog:true` — first fog-default skirmish map +
+  Ashfall Basin heat-weather; MAPS 4→6, title selector auto-lists them); 2 bosses
+  (Pyre Colossus pyro/quake 52/16/6, Storm Tyrant zephyr-fly/diveMark 40/14/4) —
+  non-summonable, `boss:true`, reuse existing abilities (no new combat code); Pyre
+  Colossus demo'd in mission 4 `ai_summons`. 998 tests; `_test_sprites` pending_art skip.
+  **BOSS ART PENDING** — 4 sprite PNGs not generated (prompt in spec appendix).
   [claude-sonnet-4-6 | medium]
 
 ## Phase 5 — Persistent war campaign

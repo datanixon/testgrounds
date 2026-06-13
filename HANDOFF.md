@@ -11,9 +11,13 @@ with "stop caveman" / "normal mode").
   a family of screenshot-found visual fixes (display/stretch; procedural-screen + top_bar +
   settings + battle-cutaway size-0 Control bugs; camera board-bounds clamping) — all merged.
   978 tests green.
-- **Phase 4.1 ART still PENDING** — 8 sprite PNGs (token+battle ×4 for Hexlord/Sigilwarden/
-  Glaciamaw/Dunestalker). Generation prompt in
-  `docs/superpowers/specs/2026-06-13-wraithspire-evolutions-design.md` (appendix). Loader
+- **In flight:** **Phase 4.3 (Bosses + maps) — DATA DONE on branch `godot-p4-3-bosses-maps`**
+  (off main, NOT merged): 2 new skirmish maps (Mistveil Hollow fog-default + Ashfall Basin),
+  2 bosses (Pyre Colossus, Storm Tyrant — non-summonable, reuse abilities), Pyre Colossus
+  demo'd in mission 4. 998 tests. **Boss art (4 PNGs) PENDING.**
+- **ART PENDING** — Phase 4.1: 8 PNGs (Hexlord/Sigilwarden/Glaciamaw/Dunestalker); Phase 4.3:
+  4 PNGs (Pyre Colossus/Storm Tyrant). Generation prompts in the respective spec appendices
+  (`docs/superpowers/specs/2026-06-13-wraithspire-{evolutions,bosses-maps}-design.md`). Loader
   degrades gracefully (engine disc) until they land. Drop-in steps in `docs/PROGRESS.md`.
 - **Visual validation tool:** `--shot <target>` hook in `scenes/main.gd` captures a screen
   to `godot/tools/shots/<target>.png` (windowed). Targets: title/skirmish/fog/mission2/

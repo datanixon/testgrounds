@@ -242,9 +242,21 @@ x=0), settings dim backdrop covered nothing. ALL fixed by sizing to the viewport
 corner) → added board-bounds clamping (`_compute_cam_bounds`/`_clamp_cam`). None were harness-visible.
 978 tests; all verified by re-captured screenshots. `docs/PROGRESS.md` = single-glance status board.
 
->>> PICK UP HERE: Phase 4.1 ART follow-up (user generates 8 PNGs per the evolutions-spec appendix →
-import + remove `pending_art` in _test_sprites) + Phase 4.3 bosses+maps (needs boss sprites; pairs with
-4.2 objectives). Each its own spec/plan. Use the `--shot` hook to visually validate. <<<
+**UPDATE (2026-06-13): PHASE 4.3 (BOSSES+MAPS) DATA DONE** on branch `godot-p4-3-bosses-maps`
+(off main, NOT merged). Spec/plan: `docs/superpowers/{specs,plans}/2026-06-13-wraithspire-bosses-maps*`.
+2 new skirmish maps in data/maps.gd (MAPS 4→6): `mistveil` (Mistveil Hollow, `fog:true` — first
+fog-default skirmish map, forests-heavy) + `ashfall` (Ashfall Basin, heat weather_table). Title selector
+auto-lists them (reads MAPS.size()). 2 bosses in data/unit_types.gd (UNIT_TYPES 24→26): `pyre_colossus`
+(pyro/quake, 52/16/6) + `storm_tyrant` (zephyr/fly/diveMark, 40/14/4) — NON-summonable (absent from
+SUMMON_LIST, still 12), `boss:true` data marker, REUSE existing abilities (no new combat code). Pyre
+Colossus added to mission 4 `ai_summons` (demo; new_campaign pre-places it). `_test_sprites` pending_art
+now has 6 stems (4 evo + 2 boss). 998 tests; both gates; title `--shot` confirms 6 maps. **BOSS ART
+PENDING** — 4 PNGs (pyre_colossus/storm_tyrant token+battle), prompt in spec appendix; same import +
+remove-pending_art follow-up as 4.1.
+
+>>> PICK UP HERE: merge `godot-p4-3-bosses-maps` on user OK; then Phase 4.1+4.3 ART follow-ups (user
+generates the 8+4 PNGs → import + remove pending_art) and/or Phase 5 (persistent campaign) / Phase 6
+(unlocks+records, fully art-free). Use the `--shot` hook to validate. <<<
 Previous handoff (M9, historical):
 - **Tracker:** `ROADMAP_GODOT.md` — M1–M8 ✅; next `- [ ] M9 — ...`. M9 needs its own spec (brainstorming) + plan (writing-plans). M9 is the PARITY-completing milestone (after it the port matches the JS reference; ROADMAP2 Phases 2–8 then get their own specs).
 - **M9 scope (port the JS sec. 5/13/14 + save blob):** the `screen` router (title/play/battle/gameover — `GameState` is currently always in "play"); title screen (synthwave sun + perspective grid, "new game"/difficulty pick) + gameover screen (archon silhouette, victory); the **difficulty-select UI** + the **player/isAI table** (M6 hardcoded AI to player 1 — generalize here: `GameState.difficulty` already exists; add per-player isAI so `_on_end_turn` reads the table instead of `current_player == 1`); **save/load** to `user://wraithspire_save.json` (versioned blob: units incl. cd/status/level/xp/evolved, weather, board/seed, turn, players, captured towers — design spec "Save / load"; optionally serialize `map_def` to fix the JS resumed-campaign-weather gap); **campaign** (CAMPAIGN data already ported in `data/campaign.gd`; scenario list + progression). Also the **battle-scene on/off setting** (JS `STATE.settings.battleScene`) deferred from M8 — a settings toggle that skips the cutaway.
