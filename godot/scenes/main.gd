@@ -11,6 +11,10 @@ const CampaignScene = preload("res://scenes/campaign/campaign_scene.gd")
 const StoryScene = preload("res://scenes/story/story_scene.gd")
 const GameoverScene = preload("res://scenes/gameover/gameover_scene.gd")
 const MatchScene = preload("res://scenes/match/match_scene.gd")
+const DeployScene = preload("res://scenes/deploy/deploy_scene.gd")
+const DeployLib = preload("res://core/deploy.gd")
+const Campaign = preload("res://data/campaign.gd")
+const RosterStore = preload("res://core/roster_store.gd")
 
 var session: Session
 var _current: Node = null
@@ -42,6 +46,8 @@ func _run_shot(target: String) -> void:
 			_on_begin_skirmish()
 		"mission2":
 			session.start_campaign(1)
+			DeployLib.commit(session.state, [])
+			session.screen = "play"
 			_route()
 		"skirmish":
 			session.settings["fog"] = false
@@ -53,6 +59,10 @@ func _run_shot(target: String) -> void:
 		"story":
 			session.story_index = 0
 			session.screen = "story"
+			_route()
+		"deploy":
+			RosterStore.save(RosterStore.migrate(4))
+			session.start_campaign(0)
 			_route()
 		"gameover":
 			session.settings["fog"] = false
@@ -138,6 +148,13 @@ func _route() -> void:
 			s.session = session
 			s.begin_mission.connect(_on_begin_mission)
 			_mount(s)
+		"deploy":
+			var d := DeployScene.new()
+			d.session = session
+			d.scenario = Campaign.CAMPAIGN[session.story_index]
+			d.begin_mission.connect(_on_deploy_begin)
+			d.back.connect(_on_deploy_back)
+			_mount(d)
 		"play":
 			var m := MatchScene.new()
 			m.init(session.state, session)
@@ -179,8 +196,15 @@ func _on_pick_mission(index: int) -> void:
 	_go("story")
 
 func _on_begin_mission() -> void:
-	session.start_campaign(session.story_index)   # sets screen = "play"
+	session.start_campaign(session.story_index)   # sets screen = "deploy"
 	_route()
+
+func _on_deploy_begin(picked_entries: Array) -> void:
+	DeployLib.commit(session.state, picked_entries)
+	_go("play")
+
+func _on_deploy_back() -> void:
+	_go("campaign")
 
 func _on_match_ended(_winner: int) -> void:
 	# session.on_match_won already ran inside MatchScene; just show the result.

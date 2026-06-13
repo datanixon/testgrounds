@@ -48,7 +48,7 @@ func start_skirmish() -> void:
 func start_campaign(index: int) -> void:
 	state = GameStateLib.new_campaign(Campaign.CAMPAIGN[index], index)
 	state.fog = bool(Campaign.CAMPAIGN[index]["map"].get("fog", false))
-	screen = "play"
+	screen = "deploy"
 
 ## on_match_won — called by MatchScene when a winner is decided. Advances campaign
 ## progress on a player-0 mission win (capped, never regressing) and persists it.

@@ -1292,7 +1292,7 @@ func _test_session() -> void:
 	_eq(s.state.is_ai, [false, true], "session: is_ai table")
 	# start a campaign mission
 	s.start_campaign(0)
-	_eq(s.screen, "play", "session: campaign -> play")
+	_eq(s.screen, "deploy", "session: campaign -> deploy")
 	_eq(s.state.campaign_index, 0, "session: campaign index tagged")
 	_eq(s.difficulty, "hard", "session: campaign did NOT overwrite skirmish pref")
 	# progression rule: P0 wins mission 0 -> progress advances to 1
