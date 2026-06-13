@@ -7,6 +7,7 @@ extends Node2D
 
 const Hex = preload("res://core/hex.gd")
 const Sprites = preload("res://core/sprites.gd")
+const Relics = preload("res://data/relics.gd")
 
 ## Team ring colors — AZURE / CRIMSON (JS PLAYERS palette p0/p1).
 const TEAM_COLORS := [Color("#5aa8d8"), Color("#cc6a4a")]
@@ -46,7 +47,7 @@ func _draw_hp_bar(radius: float) -> void:
 	var h := 4.0
 	var top_left := Vector2(-w / 2.0, -radius - 8.0)
 	draw_rect(Rect2(top_left, Vector2(w, h)), Color(0, 0, 0, 0.6))
-	var frac := clampf(float(unit["hp"]) / float(unit["max_hp"]), 0.0, 1.0)
+	var frac := clampf(float(unit["hp"]) / float(Relics.max_hp(unit)), 0.0, 1.0)
 	var col := Color("#5ad06a") if frac > 0.5 else (Color("#e0d050") if frac > 0.25 else Color("#e05050"))
 	draw_rect(Rect2(top_left, Vector2(w * frac, h)), col)
 

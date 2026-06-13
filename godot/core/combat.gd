@@ -62,8 +62,8 @@ static func state_distance(a: Dictionary, b: Dictionary) -> int:
 static func resolve_attack(state, attacker: Dictionary, defender: Dictionary, apply_status := "", status_turns := 0) -> void:
 	var atk_hp_before: int = attacker["hp"]
 	var def_hp_before: int = defender["hp"]
-	var atk_max: int = attacker["max_hp"]
-	var def_max: int = defender["max_hp"]
+	var atk_max: int = Relics.max_hp(attacker)
+	var def_max: int = Relics.max_hp(defender)
 	var terrain := "plain"
 	var dcell: Variant = state.cell_at(defender["q"], defender["r"])
 	if dcell != null:

@@ -35,8 +35,8 @@ func show_unit(unit) -> void:
 		relic_txt = "\nRelic: " + Relics.RELICS[relic_id]["name"]
 	_label.text = "%s  (%s)\nHP %d/%d   ATK %d   DEF %d\nMOV %d   RNG %d   LV %d%s%s%s" % [
 		unit["name"], unit["element"],
-		unit["hp"], unit["max_hp"], unit["power"], unit["def"],
-		unit["move"], unit["range"], unit["level"], cd_txt, statuses, relic_txt,
+		unit["hp"], Relics.max_hp(unit), unit["power"], unit["def"],
+		unit["move"] + int(Relics.unit_bonus(unit, "move")), Relics.effective_range(unit), unit["level"], cd_txt, statuses, relic_txt,
 	]
 	visible = true
 
