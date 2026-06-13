@@ -6,13 +6,10 @@ extends Node2D
 ## body at M10 — the node interface stays the same.
 
 const Hex = preload("res://core/hex.gd")
+const Sprites = preload("res://core/sprites.gd")
 
 ## Team ring colors — AZURE / CRIMSON (JS PLAYERS palette p0/p1).
 const TEAM_COLORS := [Color("#5aa8d8"), Color("#cc6a4a")]
-const ELEMENT_COLORS := {
-	"pyro": Color("#d8662e"), "hydro": Color("#3a7ad8"), "terra": Color("#9a8a52"),
-	"zephyr": Color("#7fd0c0"), "arcane": Color("#a06ad8"),
-}
 ## Status pip colors (keys from data/statuses.gd).
 const STATUS_COLORS := {
 	"burn": Color("#e0662e"), "slow": Color("#6aa0e0"), "mark": Color("#e0d050"),
@@ -34,12 +31,13 @@ func _draw() -> void:
 	if unit == null:
 		return
 	var radius := Hex.SIZE * 0.62
-	var ring: Color = TEAM_COLORS[unit["owner"]]
-	var fill: Color = ELEMENT_COLORS.get(unit["element"], Color("#cccccc"))
-	draw_circle(Vector2.ZERO, radius, ring)
-	draw_circle(Vector2.ZERO, radius * 0.74, fill)
-	if unit["is_master"]:
-		draw_circle(Vector2.ZERO, radius * 0.30, Color(1, 1, 1, 0.9))
+	# Team-colored base disc (faction identity) — the transparent-bg token sits on it.
+	draw_circle(Vector2.ZERO, radius, TEAM_COLORS[unit["owner"]])
+	# Real creature art (faction-neutral; archon splits on owner inside Sprites).
+	var tex := Sprites.token(unit["sprite"], unit["owner"])
+	if tex != null:
+		var s := radius * 2.0          # token fills the team disc; transparent edges show the ring
+		draw_texture_rect(tex, Rect2(-s / 2.0, -s / 2.0, s, s), false)
 	_draw_hp_bar(radius)
 	_draw_status_pips(radius)
 
