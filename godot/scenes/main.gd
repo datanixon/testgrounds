@@ -20,6 +20,38 @@ func _ready() -> void:
 	session.load_prefs()
 	session.screen = "title"
 	_route()
+	_maybe_shot()
+
+## _maybe_shot — dev screenshot hook (visual validation). With `-- --shot <target>` on
+## the command line, drive to a target screen, capture the window to tools/shots/, quit.
+## Runs in the normal game so autoloads (Audio) are present. No-op without the flag.
+## Targets: title | fog (fog-on skirmish) | mission2 (objective campaign mission).
+func _maybe_shot() -> void:
+	var args := OS.get_cmdline_user_args()
+	var i := args.find("--shot")
+	if i < 0:
+		return
+	var target: String = args[i + 1] if i + 1 < args.size() else "title"
+	_run_shot(target)
+
+func _run_shot(target: String) -> void:
+	await get_tree().create_timer(0.4).timeout
+	match target:
+		"fog":
+			session.settings["fog"] = true
+			_on_begin_skirmish()
+		"mission2":
+			session.start_campaign(1)
+			_route()
+		_:
+			pass   # title: capture the booted screen
+	await get_tree().create_timer(0.9).timeout
+	var dir := ProjectSettings.globalize_path("res://tools/shots/")
+	DirAccess.make_dir_recursive_absolute(dir)
+	var img := get_viewport().get_texture().get_image()
+	img.save_png(dir + target + ".png")
+	print("[SHOT] saved %s%s.png" % [dir, target])
+	get_tree().quit()
 
 ## _route — free the current screen scene and build the one matching session.screen.
 func _route() -> void:
