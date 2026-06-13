@@ -141,7 +141,27 @@ campaign/save/title/gameover) with real art + audio. Next = ROADMAP2 Phases 2–
 wave, persistent campaign, etc.) — each gets its OWN post-parity spec (brainstorm → plan → build),
 re-planned as Godot work (NOT built in the frozen JS reference).
 
->>> PICK UP HERE: M10 windowed visual check (optional), then ROADMAP2 Phase 2 (needs its own spec) <<<
+**UPDATE (2026-06-11): ROADMAP2 PHASE 2 (RELICS) COMPLETE** on branch `godot-p2-relics`
+(off main). First post-parity content milestone. `data/relics.gd` = 9 relics (6 passive: atk_charm/
+vital/swift/farsight/regenring/thorncharm; 3 consumable: phoenix/warhorn/ley_crystal; Veilstone→P3
+fog) + pure helpers (`bonus`/`unit_bonus`/`max_hp`/`effective_range`/`has_relic`/POOL). DYNAMIC stat
+seam (no base mutation): compute_damage (+atk, ×warhorn, max_hp ratio), resolve_attack/forecast counter
+(+thorn, effective_range), effective_move (+swift), compute_attack_targets (effective_range), new
+GameState.effective_max_hp + heal clamps + regenring tick. map_gen spawns def.relics (plain tiles via
+_pick + main rng, deterministic); MAPS/campaign defs got `relics` counts. GameState.pick_up_relic (auto
+-equip on move-end, swap drops old onto tile, Ley master-only +6MP, vital HP top-up). Consumables:
+phoenix revive@1HP in _apply_hit (both swings), warhorn ×1.5 then consume, ley on pickup. UI: board
+relic glyph (colored gem+letter) + info_card relic line + pickup SFX. AI: relic_tile_bonus move-nudge +
+pick_up_relic on move/attack/capture. save_game serializes map.relics (unit.relic rides whole-unit).
+Presentation seam fix: unit_node HP bar / info_card / battle-bar snapshot all route through Relics.max_hp/
+effective_range. **882 tests; both gates per task; opus whole-milestone review = end-to-end SOUND.**
+GOTCHAS: map q is NEGATIVE on lower rows (offset=-(r>>1)) so use `_pick(cells,order,rng)` NOT raw
+below(cols)/below(rows); `Relics.bonus(id,key)` takes a relic-ID string (not a unit); hard-index unit
+stats (don't .get-default max_hp → /0 risk). Accepted: procedural glyphs; Veilstone deferred to P3.
+**REMAINING:** windowed visual check (relics show/equip/swap; phoenix revive; AI grabs relics).
+
+>>> PICK UP HERE: ROADMAP2 Phase 3 (Fog of war) — needs its own spec; Veilstone relic (+1 vision) lands there <<<
+(Earlier: M10 windowed visual check still optional.)
 Previous handoff (M9, historical):
 - **Tracker:** `ROADMAP_GODOT.md` — M1–M8 ✅; next `- [ ] M9 — ...`. M9 needs its own spec (brainstorming) + plan (writing-plans). M9 is the PARITY-completing milestone (after it the port matches the JS reference; ROADMAP2 Phases 2–8 then get their own specs).
 - **M9 scope (port the JS sec. 5/13/14 + save blob):** the `screen` router (title/play/battle/gameover — `GameState` is currently always in "play"); title screen (synthwave sun + perspective grid, "new game"/difficulty pick) + gameover screen (archon silhouette, victory); the **difficulty-select UI** + the **player/isAI table** (M6 hardcoded AI to player 1 — generalize here: `GameState.difficulty` already exists; add per-player isAI so `_on_end_turn` reads the table instead of `current_player == 1`); **save/load** to `user://wraithspire_save.json` (versioned blob: units incl. cd/status/level/xp/evolved, weather, board/seed, turn, players, captured towers — design spec "Save / load"; optionally serialize `map_def` to fix the JS resumed-campaign-weather gap); **campaign** (CAMPAIGN data already ported in `data/campaign.gd`; scenario list + progression). Also the **battle-scene on/off setting** (JS `STATE.settings.battleScene`) deferred from M8 — a settings toggle that skips the cutaway.

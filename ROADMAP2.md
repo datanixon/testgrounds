@@ -70,11 +70,15 @@ Tag legend: `[model | effort]` routing hints, same rubric as v1.
 
 ## Phase 2 — Relics
 
-- [ ] 2.1 Relic core: map-gen spawns (def.relics), pickup on move-end, one
-  slot (swap drops old), 6 passive relics, tile glyph + card line + float.
-  [claude-opus-4-8 | high]
-- [ ] 2.2 Consumables + AI + saves: Phoenix Charm, Warhorn, Ley Crystal;
-  AI pathing nudge toward relics; save blob v2 fields (cd/status/relic).
+- [x] 2.1 Relic core (Godot): data/relics.gd (6 passive + helpers); dynamic stat
+  seam (atk/swift/farsight/vital→effective_max_hp/regen/thorn) in compute_damage/
+  effective_move/effective_range/heal; map-gen spawn (def.relics, _pick+main rng);
+  pick_up_relic (auto-equip, swap drops old, master-only Ley); board glyph + card
+  line + SFX; save map.relics. [claude-opus-4-8 | high]
+- [x] 2.2 Consumables + AI + saves (Godot): Phoenix (revive @1HP in _apply_hit),
+  Warhorn (×1.5 in compute_damage, consume post-swing), Ley Crystal (master +6 MP
+  on pickup); AI relic_tile_bonus move-nudge + pick_up_relic on move/attack/capture;
+  save round-trips unit.relic + map.relics. 882 tests; opus review end-to-end sound.
   [claude-sonnet-4-6 | medium]
 
 ## Phase 3 — Fog of war
