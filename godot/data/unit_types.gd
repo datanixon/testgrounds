@@ -34,6 +34,9 @@ const UNIT_TYPES := {
 	"sigilwarden": {"name": "Sigilwarden", "element": "arcane", "max_hp": 38, "move": 2, "range": 1, "power": 10, "def": 7, "cost": 30, "flying": false, "sprite": "sigilwarden", "attack": "melee", "evolved": true, "ability": "ward"},
 	"glaciamaw":   {"name": "Glaciamaw",   "element": "hydro",  "max_hp": 40, "move": 3, "range": 1, "power": 14, "def": 5, "cost": 34, "flying": false, "sprite": "glaciamaw",   "attack": "melee", "evolved": true, "ability": "frostBite"},
 	"dunestalker": {"name": "Dunestalker", "element": "terra",  "max_hp": 23, "move": 5, "range": 1, "power": 10, "def": 3, "cost": 16, "flying": false, "sprite": "dunestalker", "attack": "melee", "evolved": true, "ability": "skitter"},
+	# Bosses (P4.3; non-summonable, pre-placed only; reuse existing abilities; sprites art-pending)
+	"pyre_colossus": {"name": "Pyre Colossus", "element": "pyro",   "max_hp": 52, "move": 2, "range": 1, "power": 16, "def": 6, "cost": 40, "flying": false, "sprite": "pyre_colossus", "attack": "melee", "ability": "quake",    "boss": true},
+	"storm_tyrant":  {"name": "Storm Tyrant",  "element": "zephyr", "max_hp": 40, "move": 4, "range": 2, "power": 14, "def": 4, "cost": 38, "flying": true,  "sprite": "storm_tyrant",  "attack": "dive",  "ability": "diveMark", "boss": true},
 }
 
 const SUMMON_LIST := ["cinderling", "tidekin", "stoneward", "galewisp", "duneskink", "pyrowyrm", "hexwisp", "mistleviath", "runeward", "geomaul", "frostmaw", "skyharrow"]

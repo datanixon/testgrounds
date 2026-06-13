@@ -53,6 +53,7 @@ func _initialize() -> void:
 	_test_weather()
 	_test_leveling()
 	_test_new_evolutions()
+	_test_bosses()
 	_test_combat()
 	_test_resolve()
 	_test_turn()
@@ -222,8 +223,8 @@ func _test_board() -> void:
 	_eq(BoardLib.hex_corners(Vector2.ZERO).size(), 6, "board: 6 corners")
 
 func _test_unit_types() -> void:
-	# 8 original base + 8 evolved + 4 new base = 20.
-	_eq(UnitTypes.UNIT_TYPES.size(), 24, "unit_types: 24 entries")
+	# 8 original base + 8 evolved + 4 new base + 4 evolved + 2 bosses = 26.
+	_eq(UnitTypes.UNIT_TYPES.size(), 26, "unit_types: 26 entries")
 	_eq(UnitTypes.SUMMON_LIST.size(), 12, "unit_types: 12 summonable")
 	_eq(UnitTypes.SUMMON_LIST[0], "cinderling", "unit_types: summon[0]")
 	# Representative balance-locked values.
@@ -1829,3 +1830,23 @@ func _test_new_evolutions() -> void:
 	Units.gain_xp(d, 12 + 20 + 28)
 	_ok(Units.try_evolve(d, {"terrain": "castle", "owner": 0}), "evo: duneskink evolves on owned castle")
 	_eq(d["type_key"], "dunestalker", "evo: became dunestalker")
+
+func _test_bosses() -> void:
+	_eq(UnitTypes.UNIT_TYPES.size(), 26, "bosses: 26 unit types")
+	for id in ["pyre_colossus", "storm_tyrant"]:
+		_ok(UnitTypes.UNIT_TYPES.has(id), "bosses: %s defined" % id)
+		_eq(UnitTypes.UNIT_TYPES[id]["boss"], true, "bosses: %s boss flag" % id)
+		_ok(not (id in UnitTypes.SUMMON_LIST), "bosses: %s not summonable" % id)
+		_ok(Abilities.ABILITIES.has(UnitTypes.UNIT_TYPES[id]["ability"]), "bosses: %s ability exists" % id)
+	_eq(UnitTypes.UNIT_TYPES["pyre_colossus"]["power"], 16, "bosses: pyre_colossus power")
+	_eq(UnitTypes.UNIT_TYPES["pyre_colossus"]["ability"], "quake", "bosses: pyre_colossus quake")
+	_eq(UnitTypes.UNIT_TYPES["storm_tyrant"]["flying"], true, "bosses: storm_tyrant flying")
+	_eq(UnitTypes.UNIT_TYPES["storm_tyrant"]["ability"], "diveMark", "bosses: storm_tyrant diveMark")
+	_eq(UnitTypes.SUMMON_LIST.size(), 12, "bosses: summon list still 12")
+	_ok("pyre_colossus" in Campaign.CAMPAIGN[3]["ai_summons"], "bosses: mission 4 ai_summons has the boss")
+	var gs := GameState.new_campaign(Campaign.CAMPAIGN[3], 3)
+	var found := false
+	for u in gs.units:
+		if u["type_key"] == "pyre_colossus" and u["owner"] == 1:
+			found = true
+	_ok(found, "bosses: new_campaign spawns the boss for the AI")
