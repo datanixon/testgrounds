@@ -23,7 +23,7 @@ const CAMPAIGN := [
 	           "every defile, fed by the spires you must take.", "The mountains do not forgive haste."]},
 	{"name": "The Wraithspire", "difficulty": "hard",
 	 "map": {"key": "c4", "name": "The Wraithspire", "desc": "", "cols": 16, "rows": 13, "seed": 86011,
-	         "mountains": 4, "lakes": 3, "forests": 24, "hills": 12, "towers": 6, "relics": 2},
+	         "mountains": 4, "lakes": 3, "forests": 24, "hills": 12, "towers": 6, "relics": 2, "fog": true},
 	 "ai_mp_bonus": 10, "ai_summons": ["geomaul", "skyharrow"],
 	 "intro": ["The Wraithspire itself — the first spire, the", "one all others echo. The CRIMSON archon waits",
 	           "beneath it with everything he has left.", "Cast him down. Inherit the realm."]},

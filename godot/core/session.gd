@@ -42,10 +42,12 @@ func start_skirmish() -> void:
 	state.difficulty = difficulty
 	state.match_difficulty = difficulty
 	state.campaign_index = -1
+	state.fog = bool(settings.get("fog", false)) or bool(def.get("fog", false))
 	screen = "play"
 
 func start_campaign(index: int) -> void:
 	state = GameStateLib.new_campaign(Campaign.CAMPAIGN[index], index)
+	state.fog = bool(Campaign.CAMPAIGN[index]["map"].get("fog", false))
 	screen = "play"
 
 ## on_match_won — called by MatchScene when a winner is decided. Advances campaign
