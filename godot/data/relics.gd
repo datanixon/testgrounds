@@ -14,10 +14,11 @@ const RELICS := {
 	"phoenix":     {"name": "Phoenix Charm", "kind": "consumable", "glyph": "P", "color": Color("#ff7f50"), "revive": true},
 	"warhorn":     {"name": "Warhorn",       "kind": "consumable", "glyph": "W", "color": Color("#f0c674"), "atk_mult": 1.5},
 	"ley_crystal": {"name": "Ley Crystal",   "kind": "consumable", "glyph": "L", "color": Color("#5aa8d8"), "master_only": true, "mp": 6},
+	"veilstone":   {"name": "Veilstone",     "kind": "passive",    "glyph": "E", "color": Color("#8888cc"), "vision": 1},
 }
 
 ## Ids eligible to spawn on the map (all 9; map-gen rolls from this).
-const POOL := ["atk_charm", "vital", "swift", "farsight", "regenring", "thorncharm", "phoenix", "warhorn", "ley_crystal"]
+const POOL := ["atk_charm", "vital", "swift", "farsight", "regenring", "thorncharm", "phoenix", "warhorn", "ley_crystal", "veilstone"]
 
 static func is_passive(id: String) -> bool:
 	return RELICS.has(id) and RELICS[id]["kind"] == "passive"

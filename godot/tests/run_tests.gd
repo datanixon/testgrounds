@@ -32,6 +32,7 @@ const Tracks = preload("res://data/tracks.gd")
 const MusicSeq = preload("res://core/music_seq.gd")
 const Sprites = preload("res://core/sprites.gd")
 const Relics = preload("res://data/relics.gd")
+const Vision = preload("res://core/vision.gd")
 
 var _passed := 0
 var _failed := 0
@@ -81,6 +82,7 @@ func _initialize() -> void:
 	_test_relic_pickup()
 	_test_relic_consumables()
 	_test_ai_relic_nudge()
+	_test_vision()
 	print("\n== %d passed, %d failed ==" % [_passed, _failed])
 	quit(1 if _failed > 0 else 0)
 
@@ -1427,7 +1429,7 @@ func _test_relic_effects() -> void:
 	_ok(fatk["hp"] < fatk_hp, "relic effect: farsight extends counter range to 2")
 
 func _test_relics_data() -> void:
-	_eq(Relics.RELICS.size(), 9, "relics: 9 defined")
+	_eq(Relics.RELICS.size(), 10, "relics: 10 defined")
 	_eq(Relics.bonus("atk_charm", "atk"), 2, "relics: atk_charm +2 atk")
 	_eq(Relics.bonus("vital", "max_hp"), 4, "relics: vital +4 hp")
 	_eq(Relics.bonus("swift", "move"), 1, "relics: swift +1 move")
@@ -1557,3 +1559,37 @@ func _test_ai_relic_nudge() -> void:
 	AI._apply_action(gc, grabber, cap_action)
 	_eq(grabber["relic"], "vital", "ai: capture relocation picks up relic on dest tile")
 	_eq(gc.map["relics"].size(), 0, "ai: capture relocation clears relic tile")
+
+func _test_vision() -> void:
+	# Ground unit sees radius 3, not 4.
+	var gs := _flat_state(11, 11)
+	var g := gs.spawn_unit("cinderling", 0, 5, 5)   # grounded, move 4
+	_eq(Vision.unit_sight(g), 3, "vision: ground sight 3")
+	var vg := Vision.compute(gs, 0)
+	_ok(vg.has("5,5"), "vision: own tile visible")
+	_ok(vg.has("8,5"), "vision: ground sees distance 3")          # dist 3
+	_ok(not vg.has("9,5"), "vision: ground blind at distance 4")  # dist 4
+	# Flyer sees radius 4.
+	var gf := _flat_state(11, 11)
+	var f := gf.spawn_unit("galewisp", 0, 5, 5)      # flying, move 5
+	_eq(Vision.unit_sight(f), 4, "vision: flyer sight 4")
+	var vf := Vision.compute(gf, 0)
+	_ok(vf.has("9,5"), "vision: flyer sees distance 4")
+	_ok(not vf.has("10,5"), "vision: flyer blind at distance 5")
+	# Veilstone adds +1.
+	var gv := _flat_state(11, 11)
+	var v := gv.spawn_unit("cinderling", 0, 5, 5)
+	v["relic"] = "veilstone"
+	_eq(Vision.unit_sight(v), 4, "vision: veilstone +1 sight")
+	_ok(Vision.compute(gv, 0).has("9,5"), "vision: veilstone ground sees distance 4")
+	# Owned spire contributes radius 2; an unowned one contributes nothing.
+	var gt := _flat_state(11, 11)
+	gt.spawn_unit("cinderling", 0, 0, 0)             # far unit; its disc never reaches (8,8)
+	gt.cell_at(8, 8)["terrain"] = "tower"
+	gt.cell_at(8, 8)["owner"] = 0
+	var vt := Vision.compute(gt, 0)
+	_ok(vt.has("8,8"), "vision: owned tower visible")
+	_ok(vt.has("8,6"), "vision: owned tower radius 2")             # dist 2
+	_ok(not vt.has("8,5"), "vision: owned tower not radius 3")     # dist 3
+	gt.cell_at(8, 8)["owner"] = 1
+	_ok(not Vision.compute(gt, 0).has("8,8"), "vision: enemy tower grants no vision")
