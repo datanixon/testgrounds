@@ -7,14 +7,16 @@ with "stop caveman" / "normal mode").
 ## Where things stand
 
 - **Canonical branch:** `main` — has the COMPLETE Godot port (M1–M10), ROADMAP2 Phase 2
-  (Relics), **Phase 3 (Fog of war, merged)**, plus two windowed-test bug fixes (display/
-  stretch config + procedural-screen click hit-areas).
-- **In flight:** **ROADMAP2 Phase 4.2 (Objective framework) is COMPLETE on branch
-  `godot-p4-objectives`** (off main), 950 tests green + headless boot clean + opus
-  whole-milestone review = merge-ready. **NOT yet merged** — awaiting the user's OK to
-  FF-merge to main (and the windowed pass below).
+  (Relics), **Phase 3 (Fog of war)**, **Phase 4.2 (Objectives)**, plus two windowed-test
+  bug fixes (display/stretch config + procedural-screen click hit-areas) — all merged.
+- **In flight:** **ROADMAP2 Phase 4.1 (Evolutions) — DATA DONE on branch
+  `godot-p4-1-evolutions`** (off main), 978 tests green + headless boot clean + cavecrew
+  review clean. **NOT yet merged** — awaiting the user's OK. **Art (8 sprite PNGs) is
+  PENDING** — generation prompt is in the spec appendix; loader degrades gracefully until
+  they land (engine disc, no creature art).
 - **Done & on main:** the COMPLETE Godot port (M1–M10 — full JS-reference parity
-  + real art + audio) **plus ROADMAP2 Phase 2 (Relics) + Phase 3 (Fog of war)**.
+  + real art + audio) **plus ROADMAP2 Phase 2 (Relics) + Phase 3 (Fog) + Phase 4.2
+  (Objectives)**.
 - The JS build at repo root (`index.html` + `game.js`) is the FROZEN reference —
   do not add features to it.
 
@@ -46,17 +48,21 @@ with "stop caveman" / "normal mode").
   `godot-m10-art-audio`, `godot-m10-art`, `godot-p2-relics`. Earlier ones too.
   Cleanup optional: `git branch -d <name>`.
 
-## Next work: merge Phase 4.2, then the rest of Phase 4
+## Next work: merge Phase 4.1 data, then its art + Phase 4.3
 
-**First:** once the user OKs (and ideally after the windowed pass), FF-merge
-`godot-p4-objectives` → `main` and push.
+**First:** once the user OKs, FF-merge `godot-p4-1-evolutions` → `main` and push.
 
 **Phase 4 is decomposed into 3 slices** (each its own spec→plan→subagent build):
-- **4.2 Objective framework — DONE** on `godot-p4-objectives` (see below); the foundation
-  Phases 5 & 7 reuse.
-- **4.1 Evolutions** — 4 new evolved monsters (hexwisp/runeward/frostmaw/duneskink).
-  Mostly data, but **blocked on generating + importing 8 new sprite PNGs** (token+battle)
-  via the M10 art pipeline.
+- **4.2 Objective framework — DONE + merged.** The foundation Phases 5 & 7 reuse.
+- **4.1 Evolutions — DATA DONE** on `godot-p4-1-evolutions` (Hexlord/Sigilwarden/Glaciamaw/
+  Dunestalker entries + `evolves_to`; UNIT_TYPES 20→24; `_test_sprites` PENDING_ART skip;
+  978 tests). **ART follow-up pending:** user generates 8 PNGs (prompt in
+  `docs/superpowers/specs/2026-06-13-wraithspire-evolutions-design.md` appendix) → drop in
+  `godot/assets/sprites/` → `godot --headless --import --path godot` → remove the 4 ids from
+  `pending_art` in `_test_sprites` → commit PNGs+.import+test.
+- **4.3 Bosses + maps** — 2 boss monsters (**4 more sprites**, non-summonable) + 2 new
+  skirmish maps (one fog-default — the first fog-default *skirmish* map). Pairs with 4.2
+  objectives. Needs its own spec/plan.
 - **4.3 Bosses + maps** — 2 boss monsters (**4 more sprites**, non-summonable) + 2 new
   skirmish maps (one fog-default — the first fog-default *skirmish* map). Pairs with 4.2
   objectives.

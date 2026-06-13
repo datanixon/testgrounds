@@ -98,8 +98,13 @@ Tag legend: `[model | effort]` routing hints, same rubric as v1.
 
 ## Phase 4 — Content wave
 
-- [ ] 4.1 Four evolutions for hexwisp/runeward/frostmaw/duneskink: data +
-  map & battle sprites (every base now evolves). [claude-sonnet-4-6 | medium]
+- [~] 4.1 Four evolutions for hexwisp/runeward/frostmaw/duneskink — **DATA DONE**
+  (Godot, branch `godot-p4-1-evolutions`): Hexlord/Sigilwarden/Glaciamaw/Dunestalker
+  evolved entries + `evolves_to` wiring (mechanic unchanged); evolved forms non-summonable;
+  `_test_sprites` PENDING_ART skip; 978 tests; cavecrew review clean. **ART PENDING** — 8
+  sprite PNGs (token+battle ×4) not yet generated; loader degrades gracefully (engine disc
+  until they land). Generation prompt in the spec appendix; import + PENDING_ART removal =
+  the deferred art follow-up. [claude-sonnet-4-6 | medium]
 - [x] 4.2 Objective framework (Godot): pure `core/objectives.gd` (evaluate/label for
   survive(n)/seize(hex)/protect(unit_id)/rout, beside always-on archon-kill);
   `GameState.objective`/`objective_progress` + `unit_by_id`/`enemy_non_masters` +

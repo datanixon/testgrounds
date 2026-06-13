@@ -212,9 +212,28 @@ turn-2 guard; protect exercised by tests only (demo uses survive); gameover unch
 player id). REMAINING: windowed pass (mission 2 → "Survive: x/8" topbar, hold 8 rounds → win) then
 FF-merge `godot-p4-objectives`→main + push on user OK.
 
->>> PICK UP HERE: ROADMAP2 Phase 4 remaining slices — 4.1 evolutions (needs 8 new sprite PNGs
-generated+imported) and 4.3 bosses+maps (needs boss sprites; pairs with 4.2 objectives). Each its own
-spec/plan. (Earlier: M10 + Phase 2/3 windowed checks still optional.) <<<
+**UPDATE (2026-06-13): ROADMAP2 PHASE 4.1 (EVOLUTIONS) — DATA DONE** on branch
+`godot-p4-1-evolutions` (off main; NOT merged — awaiting user OK). Spec/plan in
+`docs/superpowers/{specs,plans}/2026-06-13-wraithspire-evolutions*`. Chose "data now, art later"
+(like M10's audio/art split). `data/unit_types.gd` gained 4 evolved entries — `hexlord` (arcane/fly/
+blink, hp19/pw9/df2/cost20), `sigilwarden` (arcane/ward, 38/10/7/30), `glaciamaw` (hydro/frostBite,
+40/14/5/34), `dunestalker` (terra/skitter, 23/10/3/16) — stats mirror the existing evolved tier (keep
+move/range/flying/element/attack/ability of the base); `evolves_to` wired on hexwisp/runeward/frostmaw/
+duneskink. UNIT_TYPES 20→24; SUMMON_LIST unchanged (12, evolved forms NON-summonable, evolution-only).
+Evolution MECHANIC unchanged (`Units.evolve_unit`/`try_evolve` already read evolves_to). Sprites are
+id-based + degrade gracefully on a missing PNG (unit_node draws engine disc + HP bar, battle_sprites
+draws glow+shadow — no crash). KEY: `_test_sprites` iterates ALL UNIT_TYPES sprite ids and asserts a
+PNG loads, so the 4 new artless stems would break it → added a `pending_art` skip-set
+(["hexlord","sigilwarden","glaciamaw","dunestalker"]). 978 tests; both gates; cavecrew review clean.
+**ART PENDING (deferred follow-up, needs the user to generate 8 PNGs):** generation prompt is in the
+spec appendix (4 evolved descriptions + exact filenames). When the PNGs land in `godot/assets/sprites/`:
+(1) `godot --headless --import --path godot` to make .import sidecars (load() won't resolve a PNG
+without them); (2) remove the 4 ids from `pending_art` in _test_sprites; (3) commit PNGs+.import+test,
+windowed-verify tokens/portraits.
+
+>>> PICK UP HERE: merge `godot-p4-1-evolutions` on user OK; then Phase 4.1 ART follow-up (generate +
+import 8 PNGs) + Phase 4.3 bosses+maps (also needs boss sprites; pairs with 4.2 objectives). Each its
+own spec/plan. (Earlier: M10 + Phase 2/3 windowed checks still optional.) <<<
 Previous handoff (M9, historical):
 - **Tracker:** `ROADMAP_GODOT.md` — M1–M8 ✅; next `- [ ] M9 — ...`. M9 needs its own spec (brainstorming) + plan (writing-plans). M9 is the PARITY-completing milestone (after it the port matches the JS reference; ROADMAP2 Phases 2–8 then get their own specs).
 - **M9 scope (port the JS sec. 5/13/14 + save blob):** the `screen` router (title/play/battle/gameover — `GameState` is currently always in "play"); title screen (synthwave sun + perspective grid, "new game"/difficulty pick) + gameover screen (archon silhouette, victory); the **difficulty-select UI** + the **player/isAI table** (M6 hardcoded AI to player 1 — generalize here: `GameState.difficulty` already exists; add per-player isAI so `_on_end_turn` reads the table instead of `current_player == 1`); **save/load** to `user://wraithspire_save.json` (versioned blob: units incl. cd/status/level/xp/evolved, weather, board/seed, turn, players, captured towers — design spec "Save / load"; optionally serialize `map_def` to fix the JS resumed-campaign-weather gap); **campaign** (CAMPAIGN data already ported in `data/campaign.gd`; scenario list + progression). Also the **battle-scene on/off setting** (JS `STATE.settings.battleScene`) deferred from M8 — a settings toggle that skips the cutaway.
