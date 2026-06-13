@@ -1386,7 +1386,7 @@ func _test_gen_wave() -> void:
 func _test_sprites() -> void:
 	# every distinct sprite id in UNIT_TYPES resolves a non-null token + battle texture,
 	# EXCEPT art-pending stems (P4.1 evolved forms whose PNGs are not generated yet).
-	var pending_art := ["hexlord", "sigilwarden", "glaciamaw", "dunestalker"]
+	var pending_art := ["hexlord", "sigilwarden", "glaciamaw", "dunestalker", "pyre_colossus", "storm_tyrant"]
 	for key in UnitTypes.UNIT_TYPES:
 		var sid: String = UnitTypes.UNIT_TYPES[key]["sprite"]
 		if sid in pending_art:
