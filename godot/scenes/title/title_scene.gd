@@ -21,8 +21,8 @@ var session = null
 var _frame := 0
 
 func _ready() -> void:
-	set_anchors_preset(Control.PRESET_FULL_RECT)
-	size = Vector2(CW, CH)   # parent is a Node2D, so anchors resolve to a 0-size rect; size the hit-area to the canvas
+	set_anchors_preset(Control.PRESET_TOP_LEFT)   # equal anchors -> explicit size sticks (no FULL_RECT override warning)
+	size = Vector2(CW, CH)   # parent is a Node2D, so anchors give no rect; size the hit-area to the canvas
 
 func _process(_delta: float) -> void:
 	_frame += 1

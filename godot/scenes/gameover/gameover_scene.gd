@@ -17,8 +17,8 @@ var _state = null
 var _frame := 0
 
 func _ready() -> void:
-	set_anchors_preset(Control.PRESET_FULL_RECT)
-	size = Vector2(CW, CH)   # Node2D parent -> anchors give a 0-size rect; size the click area to the canvas
+	set_anchors_preset(Control.PRESET_TOP_LEFT)   # equal anchors -> explicit size sticks (no FULL_RECT override warning)
+	size = Vector2(CW, CH)   # Node2D parent -> anchors give no rect; size the click area to the canvas
 
 func set_result(state) -> void:
 	_state = state
