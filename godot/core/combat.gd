@@ -11,6 +11,7 @@ const Status = preload("res://core/status.gd")
 const Weather = preload("res://core/weather.gd")
 const Hex = preload("res://core/hex.gd")
 const Units = preload("res://core/units.gd")
+const Relics = preload("res://data/relics.gd")
 
 ## computeDamage — the deterministic `base` swing of `attacker` vs `defender`, plus
 ## the multiplier breakdown the forecast/UI need. No RNG.
@@ -25,9 +26,10 @@ static func compute_damage(state, attacker: Dictionary, defender: Dictionary) ->
 	var bulwark_def: int = 2 if Status.has_status(defender, "bulwark") else 0
 	var w: Dictionary = Weather.weather_now(state)
 	var w_atk: float = w.get("atk_mul", {}).get(attacker["element"], 1.0)
-	var w_ranged: float = w["ranged_mul"] if (w.has("ranged_mul") and attacker["range"] >= 2) else 1.0
+	var w_ranged: float = w["ranged_mul"] if (w.has("ranged_mul") and Relics.effective_range(attacker) >= 2) else 1.0
 	var w_mul: float = w_atk * w_ranged
-	var raw: float = attacker["power"] * (float(attacker["hp"]) / float(attacker["max_hp"]) * 0.5 + 0.5)
+	var power: int = int(attacker["power"]) + int(Relics.unit_bonus(attacker, "atk"))
+	var raw: float = power * (float(attacker["hp"]) / float(Relics.max_hp(attacker)) * 0.5 + 0.5)
 	var mit: float = defender["def"] + bulwark_def + d_terrain_def * 0.5
 	var base: int = maxi(1, roundi(raw * elem_mul * aff_mul * mark_mul * w_mul - mit * 0.6))
 	return {"base": base, "elem_mul": elem_mul, "aff_mul": aff_mul, "has_affinity": aff != null, "d_terrain_def": d_terrain_def}
@@ -37,10 +39,10 @@ static func compute_damage(state, attacker: Dictionary, defender: Dictionary) ->
 static func forecast_battle(state, attacker: Dictionary, defender: Dictionary) -> Dictionary:
 	var a: Dictionary = compute_damage(state, attacker, defender)
 	var dist: int = state_distance(attacker, defender)
-	var can_counter: bool = dist >= 1 and dist <= defender["range"]
+	var can_counter: bool = dist >= 1 and dist <= Relics.effective_range(defender)
 	var c_base: int = 0
 	if can_counter:
-		c_base = maxi(1, roundi(compute_damage(state, defender, attacker)["base"] * 0.8))
+		c_base = maxi(1, roundi(compute_damage(state, defender, attacker)["base"] * 0.8)) + int(Relics.unit_bonus(defender, "counter"))
 	return {
 		"lo": maxi(1, a["base"] - 1), "hi": a["base"] + 1,
 		"elem_mul": a["elem_mul"], "has_affinity": a["has_affinity"],
@@ -72,9 +74,9 @@ static func resolve_attack(state, attacker: Dictionary, defender: Dictionary, ap
 	var counter := {"happened": false, "dmg": 0, "absorbed": false, "killed": false}
 	if defender["hp"] > 0:
 		var d: int = state_distance(attacker, defender)
-		if d >= 1 and d <= defender["range"]:
+		if d >= 1 and d <= Relics.effective_range(defender):
 			var a2: Dictionary = compute_damage(state, defender, attacker)
-			var counter_dmg: int = maxi(1, roundi(_jitter(state, a2["base"]) * 0.8))
+			var counter_dmg: int = maxi(1, roundi(_jitter(state, a2["base"]) * 0.8)) + int(Relics.unit_bonus(defender, "counter"))
 			var cres: Dictionary = _apply_hit(state, defender, attacker, counter_dmg)
 			counter = {"happened": true, "dmg": cres["dmg"], "absorbed": cres["absorbed"], "killed": cres["killed"]}
 	state.battle_log.append({

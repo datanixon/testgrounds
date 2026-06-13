@@ -11,6 +11,7 @@ const Rng = preload("res://core/rng.gd")
 const Weather = preload("res://core/weather.gd")
 const Status = preload("res://core/status.gd")
 const AILib = preload("res://core/ai.gd")  # M9: new_campaign AI opener; ai.gd does NOT preload game_state.gd — no cycle
+const Relics = preload("res://data/relics.gd")
 
 var map: Dictionary = {}              # the generate() result: cols, rows, cells, castles, towers
 var units: Array[Dictionary] = []
@@ -87,6 +88,10 @@ func check_win_condition() -> void:
 func capture_tower(unit: Dictionary, cell: Dictionary) -> void:
 	cell["owner"] = unit["owner"]
 
+## effective_max_hp — base max HP plus a vital relic. Single source for heal clamps.
+func effective_max_hp(unit: Dictionary) -> int:
+	return Relics.max_hp(unit)
+
 ## endTurn — advance one player's turn: lock the outgoing side, switch player, bump
 ## the round counter, regen the incoming master's MP (base + 2/owned-tower), tick
 ## statuses, unlock + heal + evolve the incoming units, and roll weather per round.
@@ -111,9 +116,12 @@ func end_turn() -> void:
 			u["cd"] -= 1
 		var c: Variant = cell_at(u["q"], u["r"])
 		if c != null and c["terrain"] == "tower" and c.get("owner", -1) == u["owner"]:
-			u["hp"] = mini(u["max_hp"], u["hp"] + 2)
+			u["hp"] = mini(effective_max_hp(u), u["hp"] + 2)
 		if c != null and c["terrain"] == "castle" and c.get("owner", -1) == u["owner"]:
-			u["hp"] = mini(u["max_hp"], u["hp"] + 4)
+			u["hp"] = mini(effective_max_hp(u), u["hp"] + 4)
+		var rg: int = int(Relics.unit_bonus(u, "regen"))
+		if rg > 0:
+			u["hp"] = mini(effective_max_hp(u), u["hp"] + rg)
 		Units.try_evolve(u, c)
 	if current_player == 0 and not weather.is_empty():
 		weather["turns_left"] -= 1

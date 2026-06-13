@@ -76,6 +76,7 @@ func _initialize() -> void:
 	_test_gen_wave()
 	_test_sprites()
 	_test_relics_data()
+	_test_relic_effects()
 	print("\n== %d passed, %d failed ==" % [_passed, _failed])
 	quit(1 if _failed > 0 else 0)
 
@@ -1364,6 +1365,49 @@ func _test_sprites() -> void:
 	# archon art differs per faction; neutral monster art does NOT depend on owner
 	_ok(Sprites.battle("archon", 0) != Sprites.battle("archon", 1), "sprites: archon faction split")
 	_ok(Sprites.token("imp", 0) == Sprites.token("imp", 1), "sprites: neutral monster owner-independent")
+
+func _test_relic_effects() -> void:
+	var gs := GameState.new_skirmish(Maps.MAPS[0], 7041)
+	# atk_charm: +2 power raises base damage vs the same defender
+	var atk := gs.spawn_unit("colossus", 0, 2, 2)
+	var foe := gs.spawn_unit("cinderling", 1, 3, 2)
+	var base_no: int = Combat.compute_damage(gs, atk, foe)["base"]
+	atk["relic"] = "atk_charm"
+	var base_atk: int = Combat.compute_damage(gs, atk, foe)["base"]
+	_ok(base_atk > base_no, "relic effect: atk_charm raises base damage")
+	atk["relic"] = ""
+	# effective_move: swift +1 (stacks with the base move)
+	var u := gs.spawn_unit("cinderling", 0, 5, 5)
+	var mv_no := Pathfinding.effective_move(u, gs)
+	u["relic"] = "swift"
+	_eq(Pathfinding.effective_move(u, gs), mv_no + 1, "relic effect: swift +1 move")
+	# effective_max_hp + regenring heal in end_turn
+	var v := gs.spawn_unit("cinderling", 0, 6, 6)
+	v["relic"] = "vital"
+	_eq(gs.effective_max_hp(v), v["max_hp"] + 4, "relic effect: vital +4 max hp")
+	v["relic"] = "regenring"
+	v["hp"] = 3
+	v["acted"] = true
+	# end_turn heals the INCOMING player's units; make player 0 incoming
+	gs.current_player = 1
+	gs.end_turn()   # -> player 0 incoming, regenring heals +2
+	_eq(v["hp"], 5, "relic effect: regenring heals +2 on turn start")
+	# thorncharm: defender's counter does +2 (compare counter dmg via resolve)
+	var d := gs.spawn_unit("stoneward", 0, 8, 8)   # tanky, survives to counter
+	var atkr := gs.spawn_unit("cinderling", 1, 9, 8)  # adjacent attacker
+	d["relic"] = "thorncharm"
+	var hp_before: int = atkr["hp"]
+	Combat.resolve_attack(gs, atkr, d)   # d counters; thorncharm adds +2
+	# attacker took counter damage; exact value varies by jitter, but with thorncharm
+	# the counter is at least base_counter+2 -> attacker lost > 0 hp (sanity)
+	_ok(atkr["hp"] < hp_before, "relic effect: thorncharm defender counters")
+	# farsight extends counter range: a range-1 defender with farsight counters at dist 2
+	var fdef := gs.spawn_unit("stoneward", 0, 1, 1)   # range 1, tanky
+	fdef["relic"] = "farsight"                          # -> effective range 2
+	var fatk := gs.spawn_unit("pyrowyrm", 1, 3, 1)      # range 2, attacks from dist 2
+	var fatk_hp: int = fatk["hp"]
+	Combat.resolve_attack(gs, fatk, fdef)               # fdef should counter (eff range 2)
+	_ok(fatk["hp"] < fatk_hp, "relic effect: farsight extends counter range to 2")
 
 func _test_relics_data() -> void:
 	_eq(Relics.RELICS.size(), 9, "relics: 9 defined")

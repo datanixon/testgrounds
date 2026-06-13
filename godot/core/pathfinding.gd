@@ -9,6 +9,7 @@ const Hex = preload("res://core/hex.gd")
 const Terrain = preload("res://data/terrain.gd")
 const Status = preload("res://core/status.gd")
 const Weather = preload("res://core/weather.gd")
+const Relics = preload("res://data/relics.gd")
 
 ## effectiveMove — move allowance after status + weather. Slow -2 (min 1), skitter +2,
 ## and the weather fly bonus for flyers. Needs `state` for the active weather.
@@ -21,6 +22,7 @@ static func effective_move(unit: Dictionary, state) -> int:
 	var w: Dictionary = Weather.weather_now(state)
 	if w.get("fly_bonus", 0) != 0 and unit["flying"]:
 		m += w["fly_bonus"]
+	m += int(Relics.unit_bonus(unit, "move"))
 	return m
 
 ## moveCostFor — cost to ENTER `cell`, or INF if impassable for this unit. `cell`
@@ -104,6 +106,6 @@ static func compute_attack_targets(state, unit: Dictionary, from_q: int, from_r:
 		if u["owner"] == unit["owner"]:
 			continue
 		var d := Hex.distance(Vector2i(from_q, from_r), Vector2i(u["q"], u["r"]))
-		if d <= unit["range"] and d >= 1:
+		if d <= Relics.effective_range(unit) and d >= 1:
 			targets[Hex.key(Vector2i(u["q"], u["r"]))] = true
 	return targets
