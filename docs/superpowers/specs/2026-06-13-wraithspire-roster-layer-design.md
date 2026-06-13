@@ -73,6 +73,9 @@ numbers are stored verbatim (not recomputed on deploy):
   "sprite": <String>,
   "attack": <String>,
   "flying": <bool>,
+  "evolved": <bool>,      # snapshot of the unit's evolved flag (drives the -1
+                          # ability cooldown); carried verbatim, not re-derived
+                          # from type_key — consistent with the full-snapshot rule
   "level": <int>,
   "xp": <int>,
   "max_hp": <int>,        # grown
