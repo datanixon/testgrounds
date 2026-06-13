@@ -6,11 +6,35 @@ with "stop caveman" / "normal mode").
 
 ## Where things stand
 
-- **Canonical branch:** `main` @ `d17ab2f` (pushed to `origin`, in sync).
+- **Canonical branch:** `main` @ `d17ab2f`. **Phase 3 (Fog of war) is COMPLETE on
+  branch `godot-p3-fog`** (off main), 919 harness tests green + headless boot clean +
+  opus whole-milestone review = merge-ready. **NOT yet merged/pushed** — awaiting the
+  user's OK to FF-merge to main (and the windowed visual pass below).
 - **Done & on main:** the COMPLETE Godot port (M1–M10 — full JS-reference parity
-  + real art + audio) **plus ROADMAP2 Phase 2 (Relics)**. 882 harness tests green.
+  + real art + audio) **plus ROADMAP2 Phase 2 (Relics)**.
 - The JS build at repo root (`index.html` + `game.js`) is the FROZEN reference —
   do not add features to it.
+
+### Phase 3 (Fog of war) — what landed on `godot-p3-fog`
+- Pure `core/vision.gd` (`Vision.compute(state, owner)` → visible "q,r" set; r3 ground
+  / r4 fly / +Veilstone; owned tower/castle r2; no LOS blocking).
+- `GameState.fog` (saved) / `visibility` (render cache) / `revealed` (per-turn ambush
+  reveals) + `recompute_visibility`. Save round-trips `fog`; visibility recomputed.
+- Fair AI: `build_threat_map` + `run_summons` filter enemies to the AI's own vision
+  when `fog`; **fog-off path is byte-identical** (determinism intact). `approach_target`
+  routes a non-master to the enemy *castle* (always-visible terrain) when the enemy
+  master is hidden, so the AI never beelines a fogged master.
+- Render: `overlay.gd` dim fog fill, `units_layer.gd` hides enemies outside vision,
+  `match_scene._refresh_fog` recomputes on every move/summon/death/turn + reveals
+  ambush attackers after their cutaway (`combat.gd` records `attacker_pos`).
+- Veilstone relic (+1 vision) in `relics.gd` POOL; title-screen FOG toggle (default
+  off, persisted); mission 4 "The Wraithspire" fog-flagged.
+- **PENDING manual windowed check** (`godot --path godot`, needs a display): fog dims
+  out-of-vision tiles; enemies hidden until in sight; vision lifts as you move; AI
+  ambush reveals the attacker; Veilstone +1; FOG OFF = no dimming; mission 4 forced fog;
+  resumed save stays fogged.
+- Docs: spec `docs/superpowers/specs/2026-06-13-wraithspire-fog-of-war-design.md`,
+  plan `docs/superpowers/plans/2026-06-13-wraithspire-fog-of-war.md`.
 
 ## Branches
 
@@ -19,14 +43,17 @@ with "stop caveman" / "normal mode").
   `godot-m10-art-audio`, `godot-m10-art`, `godot-p2-relics`. Earlier ones too.
   Cleanup optional: `git branch -d <name>`.
 
-## Next work: ROADMAP2 Phase 3 — Fog of war
+## Next work: merge Phase 3, then ROADMAP2 Phase 4 — Content wave
 
-Per `ROADMAP2.md` (3.1 + 3.2): per-turn cached vision set (r3 ground / r4 fly +
-r2 owned spires), dim overlay, hidden enemies, hover/forecast gating, skirmish
-title toggle (default off); fair-AI fog (threat map / targeting filtered to
-visible), the **Veilstone relic (+1 vision** — deferred from Phase 2, lands here),
-fog-flagged map defs, cutaway reveals. Needs its OWN spec (brainstorm) → plan
-(writing-plans) → subagent execution. Start a FRESH session for full context.
+**First:** once the user OKs (and ideally after the windowed visual pass), FF-merge
+`godot-p3-fog` → `main` and push. Then check the Phase-3 boxes stay ticked.
+
+**Then Phase 4** per `ROADMAP2.md` (4.1–4.3): four new evolutions (hexwisp/runeward/
+frostmaw/duneskink) with map+battle sprites; objective framework (survive/seize/
+protect/rout beside archon-kill + topbar line + AI weight shifts); 2 boss monsters +
+2 new skirmish maps (one fog-default — the first fog-default *skirmish* map, deferred
+from Phase 3). Each gets its OWN spec (brainstorm) → plan (writing-plans) → subagent
+execution. Start a FRESH session for full context.
 
 ## Process (proven across M1–M10 + Phase 2)
 

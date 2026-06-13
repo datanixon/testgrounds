@@ -160,8 +160,37 @@ below(cols)/below(rows); `Relics.bonus(id,key)` takes a relic-ID string (not a u
 stats (don't .get-default max_hp → /0 risk). Accepted: procedural glyphs; Veilstone deferred to P3.
 **REMAINING:** windowed visual check (relics show/equip/swap; phoenix revive; AI grabs relics).
 
->>> PICK UP HERE: ROADMAP2 Phase 3 (Fog of war) — needs its own spec; Veilstone relic (+1 vision) lands there <<<
-(Earlier: M10 windowed visual check still optional.)
+**UPDATE (2026-06-13): ROADMAP2 PHASE 3 (FOG OF WAR) COMPLETE** on branch `godot-p3-fog`
+(off main; NOT yet merged — awaiting user OK + windowed pass). Spec/plan in
+`docs/superpowers/{specs,plans}/2026-06-13-wraithspire-fog-of-war*`. New pure `core/vision.gd`
+(`Vision.compute(state,owner)` → visible "q,r" set; r3 ground/r4 fly/+Veilstone; owned
+tower+castle r2; plain hex-distance, NO LOS blocking; Relics+Hex preloads, no GameState cycle).
+`GameState` gained `fog` (SAVED), `visibility` (render cache, NOT saved), `revealed` (per-turn
+ambush reveals, NOT saved) + `recompute_visibility(owner)` (= Vision.compute ∪ revealed).
+save_game round-trips `fog` only. FAIR AI: `build_threat_map` + `run_summons` enemy-enumeration
+filter to the AI's OWN `Vision.compute` when `state.fog`; **fog-off branch is byte-identical
+(15 AI tests + explicit fog-off assert prove determinism)**; new `AI.approach_target` sends a
+non-master toward the enemy CASTLE (always-visible terrain) when the enemy master is hidden, so
+the AI never beelines a fogged master (closed a review-flagged fairness hole). RENDER: `overlay.gd`
+dim fog fill (drawn first, NOT cleared by clear_all), `units_layer.gd` skips enemy nodes whose
+tile ∉ visibility (own units always shown; `viewer` = `state.is_ai.find(false)`), `match_scene`
+`_refresh_fog()` recomputes+rebuilds on match-start/move/pickup/undo/second-move/slide/commit/
+turn + per battle cutaway; `state.revealed.clear()` at top of `_on_end_turn` drops last turn's
+reveals; ambush reveal adds `attacker_pos` (new field on the transient battle record in combat.gd)
+to `revealed` after each AI cutaway (survives recompute via the union). Veilstone relic (+1 vision,
+glyph E) in relics POOL. Title-screen FOG toggle (`_fog_rect`, default off, persisted via
+`session.persist_prefs`); `start_skirmish` reads `settings.fog OR def.fog`, `start_campaign` reads
+`scenario.map.fog`; mission 4 "The Wraithspire" flagged `"fog": true`. **919 tests; both gates
+per task; opus whole-milestone review = merge-ready.** GOTCHAS/notes: hover/forecast gating was
+moot (the port has NO enemy info-card or player forecast; clicking an enemy clears selection; armed
+attack targets are range≤2 ≤ sight 3 so always visible — no leak). Accepted divergences: flat dark
+fog fill (no edge feathering); single-viewer fog (human side; no hotseat); first fog-default
+*skirmish* map deferred to Phase 4; `score_attacks` not vision-filtered (range≤2 always visible).
+>>> REMAINING: windowed visual check (`godot --path godot`, needs display) per HANDOFF list; then
+FF-merge `godot-p3-fog`→main + push on user OK. <<<
+
+>>> PICK UP HERE: ROADMAP2 Phase 4 (Content wave — evolutions, objectives, bosses, 2 maps incl. a
+fog-default skirmish map) — its own spec/plan. (Earlier: M10 + Phase 2 windowed checks still optional.) <<<
 Previous handoff (M9, historical):
 - **Tracker:** `ROADMAP_GODOT.md` — M1–M8 ✅; next `- [ ] M9 — ...`. M9 needs its own spec (brainstorming) + plan (writing-plans). M9 is the PARITY-completing milestone (after it the port matches the JS reference; ROADMAP2 Phases 2–8 then get their own specs).
 - **M9 scope (port the JS sec. 5/13/14 + save blob):** the `screen` router (title/play/battle/gameover — `GameState` is currently always in "play"); title screen (synthwave sun + perspective grid, "new game"/difficulty pick) + gameover screen (archon silhouette, victory); the **difficulty-select UI** + the **player/isAI table** (M6 hardcoded AI to player 1 — generalize here: `GameState.difficulty` already exists; add per-player isAI so `_on_end_turn` reads the table instead of `current_player == 1`); **save/load** to `user://wraithspire_save.json` (versioned blob: units incl. cd/status/level/xp/evolved, weather, board/seed, turn, players, captured towers — design spec "Save / load"; optionally serialize `map_def` to fix the JS resumed-campaign-weather gap); **campaign** (CAMPAIGN data already ported in `data/campaign.gd`; scenario list + progression). Also the **battle-scene on/off setting** (JS `STATE.settings.battleScene`) deferred from M8 — a settings toggle that skips the cutaway.

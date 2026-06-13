@@ -83,12 +83,18 @@ Tag legend: `[model | effort]` routing hints, same rubric as v1.
 
 ## Phase 3 — Fog of war
 
-- [ ] 3.1 Visibility engine: per-turn cached vision set (r3 ground/r4 fly +
-  r2 owned spires), dim overlay, hidden enemies, hover/forecast gating,
-  skirmish title toggle (default off). [claude-opus-4-8 | high]
-- [ ] 3.2 Fair-AI fog + extras: buildThreatMap/target filtering to visible,
-  Veilstone relic (+1 vision), fog-flagged map defs, cutaway reveals.
-  [claude-opus-4-8 | high]
+- [x] 3.1 Visibility engine (Godot): pure `core/vision.gd` (r3 ground/r4 fly +
+  r2 owned spires, no LOS), `GameState.fog`/`visibility`/`revealed` +
+  `recompute_visibility`; dim overlay + hidden-enemy gating (overlay/units_layer);
+  `match_scene` recompute on move/summon/death/turn; skirmish title toggle (default
+  off) + settings persistence. (Hover/forecast gating moot — no enemy card/forecast
+  in the port; in-range enemies always within sight.) [claude-opus-4-8 | high]
+- [x] 3.2 Fair-AI fog + extras (Godot): vision filter in `build_threat_map` +
+  `run_summons` (fog-off = byte-identical, determinism preserved); `approach_target`
+  falls back to the enemy castle when the master is hidden (no beeline); Veilstone
+  relic (+1 vision) in POOL; `fog` flag on mission 4 (Wraithspire) + save round-trip;
+  cutaway ambush reveal (attacker tile shown for the rest of the turn). 919 tests;
+  opus whole-milestone review = merge-ready. [claude-opus-4-8 | high]
 
 ## Phase 4 — Content wave
 
