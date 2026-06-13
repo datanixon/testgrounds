@@ -54,6 +54,9 @@ func _campaign_rect() -> Rect2:
 func _continue_rect() -> Rect2:
 	return Rect2(CW / 2 + 8, CH * 0.60, 180, 38)
 
+func _fog_rect() -> Rect2:
+	return Rect2(CW / 2 - 70, 668, 140, 22)
+
 func _draw() -> void:
 	if session == null:
 		return
@@ -92,6 +95,12 @@ func _draw() -> void:
 	_draw_btn(_campaign_rect(), "CAMPAIGN", next_name, Pal.GOLD, fnt)
 	if session.has_save:
 		_draw_btn(_continue_rect(), "CONTINUE", "resume the saved battle", Pal.GREEN, fnt)
+	# fog toggle (skirmish)
+	var fr := _fog_rect()
+	var fog_on: bool = session.settings.get("fog", false)
+	draw_rect(fr, Pal.PURPLE if fog_on else Color(0.12, 0.11, 0.19, 0.85))
+	draw_rect(fr, Pal.PURPLE if fog_on else Pal.INK_FAINT, false, 1.0)
+	draw_string(fnt, Vector2(fr.position.x, fr.position.y + 15), "FOG: ON" if fog_on else "FOG: OFF", HORIZONTAL_ALIGNMENT_CENTER, fr.size.x, 12, Pal.BG if fog_on else Pal.INK_DIM)
 	# map selector
 	for m in _map_rects():
 		var sel: bool = m["index"] == session.map_index
@@ -133,4 +142,7 @@ func _gui_input(event: InputEvent) -> void:
 		open_campaign.emit(); return
 	if session.has_save and _continue_rect().has_point(p):
 		continue_save.emit(); return
+	if _fog_rect().has_point(p):
+		session.settings["fog"] = not session.settings.get("fog", false)
+		session.persist_prefs(); return
 	begin_skirmish.emit()
