@@ -106,6 +106,7 @@ func _initialize() -> void:
 	_test_deploy_commit()
 	_test_deploy_save()
 	_test_deploy_reconcile_on_win()
+	_test_missions_5_8()
 	print("\n== %d passed, %d failed ==" % [_passed, _failed])
 	quit(1 if _failed > 0 else 0)
 
@@ -180,7 +181,7 @@ func _test_data() -> void:
 	_eq(Maps.MAPS[5]["key"], "ashfall", "maps: [5] key")
 	_eq(Maps.MAPS[5]["weather_table"], ["heat", "heat", "gale", "clear"], "maps: ashfall weather")
 	# Campaign
-	_eq(Campaign.CAMPAIGN.size(), 4, "campaign: 4 missions")
+	_eq(Campaign.CAMPAIGN.size(), 8, "campaign: 8 missions")
 	_eq(Campaign.CAMPAIGN[0]["map"]["seed"], 7041, "campaign: c1 seed")
 	_eq(Campaign.CAMPAIGN[0]["map"]["cols"], 11, "campaign: c1 cols")
 	_eq(Campaign.CAMPAIGN[3]["difficulty"], "hard", "campaign: c4 difficulty")
@@ -2111,3 +2112,28 @@ func _test_deploy_reconcile_on_win() -> void:
 	_eq(Deploy.slots_for(Campaign.CAMPAIGN[0]), 3, "deploy: mission 1 cap 3")
 	_eq(Deploy.slots_for(Campaign.CAMPAIGN[2]), 4, "deploy: mission 3 cap 4")
 	RosterStore.reset()   # cleanup the slot file
+
+func _test_missions_5_8() -> void:
+	_eq(Campaign.CAMPAIGN.size(), 8, "campaign: 8 missions")
+	for i in [4, 5, 6, 7]:
+		var sc: Dictionary = Campaign.CAMPAIGN[i]
+		_ok(sc.has("name") and String(sc["name"]) != "", "campaign %d: has name" % i)
+		_eq(sc["difficulty"], "hard", "campaign %d: hard" % i)
+		_ok(int(sc.get("deploy_slots", 0)) > 0, "campaign %d: has deploy_slots" % i)
+		var m: Dictionary = sc["map"]
+		_ok(m.has("seed") and m.has("cols") and m.has("rows"), "campaign %d: map seed/dims" % i)
+		_ok((sc.get("intro", []) as Array).size() >= 1, "campaign %d: has intro" % i)
+	_eq(Deploy.slots_for(Campaign.CAMPAIGN[4]), 5, "campaign m5: slots 5")
+	_eq(Deploy.slots_for(Campaign.CAMPAIGN[5]), 5, "campaign m6: slots 5")
+	_eq(Deploy.slots_for(Campaign.CAMPAIGN[6]), 6, "campaign m7: slots 6")
+	_eq(Deploy.slots_for(Campaign.CAMPAIGN[7]), 6, "campaign m8: slots 6")
+	_eq(UnitTypes.UNIT_TYPES["pyre_colossus"].get("boss", false), true, "pyre_colossus is boss")
+	_eq(UnitTypes.UNIT_TYPES["storm_tyrant"].get("boss", false), true, "storm_tyrant is boss")
+	_ok(UnitTypes.UNIT_TYPES.has("runeward"), "runeward exists (protect ally)")
+	_eq(Campaign.CAMPAIGN[4]["map"].get("objective", {}).get("kind", ""), "rout", "m5: rout objective")
+	_eq(Campaign.CAMPAIGN[7]["map"].has("objective"), false, "m8: no static objective")
+	_ok("pyre_colossus" in Campaign.CAMPAIGN[4]["ai_summons"], "m5 summons pyre_colossus")
+	_ok("storm_tyrant" in Campaign.CAMPAIGN[5]["ai_summons"], "m6 summons storm_tyrant")
+	_ok("pyre_colossus" in Campaign.CAMPAIGN[7]["ai_summons"] and "storm_tyrant" in Campaign.CAMPAIGN[7]["ai_summons"], "m8 summons both titans")
+	_eq(Campaign.CAMPAIGN[5].get("seize_enemy_castle", false), true, "m6: seize_enemy_castle flag")
+	_eq(Campaign.CAMPAIGN[6].get("protect_ally", ""), "runeward", "m7: protect_ally runeward")
