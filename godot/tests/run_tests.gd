@@ -158,12 +158,16 @@ func _test_data() -> void:
 	_eq(Terrain.TERRAIN["tower"]["capturable"], true, "terrain: tower capturable")
 	_eq(Terrain.TERRAIN["castle"]["def"], 4, "terrain: castle def")
 	# Maps
-	_eq(Maps.MAPS.size(), 4, "maps: 4 skirmish")
+	_eq(Maps.MAPS.size(), 6, "maps: 6 skirmish")
 	_eq(Maps.MAPS[0]["key"], "frontier", "maps: [0] key")
 	_eq(Maps.MAPS[0]["cols"], 14, "maps: [0] cols")
 	_eq(Maps.MAPS[2]["key"], "crags", "maps: [2] key")
 	_eq(Maps.MAPS[2]["castles"], [Vector2i(0, 5), Vector2i(9, 5)], "maps: crags castles")
 	_eq(Maps.MAPS[2]["weather_table"], ["heat", "heat", "clear", "gale"], "maps: crags weather")
+	_eq(Maps.MAPS[4]["key"], "mistveil", "maps: [4] key")
+	_eq(Maps.MAPS[4]["fog"], true, "maps: mistveil fog-default")
+	_eq(Maps.MAPS[5]["key"], "ashfall", "maps: [5] key")
+	_eq(Maps.MAPS[5]["weather_table"], ["heat", "heat", "gale", "clear"], "maps: ashfall weather")
 	# Campaign
 	_eq(Campaign.CAMPAIGN.size(), 4, "campaign: 4 missions")
 	_eq(Campaign.CAMPAIGN[0]["map"]["seed"], 7041, "campaign: c1 seed")

@@ -13,4 +13,10 @@ const MAPS := [
 	 "weather_table": ["heat", "heat", "clear", "gale"], "relics": 2},
 	{"key": "verdant", "name": "Verdant Expanse", "desc": "Wide greens, six spires.",
 	 "cols": 16, "rows": 13, "seed": -1, "mountains": 2, "lakes": 2, "forests": 30, "hills": 10, "towers": 6, "relics": 3},
+	{"key": "mistveil", "name": "Mistveil Hollow", "desc": "Fog-shrouded woods.",
+	 "cols": 15, "rows": 12, "seed": -1, "mountains": 2, "lakes": 3, "forests": 34, "hills": 10,
+	 "towers": 5, "relics": 2, "fog": true},
+	{"key": "ashfall", "name": "Ashfall Basin", "desc": "Volcanic crags, ash winds.",
+	 "cols": 15, "rows": 11, "seed": -1, "mountains": 8, "lakes": 1, "forests": 6, "hills": 22,
+	 "towers": 4, "weather_table": ["heat", "heat", "gale", "clear"], "relics": 2},
 ]
