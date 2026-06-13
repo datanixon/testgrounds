@@ -52,6 +52,7 @@ func _initialize() -> void:
 	_test_status()
 	_test_weather()
 	_test_leveling()
+	_test_new_evolutions()
 	_test_combat()
 	_test_resolve()
 	_test_turn()
@@ -218,7 +219,7 @@ func _test_board() -> void:
 
 func _test_unit_types() -> void:
 	# 8 original base + 8 evolved + 4 new base = 20.
-	_eq(UnitTypes.UNIT_TYPES.size(), 20, "unit_types: 20 entries")
+	_eq(UnitTypes.UNIT_TYPES.size(), 24, "unit_types: 24 entries")
 	_eq(UnitTypes.SUMMON_LIST.size(), 12, "unit_types: 12 summonable")
 	_eq(UnitTypes.SUMMON_LIST[0], "cinderling", "unit_types: summon[0]")
 	# Representative balance-locked values.
@@ -1792,3 +1793,35 @@ func _test_objective_campaign() -> void:
 	_eq(gs.objective.get("kind"), "survive", "obj-campaign: mission 2 has a survive objective")
 	_eq(int(gs.objective["turns"]), 8, "obj-campaign: survive 8 turns")
 	_eq(int(gs.objective_progress.get("start_turn", -1)), 1, "obj-campaign: start_turn stamped")
+
+func _test_new_evolutions() -> void:
+	# evolves_to wired on the four newest bases.
+	_eq(UnitTypes.UNIT_TYPES["hexwisp"]["evolves_to"], "hexlord", "evo: hexwisp -> hexlord")
+	_eq(UnitTypes.UNIT_TYPES["runeward"]["evolves_to"], "sigilwarden", "evo: runeward -> sigilwarden")
+	_eq(UnitTypes.UNIT_TYPES["frostmaw"]["evolves_to"], "glaciamaw", "evo: frostmaw -> glaciamaw")
+	_eq(UnitTypes.UNIT_TYPES["duneskink"]["evolves_to"], "dunestalker", "evo: duneskink -> dunestalker")
+	# evolved entries exist with the evolved flag, lineage element, and the base's ability.
+	for id in ["hexlord", "sigilwarden", "glaciamaw", "dunestalker"]:
+		_ok(UnitTypes.UNIT_TYPES.has(id), "evo: %s defined" % id)
+		_eq(UnitTypes.UNIT_TYPES[id]["evolved"], true, "evo: %s evolved flag" % id)
+	_eq(UnitTypes.UNIT_TYPES["hexlord"]["element"], "arcane", "evo: hexlord arcane")
+	_eq(UnitTypes.UNIT_TYPES["hexlord"]["flying"], true, "evo: hexlord flying")
+	_eq(UnitTypes.UNIT_TYPES["hexlord"]["ability"], "blink", "evo: hexlord keeps blink")
+	_eq(UnitTypes.UNIT_TYPES["glaciamaw"]["power"], 14, "evo: glaciamaw power")
+	# evolved forms are NOT summonable.
+	_eq(UnitTypes.SUMMON_LIST.size(), 12, "evo: summon list unchanged (12)")
+	for id in ["hexlord", "sigilwarden", "glaciamaw", "dunestalker"]:
+		_ok(not (id in UnitTypes.SUMMON_LIST), "evo: %s not summonable" % id)
+	# behavior: a level-4 hexwisp on an owned tower evolves to hexlord, absorbing growth.
+	var h := Units.make_unit(101, "hexwisp", 0, 0, 0)
+	Units.gain_xp(h, 12 + 20 + 28)   # level 1 -> 4
+	_eq(h["level"], 4, "evo: hexwisp at level 4")
+	_ok(Units.try_evolve(h, {"terrain": "tower", "owner": 0}), "evo: hexwisp evolves on owned tower")
+	_eq(h["type_key"], "hexlord", "evo: became hexlord")
+	_eq(h["evolved"], true, "evo: hexlord evolved flag set")
+	_eq(h["hp"], h["max_hp"], "evo: full restore on evolve")
+	# spot-check a second line on an owned castle.
+	var d := Units.make_unit(102, "duneskink", 0, 0, 0)
+	Units.gain_xp(d, 12 + 20 + 28)
+	_ok(Units.try_evolve(d, {"terrain": "castle", "owner": 0}), "evo: duneskink evolves on owned castle")
+	_eq(d["type_key"], "dunestalker", "evo: became dunestalker")

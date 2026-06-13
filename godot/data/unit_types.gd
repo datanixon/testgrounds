@@ -25,10 +25,15 @@ const UNIT_TYPES := {
 	"stormwisp":    {"name": "Stormwisp",    "element": "zephyr", "max_hp": 18, "move": 5, "range": 2, "power": 8,  "def": 2, "cost": 18, "flying": true,  "sprite": "stormwisp",    "attack": "spark",  "evolved": true, "ability": "galeRush"},
 	"skytyrant":    {"name": "Skytyrant",    "element": "zephyr", "max_hp": 26, "move": 4, "range": 2, "power": 11, "def": 3, "cost": 24, "flying": true,  "sprite": "skytyrant",    "attack": "dive",   "evolved": true, "ability": "diveMark"},
 	# New base monsters (arcane coverage + roster depth)
-	"hexwisp":   {"name": "Hexwisp",   "element": "arcane", "max_hp": 11, "move": 5, "range": 2, "power": 5,  "def": 1, "cost": 8,  "flying": true,  "sprite": "hexwisp",   "attack": "bolt",  "ability": "blink"},
-	"runeward":  {"name": "Runeward",  "element": "arcane", "max_hp": 24, "move": 2, "range": 1, "power": 7,  "def": 5, "cost": 15, "flying": false, "sprite": "runeward",  "attack": "melee", "ability": "ward"},
-	"frostmaw":  {"name": "Frostmaw",  "element": "hydro",  "max_hp": 28, "move": 3, "range": 1, "power": 10, "def": 3, "cost": 18, "flying": false, "sprite": "frostmaw",  "attack": "melee", "ability": "frostBite"},
-	"duneskink": {"name": "Duneskink", "element": "terra",  "max_hp": 13, "move": 5, "range": 1, "power": 6,  "def": 1, "cost": 6,  "flying": false, "sprite": "duneskink", "attack": "melee", "ability": "skitter"},
+	"hexwisp":   {"name": "Hexwisp",   "element": "arcane", "max_hp": 11, "move": 5, "range": 2, "power": 5,  "def": 1, "cost": 8,  "flying": true,  "sprite": "hexwisp",   "attack": "bolt",  "evolves_to": "hexlord",     "ability": "blink"},
+	"runeward":  {"name": "Runeward",  "element": "arcane", "max_hp": 24, "move": 2, "range": 1, "power": 7,  "def": 5, "cost": 15, "flying": false, "sprite": "runeward",  "attack": "melee", "evolves_to": "sigilwarden", "ability": "ward"},
+	"frostmaw":  {"name": "Frostmaw",  "element": "hydro",  "max_hp": 28, "move": 3, "range": 1, "power": 10, "def": 3, "cost": 18, "flying": false, "sprite": "frostmaw",  "attack": "melee", "evolves_to": "glaciamaw",   "ability": "frostBite"},
+	"duneskink": {"name": "Duneskink", "element": "terra",  "max_hp": 13, "move": 5, "range": 1, "power": 6,  "def": 1, "cost": 6,  "flying": false, "sprite": "duneskink", "attack": "melee", "evolves_to": "dunestalker", "ability": "skitter"},
+	# Evolved forms for the four newest bases (P4.1; sprites art-pending)
+	"hexlord":     {"name": "Hexlord",     "element": "arcane", "max_hp": 19, "move": 5, "range": 2, "power": 9,  "def": 2, "cost": 20, "flying": true,  "sprite": "hexlord",     "attack": "bolt",  "evolved": true, "ability": "blink"},
+	"sigilwarden": {"name": "Sigilwarden", "element": "arcane", "max_hp": 38, "move": 2, "range": 1, "power": 10, "def": 7, "cost": 30, "flying": false, "sprite": "sigilwarden", "attack": "melee", "evolved": true, "ability": "ward"},
+	"glaciamaw":   {"name": "Glaciamaw",   "element": "hydro",  "max_hp": 40, "move": 3, "range": 1, "power": 14, "def": 5, "cost": 34, "flying": false, "sprite": "glaciamaw",   "attack": "melee", "evolved": true, "ability": "frostBite"},
+	"dunestalker": {"name": "Dunestalker", "element": "terra",  "max_hp": 23, "move": 5, "range": 1, "power": 10, "def": 3, "cost": 16, "flying": false, "sprite": "dunestalker", "attack": "melee", "evolved": true, "ability": "skitter"},
 }
 
 const SUMMON_LIST := ["cinderling", "tidekin", "stoneward", "galewisp", "duneskink", "pyrowyrm", "hexwisp", "mistleviath", "runeward", "geomaul", "frostmaw", "skyharrow"]
