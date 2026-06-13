@@ -34,6 +34,7 @@ const Sprites = preload("res://core/sprites.gd")
 const Relics = preload("res://data/relics.gd")
 const Vision = preload("res://core/vision.gd")
 const Objectives = preload("res://core/objectives.gd")
+const RosterStore = preload("res://core/roster_store.gd")
 
 var _passed := 0
 var _failed := 0
@@ -96,6 +97,7 @@ func _initialize() -> void:
 	_test_objective_ai_weights()
 	_test_objective_campaign()
 	_test_fog_settings()
+	_test_roster_basic()
 	print("\n== %d passed, %d failed ==" % [_passed, _failed])
 	quit(1 if _failed > 0 else 0)
 
@@ -1850,3 +1852,44 @@ func _test_bosses() -> void:
 		if u["type_key"] == "pyre_colossus" and u["owner"] == 1:
 			found = true
 	_ok(found, "bosses: new_campaign spawns the boss for the AI")
+
+func _test_roster_basic() -> void:
+	var b := RosterStore.new_roster()
+	_eq(b["v"], 2, "roster: new version 2")
+	_eq((b["roster"] as Array).size(), 0, "roster: new empty")
+	_eq(b["next_roster_id"], 1, "roster: new next id 1")
+	# entry_from_unit snapshots carry fields, strips transient, doesn't mutate.
+	var u := {
+		"id": 42, "owner": 0, "q": 3, "r": 5, "is_master": false,
+		"type_key": "stoneward", "name": "Stoneward", "element": "terra",
+		"sprite": "golem", "attack": "melee", "flying": false,
+		"hp": 10, "max_hp": 26, "power": 6, "def": 5, "move": 2, "range": 1,
+		"level": 2, "xp": 4, "relic": "vital", "acted": true, "cd": 1, "second_move": true,
+	}
+	var e := RosterStore.entry_from_unit(u, 7)
+	_eq(e["roster_id"], 7, "entry: roster_id stamped")
+	_eq(e["type_key"], "stoneward", "entry: type_key kept")
+	_eq(e["level"], 2, "entry: level kept")
+	_eq(e["xp"], 4, "entry: xp kept")
+	_eq(e["max_hp"], 26, "entry: grown max_hp kept")
+	_eq(e["power"], 6, "entry: grown power kept")
+	_eq(e["relic"], "vital", "entry: relic kept")
+	_eq(e["flying"], false, "entry: flying kept")
+	_eq(e.has("q"), false, "entry: q stripped")
+	_eq(e.has("hp"), false, "entry: hp stripped")
+	_eq(e.has("id"), false, "entry: id stripped")
+	_eq(e.has("acted"), false, "entry: acted stripped")
+	_eq(u["id"], 42, "entry: source unit not mutated")
+	# add / remove / clear.
+	var id1 := RosterStore.add_entry(b, u)
+	var id2 := RosterStore.add_entry(b, u)
+	_eq(id1, 1, "add: first id 1")
+	_eq(id2, 2, "add: second id 2")
+	_eq(b["next_roster_id"], 3, "add: next id bumped")
+	_eq((b["roster"] as Array).size(), 2, "add: roster size 2")
+	_eq(RosterStore.remove_entry(b, 1), true, "remove: existing returns true")
+	_eq(RosterStore.remove_entry(b, 99), false, "remove: missing returns false")
+	_eq((b["roster"] as Array).size(), 1, "remove: roster size 1")
+	RosterStore.clear(b)
+	_eq((b["roster"] as Array).size(), 0, "clear: empty")
+	_eq(b["next_roster_id"], 3, "clear: next id preserved")
