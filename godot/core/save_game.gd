@@ -36,6 +36,7 @@ static func to_dict(state) -> Dictionary:
 		"is_ai": state.is_ai.duplicate(),
 		"weather": state.weather.duplicate(true),
 		"map_def": state.map_def.duplicate(true),
+		"relics": (state.map.get("relics", []) as Array).duplicate(true),
 	}
 
 ## from_dict — rebuild a GameState from a blob, or null if invalid. Rebuilds the
@@ -63,6 +64,10 @@ static func from_dict(blob) -> GameState:
 		"cols": int(blob.get("cols", 0)), "rows": int(blob.get("rows", 0)),
 		"cells": cells, "towers": towers, "castles": castles,
 	}
+	var relics: Array = []
+	for r in blob.get("relics", []):
+		relics.append({"q": int(r["q"]), "r": int(r["r"]), "relic": String(r["relic"])})
+	gs.map["relics"] = relics
 	var units: Array[Dictionary] = []
 	for u in blob["units"]:
 		var ud: Dictionary = (u as Dictionary).duplicate(true)

@@ -1201,6 +1201,19 @@ func _test_save() -> void:
 	# the actual crash scenario: a float subscript would panic here
 	gs4.stats["lost"][ju["owner"]] += 1
 	_ok(true, "save: json-path stats subscript by unit owner does not crash")
+	# relics: map.relics + unit.relic round-trip
+	var rgs := GameState.new_skirmish(Maps.MAPS[0], 7041)
+	rgs.map["relics"] = [{"q": 2, "r": 2, "relic": "swift"}]
+	var ru := rgs.spawn_unit("cinderling", 0, 1, 1)
+	ru["relic"] = "atk_charm"
+	var rblob = SaveGame.from_dict(JSON.parse_string(JSON.stringify(SaveGame.to_dict(rgs))))
+	_eq(rblob.map["relics"], [{"q": 2, "r": 2, "relic": "swift"}], "save: map.relics round-trips")
+	var ru2 = rblob.unit_at(1, 1)
+	_eq(ru2["relic"], "atk_charm", "save: unit.relic round-trips")
+	# old blob (no relics key) defaults to []
+	var noblob := SaveGame.to_dict(rgs)
+	noblob.erase("relics")
+	_eq(SaveGame.from_dict(noblob).map["relics"], [], "save: missing relics -> []")
 
 func _test_settings() -> void:
 	# default blob shape
