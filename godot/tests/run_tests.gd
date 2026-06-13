@@ -92,6 +92,7 @@ func _initialize() -> void:
 	_test_objective_win()
 	_test_objective_save()
 	_test_objective_ai_weights()
+	_test_objective_campaign()
 	_test_fog_settings()
 	print("\n== %d passed, %d failed ==" % [_passed, _failed])
 	quit(1 if _failed > 0 else 0)
@@ -1781,3 +1782,9 @@ func _test_objective_ai_weights() -> void:
 	_eq(int(w["atk_floor"]), 0, "obj-ai: survive zeroes atk_floor")
 	# The const profile must NOT be mutated.
 	_approx(float(AiProfiles.AI_PROFILES["normal"]["approach"]), base_approach, "obj-ai: profile not mutated")
+
+func _test_objective_campaign() -> void:
+	var gs := GameState.new_campaign(Campaign.CAMPAIGN[1], 1)
+	_eq(gs.objective.get("kind"), "survive", "obj-campaign: mission 2 has a survive objective")
+	_eq(int(gs.objective["turns"]), 8, "obj-campaign: survive 8 turns")
+	_eq(int(gs.objective_progress.get("start_turn", -1)), 1, "obj-campaign: start_turn stamped")
