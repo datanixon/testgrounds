@@ -23,6 +23,8 @@ static func to_dict(state) -> Dictionary:
 	return {
 		"v": 1,
 		"fog": state.fog,
+		"objective": state.objective.duplicate(true),
+		"objective_progress": state.objective_progress.duplicate(true),
 		"turn": state.turn,
 		"current_player": state.current_player,
 		"next_id": state._next_id,
@@ -106,6 +108,8 @@ static func from_dict(blob) -> GameState:
 	gs.map_def = blob.get("map_def", {})
 	gs.rng = Rng.new(0)   # resumed match: fresh RNG stream (determinism is per-session, not cross-save)
 	gs.fog = bool(blob.get("fog", false))
+	gs.objective = blob.get("objective", {})
+	gs.objective_progress = blob.get("objective_progress", {})
 	return gs
 
 # ---- file I/O (thin; not unit-tested — the pure round-trip above is) ----

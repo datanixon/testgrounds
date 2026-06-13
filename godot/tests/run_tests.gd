@@ -90,6 +90,7 @@ func _initialize() -> void:
 	_test_ai_fog_approach()
 	_test_objectives()
 	_test_objective_win()
+	_test_objective_save()
 	_test_fog_settings()
 	print("\n== %d passed, %d failed ==" % [_passed, _failed])
 	quit(1 if _failed > 0 else 0)
@@ -1750,3 +1751,18 @@ func _test_objective_win() -> void:
 	# A def with no objective -> empty (skirmish stays archon-kill).
 	var g5 := GameState.new_skirmish(Maps.MAPS[0], 42)
 	_eq(g5.objective, {}, "obj-win: no def objective -> empty")
+
+func _test_objective_save() -> void:
+	var gs := GameState.new_skirmish(Maps.MAPS[0], 42)
+	gs.objective = {"kind": "seize", "q": 3, "r": 4}
+	gs.objective_progress = {"start_turn": 2}
+	var blob := SaveGame.to_dict(gs)
+	_eq(blob["objective"].get("kind"), "seize", "obj-save: objective serialized")
+	var r := SaveGame.from_dict(blob)
+	_eq(r.objective.get("kind"), "seize", "obj-save: objective restored")
+	_eq(int(r.objective_progress.get("start_turn", -1)), 2, "obj-save: progress restored")
+	# old blob without objective -> {}.
+	blob.erase("objective")
+	blob.erase("objective_progress")
+	var r2 := SaveGame.from_dict(blob)
+	_eq(r2.objective, {}, "obj-save: missing objective -> empty")
