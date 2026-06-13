@@ -47,3 +47,32 @@ static func remove_entry(blob: Dictionary, roster_id: int) -> bool:
 
 static func clear(blob: Dictionary) -> void:
 	blob["roster"] = []
+
+# ---- reconcile (called after a mission win, in Phase 5.2) ----
+
+static func reconcile(blob: Dictionary, living_units: Array, deployed_ids: Array) -> Dictionary:
+	var out: Dictionary = blob.duplicate(true)
+	# Index living units that carry a roster_id (deployed veterans that survived).
+	var living_by_rid := {}
+	for u in living_units:
+		if u.has("roster_id"):
+			living_by_rid[int(u["roster_id"])] = u
+	# Deployed veterans: update survivors, cull the dead (permadeath).
+	for rid in deployed_ids:
+		var r := int(rid)
+		if living_by_rid.has(r):
+			_update_entry(out, r, living_by_rid[r])
+		else:
+			remove_entry(out, r)
+	# Fresh summons that survived (no roster_id) join the roster.
+	for u in living_units:
+		if not u.has("roster_id"):
+			add_entry(out, u)
+	return out
+
+static func _update_entry(blob: Dictionary, roster_id: int, unit: Dictionary) -> void:
+	var arr: Array = blob["roster"]
+	for i in arr.size():
+		if int(arr[i]["roster_id"]) == roster_id:
+			arr[i] = entry_from_unit(unit, roster_id)
+			return

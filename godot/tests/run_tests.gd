@@ -98,6 +98,7 @@ func _initialize() -> void:
 	_test_objective_campaign()
 	_test_fog_settings()
 	_test_roster_basic()
+	_test_roster_reconcile()
 	print("\n== %d passed, %d failed ==" % [_passed, _failed])
 	quit(1 if _failed > 0 else 0)
 
@@ -1893,3 +1894,46 @@ func _test_roster_basic() -> void:
 	RosterStore.clear(b)
 	_eq((b["roster"] as Array).size(), 0, "clear: empty")
 	_eq(b["next_roster_id"], 3, "clear: next id preserved")
+
+func _test_roster_reconcile() -> void:
+	# Seed a roster with two deployed veterans (roster_ids 1, 2).
+	var b := RosterStore.new_roster()
+	var vet_a := {"type_key": "stoneward", "name": "Stoneward", "element": "terra",
+		"sprite": "golem", "attack": "melee", "flying": false,
+		"max_hp": 26, "power": 6, "def": 5, "move": 2, "range": 1, "level": 2, "xp": 0, "relic": ""}
+	var vet_b := {"type_key": "tidekin", "name": "Tidekin", "element": "hydro",
+		"sprite": "merfolk", "attack": "melee", "flying": false,
+		"max_hp": 22, "power": 6, "def": 3, "move": 4, "range": 1, "level": 3, "xp": 0, "relic": ""}
+	var rid_a := RosterStore.add_entry(b, vet_a)   # 1
+	var rid_b := RosterStore.add_entry(b, vet_b)   # 2
+	# After the mission: vet A lived and leveled to 3 + grabbed a relic; vet B
+	# died; a fresh summon (no roster_id) lived; another fresh summon died (absent).
+	var living := [
+		{"roster_id": rid_a, "type_key": "stoneward", "name": "Stoneward", "element": "terra",
+		 "sprite": "golem", "attack": "melee", "flying": false,
+		 "max_hp": 30, "power": 7, "def": 6, "move": 2, "range": 1, "level": 3, "xp": 2, "relic": "vital"},
+		{"type_key": "galewisp", "name": "Galewisp", "element": "zephyr",
+		 "sprite": "wisp", "attack": "spark", "flying": true,
+		 "max_hp": 10, "power": 4, "def": 1, "move": 5, "range": 2, "level": 1, "xp": 0, "relic": ""},
+	]
+	var out := RosterStore.reconcile(b, living, [rid_a, rid_b])
+	var arr: Array = out["roster"]
+	_eq(arr.size(), 2, "reconcile: survivor-vet + fresh-survivor = 2")
+	_eq((b["roster"] as Array).size(), 2, "reconcile: original blob untouched")
+	var a_entry := {}
+	var fresh_entry := {}
+	var has_b := false
+	for e in arr:
+		if int(e["roster_id"]) == rid_a:
+			a_entry = e
+		elif int(e["roster_id"]) == rid_b:
+			has_b = true
+		elif e["type_key"] == "galewisp":
+			fresh_entry = e
+	_eq(a_entry.is_empty(), false, "reconcile: vet A retained")
+	_eq(a_entry.get("level"), 3, "reconcile: vet A leveled to 3")
+	_eq(a_entry.get("max_hp"), 30, "reconcile: vet A grown stats updated")
+	_eq(a_entry.get("relic"), "vital", "reconcile: vet A relic carried")
+	_eq(has_b, false, "reconcile: dead vet B culled (permadeath)")
+	_eq(fresh_entry.is_empty(), false, "reconcile: fresh survivor added")
+	_ok(int(fresh_entry.get("roster_id", -1)) >= 3, "reconcile: fresh survivor got a new id")
