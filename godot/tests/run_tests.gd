@@ -35,6 +35,7 @@ const Relics = preload("res://data/relics.gd")
 const Vision = preload("res://core/vision.gd")
 const Objectives = preload("res://core/objectives.gd")
 const RosterStore = preload("res://core/roster_store.gd")
+const Deploy = preload("res://core/deploy.gd")
 
 var _passed := 0
 var _failed := 0
@@ -101,6 +102,7 @@ func _initialize() -> void:
 	_test_roster_reconcile()
 	_test_roster_migrate()
 	_test_roster_roundtrip()
+	_test_deploy_helpers()
 	print("\n== %d passed, %d failed ==" % [_passed, _failed])
 	quit(1 if _failed > 0 else 0)
 
@@ -1991,3 +1993,39 @@ func _test_roster_roundtrip() -> void:
 	_eq(RosterStore._validate({"v": 2}), null, "roundtrip: missing roster rejected")
 	_eq(RosterStore._validate({"v": 2, "roster": []}), null, "roundtrip: missing next_roster_id rejected")
 	_eq(RosterStore._validate({"v": 2, "next_roster_id": 1, "roster": [{}]}), null, "roundtrip: entry missing roster_id rejected")
+
+func _test_deploy_helpers() -> void:
+	# unit_from_entry rebuilds a ready live unit from a snapshot entry.
+	var entry := {
+		"roster_id": 5, "type_key": "earthbreaker", "name": "Earthbreaker", "element": "terra",
+		"sprite": "earthbreaker", "attack": "melee", "relic": "vital",
+		"flying": false, "evolved": true,
+		"level": 4, "xp": 0, "max_hp": 54, "power": 17, "def": 9, "move": 2, "range": 1,
+	}
+	var u := Deploy.unit_from_entry(entry, 1001, 0, 3, 4)
+	_eq(u["id"], 1001, "deploy: unit id set")
+	_eq(u["owner"], 0, "deploy: owner set")
+	_eq(u["q"], 3, "deploy: q set")
+	_eq(u["r"], 4, "deploy: r set")
+	_eq(u["roster_id"], 5, "deploy: roster_id stamped")
+	_eq(u["type_key"], "earthbreaker", "deploy: type_key restored")
+	_eq(u["level"], 4, "deploy: level restored")
+	_eq(u["max_hp"], 54, "deploy: max_hp restored")
+	_eq(u["hp"], 54, "deploy: hp restored to full")
+	_eq(u["power"], 17, "deploy: power restored")
+	_eq(u["relic"], "vital", "deploy: relic restored")
+	_eq(u["evolved"], true, "deploy: evolved restored")
+	_eq(u["is_master"], false, "deploy: not a master")
+	_eq(u["acted"], false, "deploy: ready to act turn 1")
+	_eq(u["cd"], 0, "deploy: cd reset")
+	_eq(u["second_move"], false, "deploy: second_move reset")
+	# roster_value sums type costs (earthbreaker 30 + cinderling 6 = 36).
+	_eq(Deploy.roster_value([entry, {"type_key": "cinderling"}]), 36, "deploy: roster_value sums costs")
+	_eq(Deploy.roster_value([]), 0, "deploy: empty army worth 0")
+	# ai_scale_mp: zero, linear under cap, clamped.
+	_eq(Deploy.ai_scale_mp(0), 0, "deploy: scale at 0")
+	_eq(Deploy.ai_scale_mp(36), 3, "deploy: scale 36/10 = 3")
+	_eq(Deploy.ai_scale_mp(1000), 12, "deploy: scale capped at 12")
+	# slots_for: explicit vs default.
+	_eq(Deploy.slots_for({"deploy_slots": 5}), 5, "deploy: explicit slots")
+	_eq(Deploy.slots_for({}), 3, "deploy: default slots 3")
