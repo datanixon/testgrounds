@@ -12,6 +12,7 @@ const Weather = preload("res://core/weather.gd")
 const Status = preload("res://core/status.gd")
 const AILib = preload("res://core/ai.gd")  # M9: new_campaign AI opener; ai.gd does NOT preload game_state.gd — no cycle
 const Relics = preload("res://data/relics.gd")
+const Vision = preload("res://core/vision.gd")
 
 var map: Dictionary = {}              # the generate() result: cols, rows, cells, castles, towers
 var units: Array[Dictionary] = []
@@ -24,6 +25,9 @@ var map_def: Dictionary = {}  # the active map def (for its weather_table)
 var winner: int = -1          # -1 none; else the winning owner
 var difficulty := "normal"    # AI weight profile (easy/normal/hard); difficulty-select UI is M9
 var battle_log: Array = []   # M8: per-battle snapshots appended by Combat.resolve_attack, drained by the presentation cutaway
+var fog: bool = false              # P3: this match uses fog of war (saved)
+var visibility: Dictionary = {}    # P3: cached visible "q,r" set for the viewer (NOT saved)
+var revealed: Dictionary = {}      # P3: extra reveals this turn (ambush cutaways); NOT saved
 var is_ai: Array[bool] = [false, true]   # M9: per-player AI flag (replaces the current_player==1 hardcode)
 var campaign_index: int = -1             # M9: -1 skirmish; else CAMPAIGN index
 var match_difficulty: String = "normal"  # M9: difficulty in force THIS match (campaign sets its own w/o touching prefs)
@@ -91,6 +95,14 @@ func capture_tower(unit: Dictionary, cell: Dictionary) -> void:
 ## effective_max_hp — base max HP plus a vital relic. Single source for heal clamps.
 func effective_max_hp(unit: Dictionary) -> int:
 	return Relics.max_hp(unit)
+
+## recompute_visibility — refresh the cached visible-key set for `owner` (the viewer),
+## unioning in any per-turn revealed tiles. Presentation calls this on match start and
+## after each move/summon/death/turn. Pure read of unit positions + owned spires.
+func recompute_visibility(owner: int) -> void:
+	visibility = Vision.compute(self, owner)
+	for k in revealed:
+		visibility[k] = true
 
 ## pick_up_relic — if a relic sits on `unit`'s tile, resolve pickup and return the
 ## relic id taken (or "" if none / left). Ley Crystal: master-only, applies MP and

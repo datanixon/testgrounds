@@ -84,6 +84,7 @@ func _initialize() -> void:
 	_test_ai_relic_nudge()
 	_test_vision()
 	_test_veilstone()
+	_test_fog_state()
 	print("\n== %d passed, %d failed ==" % [_passed, _failed])
 	quit(1 if _failed > 0 else 0)
 
@@ -1604,3 +1605,25 @@ func _test_veilstone() -> void:
 	_eq(Relics.unit_bonus(u, "vision"), 0, "veilstone: no relic -> 0 vision bonus")
 	u["relic"] = "veilstone"
 	_eq(Relics.unit_bonus(u, "vision"), 1, "veilstone: equipped -> +1")
+
+func _test_fog_state() -> void:
+	# recompute_visibility fills the cache for the viewer; revealed tiles union in.
+	var gs := _flat_state(9, 9)
+	gs.spawn_unit("cinderling", 0, 4, 4)   # owner-0 vision source
+	gs.recompute_visibility(0)
+	_ok(gs.visibility.has("4,4"), "fog state: recompute fills viewer vision")
+	_ok(not gs.visibility.has("0,0"), "fog state: far tile not visible")
+	gs.revealed["0,0"] = true
+	gs.recompute_visibility(0)
+	_ok(gs.visibility.has("0,0"), "fog state: revealed tiles union into visibility")
+	# fog flag round-trips through save; visibility/revealed are NOT saved.
+	var g2 := GameState.new_skirmish(Maps.MAPS[0], 42)
+	g2.fog = true
+	var blob := SaveGame.to_dict(g2)
+	_eq(blob["fog"], true, "fog state: to_dict serializes fog")
+	_eq(blob.has("visibility"), false, "fog state: visibility not serialized")
+	var restored := SaveGame.from_dict(blob)
+	_eq(restored.fog, true, "fog state: from_dict restores fog")
+	# old blob without fog defaults to false.
+	blob.erase("fog")
+	_eq(SaveGame.from_dict(blob).fog, false, "fog state: missing fog defaults false")

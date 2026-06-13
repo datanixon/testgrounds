@@ -22,6 +22,7 @@ static func to_dict(state) -> Dictionary:
 			living.append(u.duplicate(true))
 	return {
 		"v": 1,
+		"fog": state.fog,
 		"turn": state.turn,
 		"current_player": state.current_player,
 		"next_id": state._next_id,
@@ -104,6 +105,7 @@ static func from_dict(blob) -> GameState:
 	gs.weather = blob.get("weather", {"key": "clear", "turns_left": 5})
 	gs.map_def = blob.get("map_def", {})
 	gs.rng = Rng.new(0)   # resumed match: fresh RNG stream (determinism is per-session, not cross-save)
+	gs.fog = bool(blob.get("fog", false))
 	return gs
 
 # ---- file I/O (thin; not unit-tested — the pure round-trip above is) ----
