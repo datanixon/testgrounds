@@ -20,7 +20,23 @@ const Vision = preload("res://core/vision.gd")
 
 ## weights — the active difficulty's weight profile (defaults to normal).
 static func weights(state) -> Dictionary:
-	return AiProfiles.AI_PROFILES.get(state.difficulty, AiProfiles.AI_PROFILES["normal"])
+	var base: Dictionary = AiProfiles.AI_PROFILES.get(state.difficulty, AiProfiles.AI_PROFILES["normal"])
+	var obj: Dictionary = state.objective
+	if obj.is_empty():
+		return base
+	var W := base.duplicate(true)
+	match obj.get("kind", ""):
+		"survive":              # player turtles a timer -> AI rushes
+			W["approach"] = float(W["approach"]) * 1.5
+			W["atk_floor"] = 0
+		"seize":                # player rushes a hex -> AI holds ground
+			W["threat_safe"] = float(W["threat_safe"]) + 0.3
+			W["threat_hurt"] = float(W["threat_hurt"]) + 0.3
+		"protect":              # AI pressures
+			W["approach"] = float(W["approach"]) * 1.3
+		"rout":
+			pass
+	return W
 
 ## build_threat_map — total potential enemy damage onto every tile: each enemy of the
 ## OTHER player expands its reachable tiles by its attack range; one enemy contributes

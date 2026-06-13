@@ -91,6 +91,7 @@ func _initialize() -> void:
 	_test_objectives()
 	_test_objective_win()
 	_test_objective_save()
+	_test_objective_ai_weights()
 	_test_fog_settings()
 	print("\n== %d passed, %d failed ==" % [_passed, _failed])
 	quit(1 if _failed > 0 else 0)
@@ -1766,3 +1767,17 @@ func _test_objective_save() -> void:
 	blob.erase("objective_progress")
 	var r2 := SaveGame.from_dict(blob)
 	_eq(r2.objective, {}, "obj-save: missing objective -> empty")
+
+func _test_objective_ai_weights() -> void:
+	var gs := _flat_state(9, 9)
+	gs.difficulty = "normal"
+	# No objective -> identical to the profile.
+	_eq(AI.weights(gs), AiProfiles.AI_PROFILES["normal"], "obj-ai: no objective -> profile unchanged")
+	# survive -> approach * 1.5, atk_floor 0.
+	var base_approach: float = float(AiProfiles.AI_PROFILES["normal"]["approach"])
+	gs.objective = {"kind": "survive", "turns": 5}
+	var w := AI.weights(gs)
+	_approx(float(w["approach"]), base_approach * 1.5, "obj-ai: survive raises approach")
+	_eq(int(w["atk_floor"]), 0, "obj-ai: survive zeroes atk_floor")
+	# The const profile must NOT be mutated.
+	_approx(float(AiProfiles.AI_PROFILES["normal"]["approach"]), base_approach, "obj-ai: profile not mutated")
