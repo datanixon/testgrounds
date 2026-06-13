@@ -28,6 +28,8 @@ var battle_log: Array = []   # M8: per-battle snapshots appended by Combat.resol
 var fog: bool = false              # P3: this match uses fog of war (saved)
 var visibility: Dictionary = {}    # P3: cached visible "q,r" set for the viewer (NOT saved)
 var revealed: Dictionary = {}      # P3: extra reveals this turn (ambush cutaways); NOT saved
+var objective: Dictionary = {}           # P4.2: win condition beyond archon-kill ({} = none); saved
+var objective_progress: Dictionary = {}  # P4.2: survive start turn; saved
 var is_ai: Array[bool] = [false, true]   # M9: per-player AI flag (replaces the current_player==1 hardcode)
 var campaign_index: int = -1             # M9: -1 skirmish; else CAMPAIGN index
 var match_difficulty: String = "normal"  # M9: difficulty in force THIS match (campaign sets its own w/o touching prefs)
@@ -66,6 +68,21 @@ func master_of(owner: int) -> Variant:
 		if u["is_master"] and u["owner"] == owner and u["hp"] > 0:
 			return u
 	return null
+
+## unit_by_id — first living unit with `id`, or null.
+func unit_by_id(id: int) -> Variant:
+	for u in units:
+		if u["id"] == id and u["hp"] > 0:
+			return u
+	return null
+
+## enemy_non_masters — living non-master units belonging to 1 - owner (for rout).
+func enemy_non_masters(owner: int) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	for u in alive_units(1 - owner):
+		if not u.get("is_master", false):
+			out.append(u)
+	return out
 
 func spawn_unit(type_key: String, owner: int, q: int, r: int) -> Dictionary:
 	var u := Units.make_unit(_new_id(), type_key, owner, q, r)

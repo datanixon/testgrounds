@@ -33,6 +33,7 @@ const MusicSeq = preload("res://core/music_seq.gd")
 const Sprites = preload("res://core/sprites.gd")
 const Relics = preload("res://data/relics.gd")
 const Vision = preload("res://core/vision.gd")
+const Objectives = preload("res://core/objectives.gd")
 
 var _passed := 0
 var _failed := 0
@@ -87,6 +88,7 @@ func _initialize() -> void:
 	_test_fog_state()
 	_test_ai_fog()
 	_test_ai_fog_approach()
+	_test_objectives()
 	_test_fog_settings()
 	print("\n== %d passed, %d failed ==" % [_passed, _failed])
 	quit(1 if _failed > 0 else 0)
@@ -1670,3 +1672,49 @@ func _test_fog_settings() -> void:
 	_eq(merged["fog"], true, "settings: fog merges from a valid blob")
 	var bad := SettingsStore.merge(SettingsStore.defaults(), {"fog": "yes"})
 	_eq(bad["fog"], false, "settings: non-bool fog rejected")
+
+func _test_objectives() -> void:
+	# empty objective -> no verdict.
+	var gs := _flat_state(9, 9)
+	_eq(Objectives.evaluate(gs), -1, "obj: empty -> -1")
+	# survive: met only at/after start + turns.
+	gs.objective = {"kind": "survive", "turns": 3}
+	gs.objective_progress = {"start_turn": 1}
+	gs.turn = 3
+	_eq(Objectives.evaluate(gs), -1, "obj: survive not yet (turn 3, need start+3=4)")
+	gs.turn = 4
+	_eq(Objectives.evaluate(gs), 0, "obj: survive met")
+	# seize: a player-0 unit on the target hex wins.
+	var gz := _flat_state(9, 9)
+	gz.objective = {"kind": "seize", "q": 5, "r": 5}
+	_eq(Objectives.evaluate(gz), -1, "obj: seize empty hex -> -1")
+	gz.spawn_unit("cinderling", 1, 5, 5)
+	_eq(Objectives.evaluate(gz), -1, "obj: seize enemy-occupied -> -1")
+	gz.units.clear()
+	gz.spawn_unit("cinderling", 0, 5, 5)
+	_eq(Objectives.evaluate(gz), 0, "obj: seize player-occupied -> 0")
+	# protect: lose when the unit id is gone.
+	var gp := _flat_state(9, 9)
+	var ally := gp.spawn_unit("cinderling", 0, 2, 2)
+	gp.objective = {"kind": "protect", "unit_id": ally["id"]}
+	_eq(Objectives.evaluate(gp), -1, "obj: protect alive -> -1")
+	ally["hp"] = 0
+	_eq(Objectives.evaluate(gp), 1, "obj: protect dead -> 1 (player loses)")
+	# rout: turn-2 guard, then win when enemy non-masters are cleared.
+	var gr := _flat_state(9, 9)
+	gr.objective = {"kind": "rout"}
+	gr.spawn_master(1, 0, 0)
+	var foe := gr.spawn_unit("cinderling", 1, 3, 3)
+	gr.turn = 1
+	_eq(Objectives.evaluate(gr), -1, "obj: rout turn-1 guard")
+	gr.turn = 2
+	_eq(Objectives.evaluate(gr), -1, "obj: rout with a live enemy -> -1")
+	foe["hp"] = 0
+	_eq(Objectives.evaluate(gr), 0, "obj: rout cleared -> 0")
+	# label.
+	var gl := _flat_state(9, 9)
+	gl.objective = {"kind": "survive", "turns": 8}
+	gl.objective_progress = {"start_turn": 1}
+	gl.turn = 4
+	_eq(Objectives.label(gl), "Survive: 3/8", "obj: survive label")
+	_eq(Objectives.label(_flat_state(3, 3)), "", "obj: no objective -> empty label")
