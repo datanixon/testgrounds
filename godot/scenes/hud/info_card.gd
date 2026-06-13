@@ -8,8 +8,11 @@ const Relics = preload("res://data/relics.gd")
 var _label: Label
 
 func _ready() -> void:
-	set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
-	position = Vector2(12, -150)
+	# CanvasLayer parent -> BOTTOM_LEFT anchors resolve to the top, putting position.y=-150
+	# offscreen. Anchor TOP_LEFT and place explicitly against the real viewport bottom.
+	set_anchors_preset(Control.PRESET_TOP_LEFT)
+	size = Vector2(240, 138)
+	position = Vector2(12, get_viewport_rect().size.y - size.y - 12)
 	custom_minimum_size = Vector2(240, 138)
 	var bg := ColorRect.new()
 	bg.color = Color(0.06, 0.07, 0.10, 0.85)

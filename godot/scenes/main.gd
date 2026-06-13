@@ -67,6 +67,29 @@ func _run_shot(target: String) -> void:
 			_route()
 			await get_tree().create_timer(0.3).timeout
 			_current.settings_panel.open(session)
+		"selected":
+			session.settings["fog"] = false
+			session.start_skirmish()
+			_route()
+			await get_tree().create_timer(0.3).timeout
+			var ms = _current.state.master_of(0)
+			_current._on_click(Vector2i(ms["q"], ms["r"]))
+		"menu":
+			session.settings["fog"] = false
+			session.start_skirmish()
+			_route()
+			await get_tree().create_timer(0.3).timeout
+			var mm = _current.state.master_of(0)
+			_current.selected = mm
+			_current._open_menu_for(mm)
+		"summon":
+			session.settings["fog"] = false
+			session.start_skirmish()
+			_route()
+			await get_tree().create_timer(0.3).timeout
+			var mu = _current.state.master_of(0)
+			_current.selected = mu
+			_current._on_action_chosen("summon")
 		"battle":
 			session.start_skirmish()
 			_route()
