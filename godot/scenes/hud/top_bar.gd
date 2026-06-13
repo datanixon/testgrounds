@@ -7,6 +7,7 @@ signal end_turn_pressed
 signal settings_pressed
 
 const PLAYER_NAMES := ["AZURE", "CRIMSON"]
+const Objectives = preload("res://core/objectives.gd")
 
 var _label: Label
 var _button: Button
@@ -48,4 +49,6 @@ func refresh(state) -> void:
 	var weather_key: String = state.weather.get("key", "clear") if state.weather != null else "clear"
 	var m = state.master_of(state.current_player)
 	var mp: int = m["mp"] if m != null else 0
-	_label.text = "Turn %d   %s   Weather: %s   MP: %d" % [state.turn, who, weather_key, mp]
+	var base := "Turn %d   %s   Weather: %s   MP: %d" % [state.turn, who, weather_key, mp]
+	var obj := Objectives.label(state)
+	_label.text = base if obj == "" else base + "   |   " + obj
