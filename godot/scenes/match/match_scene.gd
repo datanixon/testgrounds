@@ -52,6 +52,7 @@ const ZOOM_MIN := 0.5
 const ZOOM_MAX := 2.5
 const ZOOM_STEP := 1.1
 var _panning := false
+var _cam_bounds := Rect2()   # board pixel bounds; camera is clamped inside it (no off-board void)
 
 func init(p_state, p_session) -> void:
 	state = p_state
@@ -63,6 +64,7 @@ func _ready() -> void:
 	board = BoardScript.new()
 	board.set_map(state.map)
 	add_child(board)
+	_compute_cam_bounds()
 	overlay = OverlayScript.new()
 	add_child(overlay)
 	units_layer = UnitsLayerScript.new()
@@ -77,6 +79,7 @@ func _ready() -> void:
 	cam.position = Hex.axial_to_pixel(Vector2i(m["q"], m["r"]))
 	add_child(cam)
 	cam.make_current()
+	_clamp_cam()
 	hud = CanvasLayer.new()
 	add_child(hud)
 	top_bar = TopBarScript.new()
@@ -109,12 +112,15 @@ func _unhandled_input(event: InputEvent) -> void:
 			return
 		elif event.button_index == MOUSE_BUTTON_WHEEL_UP and event.pressed:
 			cam.zoom = (cam.zoom * ZOOM_STEP).clamp(Vector2(ZOOM_MIN, ZOOM_MIN), Vector2(ZOOM_MAX, ZOOM_MAX))
+			_clamp_cam()
 			return
 		elif event.button_index == MOUSE_BUTTON_WHEEL_DOWN and event.pressed:
 			cam.zoom = (cam.zoom / ZOOM_STEP).clamp(Vector2(ZOOM_MIN, ZOOM_MIN), Vector2(ZOOM_MAX, ZOOM_MAX))
+			_clamp_cam()
 			return
 	if event is InputEventMouseMotion and _panning:
 		cam.position -= event.relative / cam.zoom
+		_clamp_cam()
 		return
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 		_on_click(Hex.pixel_to_axial(get_global_mouse_position()))
@@ -146,6 +152,35 @@ func _center_on_master() -> void:
 	var m = state.master_of(state.current_player)
 	if m != null:
 		cam.position = Hex.axial_to_pixel(Vector2i(m["q"], m["r"]))
+		_clamp_cam()
+
+## _compute_cam_bounds — pixel bounding box of the board (+ a hex of padding). Cached.
+func _compute_cam_bounds() -> void:
+	var mn := Vector2(INF, INF)
+	var mx := Vector2(-INF, -INF)
+	for k in state.map.get("cells", {}):
+		var c: Dictionary = state.map["cells"][k]
+		var p := Hex.axial_to_pixel(Vector2i(c["q"], c["r"]))
+		mn = mn.min(p)
+		mx = mx.max(p)
+	if not is_finite(mn.x):
+		_cam_bounds = Rect2()
+		return
+	var pad := Vector2(Hex.SIZE, Hex.SIZE) * 1.5
+	_cam_bounds = Rect2(mn - pad, (mx - mn) + pad * 2.0)
+
+## _clamp_cam — keep the camera within the board: clamp each axis so no off-board void
+## shows; if the board is smaller than the view on an axis, center it on that axis.
+func _clamp_cam() -> void:
+	if _cam_bounds.size == Vector2.ZERO:
+		return
+	var half := get_viewport_rect().size * 0.5 / cam.zoom
+	var minp := _cam_bounds.position + half
+	var maxp := _cam_bounds.end - half
+	var pos := cam.position
+	pos.x = _cam_bounds.get_center().x if minp.x > maxp.x else clampf(pos.x, minp.x, maxp.x)
+	pos.y = _cam_bounds.get_center().y if minp.y > maxp.y else clampf(pos.y, minp.y, maxp.y)
+	cam.position = pos
 
 ## World hex -> screen position for anchoring a HUD popup at a unit (CanvasLayer is not
 ## affected by the camera, so convert through the canvas transform).

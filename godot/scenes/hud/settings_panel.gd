@@ -19,7 +19,8 @@ var _music_off_btn: Button
 var _track_label: Label
 
 func _ready() -> void:
-	set_anchors_preset(Control.PRESET_FULL_RECT)
+	set_anchors_preset(Control.PRESET_TOP_LEFT)   # CanvasLayer parent -> FULL_RECT gives size 0; size to the viewport so the dim backdrop covers the screen
+	size = get_viewport_rect().size
 	visible = false
 	mouse_filter = Control.MOUSE_FILTER_STOP
 

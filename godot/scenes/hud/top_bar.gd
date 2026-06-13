@@ -13,8 +13,9 @@ var _label: Label
 var _button: Button
 
 func _ready() -> void:
-	set_anchors_preset(Control.PRESET_TOP_WIDE)
+	set_anchors_preset(Control.PRESET_TOP_LEFT)   # CanvasLayer parent -> TOP_WIDE gives width 0; size to the viewport so the bg strip + right-anchored buttons place correctly
 	custom_minimum_size = Vector2(0, 36)
+	size = Vector2(get_viewport_rect().size.x, 36)
 	var bg := ColorRect.new()
 	bg.color = Color(0.06, 0.07, 0.10, 0.85)
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)

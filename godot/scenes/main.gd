@@ -43,6 +43,30 @@ func _run_shot(target: String) -> void:
 		"mission2":
 			session.start_campaign(1)
 			_route()
+		"skirmish":
+			session.settings["fog"] = false
+			session.start_skirmish()
+			_route()
+		"campaign":
+			session.screen = "campaign"
+			_route()
+		"story":
+			session.story_index = 0
+			session.screen = "story"
+			_route()
+		"gameover":
+			session.settings["fog"] = false
+			session.start_skirmish()
+			session.state.stats = {"summoned": [3, 2], "lost": [1, 2], "battles": 4}
+			session.state.winner = 0
+			session.screen = "gameover"
+			_route()
+		"settings":
+			session.settings["fog"] = false
+			session.start_skirmish()
+			_route()
+			await get_tree().create_timer(0.3).timeout
+			_current.settings_panel.open(session)
 		"battle":
 			session.start_skirmish()
 			_route()
