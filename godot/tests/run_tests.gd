@@ -79,6 +79,7 @@ func _initialize() -> void:
 	_test_relic_effects()
 	_test_relic_spawn()
 	_test_relic_pickup()
+	_test_relic_consumables()
 	print("\n== %d passed, %d failed ==" % [_passed, _failed])
 	quit(1 if _failed > 0 else 0)
 
@@ -1503,3 +1504,28 @@ func _test_relic_pickup() -> void:
 	_eq(gs.map["relics"].size(), 0, "pickup: ley tile cleared")
 	# no relic on tile -> ""
 	_eq(gs.pick_up_relic(u), "", "pickup: empty tile -> ''")
+
+func _test_relic_consumables() -> void:
+	var gs := GameState.new_skirmish(Maps.MAPS[0], 7041)
+	# warhorn: boosts compute_damage base ~1.5x, then clears after the swing
+	var atk := gs.spawn_unit("colossus", 0, 2, 2)
+	var foe := gs.spawn_unit("stoneward", 1, 3, 2)
+	var base_no: int = Combat.compute_damage(gs, atk, foe)["base"]
+	atk["relic"] = "warhorn"
+	var base_wh: int = Combat.compute_damage(gs, atk, foe)["base"]
+	_ok(base_wh > base_no, "consumable: warhorn boosts base damage")
+	Combat.resolve_attack(gs, atk, foe)
+	_eq(atk["relic"], "", "consumable: warhorn consumed after attack")
+	# phoenix: a lethal hit leaves the bearer at 1 hp, relic cleared, alive
+	var killer := gs.spawn_unit("colossus", 0, 6, 6)
+	var victim := gs.spawn_unit("cinderling", 1, 7, 6)
+	victim["relic"] = "phoenix"
+	victim["hp"] = 1   # ensure the swing is lethal
+	Combat.resolve_attack(gs, killer, victim)
+	_eq(victim["hp"], 1, "consumable: phoenix revives at 1 hp")
+	_eq(victim["relic"], "", "consumable: phoenix consumed")
+	_ok(gs.unit_at(7, 6) != null, "consumable: phoenix-saved unit still alive")
+	# a second lethal hit (no phoenix now) kills
+	victim["hp"] = 1
+	Combat.resolve_attack(gs, killer, victim)
+	_ok(victim["hp"] <= 0, "consumable: no phoenix second time -> dead")

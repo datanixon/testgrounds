@@ -32,6 +32,8 @@ static func compute_damage(state, attacker: Dictionary, defender: Dictionary) ->
 	var raw: float = power * (float(attacker["hp"]) / float(Relics.max_hp(attacker)) * 0.5 + 0.5)
 	var mit: float = defender["def"] + bulwark_def + d_terrain_def * 0.5
 	var base: int = maxi(1, roundi(raw * elem_mul * aff_mul * mark_mul * w_mul - mit * 0.6))
+	if Relics.has_relic(attacker, "warhorn"):
+		base = maxi(1, roundi(base * float(Relics.bonus("warhorn", "atk_mult"))))
 	return {"base": base, "elem_mul": elem_mul, "aff_mul": aff_mul, "has_affinity": aff != null, "d_terrain_def": d_terrain_def}
 
 ## forecastBattle — two-way pre-jitter forecast for the UI/AI. Mirrors resolve_attack's
@@ -68,6 +70,8 @@ static func resolve_attack(state, attacker: Dictionary, defender: Dictionary, ap
 		terrain = dcell["terrain"]
 	var a1: Dictionary = compute_damage(state, attacker, defender)
 	var primary: Dictionary = _apply_hit(state, attacker, defender, _jitter(state, a1["base"]), apply_status, status_turns)
+	if Relics.has_relic(attacker, "warhorn"):
+		attacker["relic"] = ""
 	var status_rec: Variant = null
 	if apply_status != "" and not primary["absorbed"] and not primary["killed"]:
 		status_rec = {"key": apply_status, "turns": status_turns}
@@ -113,6 +117,10 @@ static func _apply_hit(_state, src: Dictionary, dst: Dictionary, dmg: int, statu
 		return {"dmg": 0, "absorbed": true, "killed": false}
 	dst["hp"] -= dmg
 	var killed: bool = dst["hp"] <= 0
+	if killed and Relics.has_relic(dst, "phoenix"):
+		dst["hp"] = 1
+		dst["relic"] = ""
+		killed = false
 	var xp_amt: int = dmg + (Units.KILL_XP_BONUS if killed else 0)
 	Units.gain_xp(src, xp_amt)
 	if status != "" and dst["hp"] > 0:
