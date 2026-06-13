@@ -21,26 +21,35 @@ Two builds:
 | ROADMAP2 Phase 2 — Relics | ✅ done, on `main` | — |
 | ROADMAP2 Phase 3 — Fog of war | ✅ done, on `main` | — |
 | Phase 4.2 — Objective framework | ✅ done, on `main` | — |
-| Phase 4.1 — Evolutions (**data**) | ✅ data done, **unmerged** | branch `godot-p4-1-evolutions` |
+| Phase 4.1 — Evolutions (**data**) | ✅ done, on `main` | — |
 | Phase 4.1 — Evolutions (**art**) | ⏳ pending 8 sprite PNGs | needs user-generated art |
 | Phase 4.3 — Bosses + maps | ⬜ not started (needs sprites) | — |
 | Phases 5–8 (campaign, unlocks/records, gauntlet, balance) | ⬜ not started | `ROADMAP2.md` |
 
-Two windowed-test bug fixes also merged to `main`: a `[display]` window/stretch config
-(the game ran in a too-small default window, cropping menu controls) and a
-procedural-screen click hit-area fix (title/campaign/story/gameover Controls had size
-(0,0), so menu clicks never registered).
+Test suite: **978 harness asserts green** on `main`.
 
-Test suite: **978 harness asserts green** on `godot-p4-1-evolutions` (950 on `main`).
+## Visual bug fixes merged to `main` (found via screenshots)
 
-## Current branch: `godot-p4-1-evolutions` (off `main`, NOT merged)
+A `--shot` screenshot sweep of every screen surfaced a family of latent render bugs —
+a `Control` parented to a non-Control (the Node2D router or a HUD CanvasLayer) gets
+size (0,0) from `FULL_RECT`/`TOP_WIDE`, so anything drawn at its own scale collapsed.
+All fixed + verified:
+- `[display]` window/stretch config (default window too small, cropping controls).
+- Procedural screens (title/campaign/story/gameover): clicks dead (size 0) → sized to canvas.
+- Battle cutaway: rendered in the top-left corner → draws against the viewport rect.
+- Top bar: bg strip gone, End Turn + gear buttons collapsed to x=0 → sized to viewport.
+- Settings: full-screen dim backdrop covered nothing → sized to viewport.
+- Camera: centered on the master (board corner) → ~half-empty view; added board-bounds
+  clamping so the board fills/centers in the view.
 
-Phase 4.1 **data**: four evolved forms — `Hexlord` (Hexwisp+), `Sigilwarden`
-(Runeward+), `Glaciamaw` (Frostmaw+), `Dunestalker` (Duneskink+) — added to
-`data/unit_types.gd` with `evolves_to` wiring. Evolution mechanic unchanged; evolved
-forms are non-summonable (evolution-only). `UNIT_TYPES` 20→24.
+None were in harness tests (render-layer) — the screenshot hook caught them all.
 
-Awaiting: user OK to FF-merge.
+## Phase 4.1 — Evolutions (data, merged)
+
+Four evolved forms — `Hexlord` (Hexwisp+), `Sigilwarden` (Runeward+), `Glaciamaw`
+(Frostmaw+), `Dunestalker` (Duneskink+) — in `data/unit_types.gd` with `evolves_to`
+wiring. Evolution mechanic unchanged; evolved forms non-summonable (evolution-only).
+`UNIT_TYPES` 20→24. **Art still pending** (8 PNGs — see below).
 
 ## Pending art (blocks 4.1 visuals + all of 4.3)
 

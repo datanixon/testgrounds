@@ -7,13 +7,17 @@ with "stop caveman" / "normal mode").
 ## Where things stand
 
 - **Canonical branch:** `main` — has the COMPLETE Godot port (M1–M10), ROADMAP2 Phase 2
-  (Relics), **Phase 3 (Fog of war)**, **Phase 4.2 (Objectives)**, plus two windowed-test
-  bug fixes (display/stretch config + procedural-screen click hit-areas) — all merged.
-- **In flight:** **ROADMAP2 Phase 4.1 (Evolutions) — DATA DONE on branch
-  `godot-p4-1-evolutions`** (off main), 978 tests green + headless boot clean + cavecrew
-  review clean. **NOT yet merged** — awaiting the user's OK. **Art (8 sprite PNGs) is
-  PENDING** — generation prompt is in the spec appendix; loader degrades gracefully until
-  they land (engine disc, no creature art).
+  (Relics), Phase 3 (Fog), Phase 4.2 (Objectives), **Phase 4.1 (Evolutions — DATA)**, and
+  a family of screenshot-found visual fixes (display/stretch; procedural-screen + top_bar +
+  settings + battle-cutaway size-0 Control bugs; camera board-bounds clamping) — all merged.
+  978 tests green.
+- **Phase 4.1 ART still PENDING** — 8 sprite PNGs (token+battle ×4 for Hexlord/Sigilwarden/
+  Glaciamaw/Dunestalker). Generation prompt in
+  `docs/superpowers/specs/2026-06-13-wraithspire-evolutions-design.md` (appendix). Loader
+  degrades gracefully (engine disc) until they land. Drop-in steps in `docs/PROGRESS.md`.
+- **Visual validation tool:** `--shot <target>` hook in `scenes/main.gd` captures a screen
+  to `godot/tools/shots/<target>.png` (windowed). Targets: title/skirmish/fog/mission2/
+  battle/campaign/story/gameover/settings. `godot --path godot -- --shot fog`.
 - **Done & on main:** the COMPLETE Godot port (M1–M10 — full JS-reference parity
   + real art + audio) **plus ROADMAP2 Phase 2 (Relics) + Phase 3 (Fog) + Phase 4.2
   (Objectives)**.

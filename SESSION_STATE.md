@@ -231,9 +231,20 @@ spec appendix (4 evolved descriptions + exact filenames). When the PNGs land in 
 without them); (2) remove the 4 ids from `pending_art` in _test_sprites; (3) commit PNGs+.import+test,
 windowed-verify tokens/portraits.
 
->>> PICK UP HERE: merge `godot-p4-1-evolutions` on user OK; then Phase 4.1 ART follow-up (generate +
-import 8 PNGs) + Phase 4.3 bosses+maps (also needs boss sprites; pairs with 4.2 objectives). Each its
-own spec/plan. (Earlier: M10 + Phase 2/3 windowed checks still optional.) <<<
+**UPDATE (2026-06-13): 4.1 MERGED + SCREENSHOT-FOUND VISUAL FIXES MERGED to main.** Built a
+`--shot <target>` screenshot hook in scenes/main.gd (windowed capture → tools/shots/<target>.png;
+targets title/skirmish/fog/mission2/battle/campaign/story/gameover/settings) for automated visual
+validation — headless can't render. A sweep found a FAMILY of latent size-(0,0) Control bugs (Control
+under a non-Control parent — Node2D router or HUD CanvasLayer — gets no size from FULL_RECT/TOP_WIDE):
+battle cutaway rendered in the corner, top_bar lost its strip + End Turn/gear buttons (collapsed to
+x=0), settings dim backdrop covered nothing. ALL fixed by sizing to the viewport / drawing against
+`get_viewport_rect().size`. ALSO fixed: camera framed ~half-empty (centered on the master in the board
+corner) → added board-bounds clamping (`_compute_cam_bounds`/`_clamp_cam`). None were harness-visible.
+978 tests; all verified by re-captured screenshots. `docs/PROGRESS.md` = single-glance status board.
+
+>>> PICK UP HERE: Phase 4.1 ART follow-up (user generates 8 PNGs per the evolutions-spec appendix →
+import + remove `pending_art` in _test_sprites) + Phase 4.3 bosses+maps (needs boss sprites; pairs with
+4.2 objectives). Each its own spec/plan. Use the `--shot` hook to visually validate. <<<
 Previous handoff (M9, historical):
 - **Tracker:** `ROADMAP_GODOT.md` — M1–M8 ✅; next `- [ ] M9 — ...`. M9 needs its own spec (brainstorming) + plan (writing-plans). M9 is the PARITY-completing milestone (after it the port matches the JS reference; ROADMAP2 Phases 2–8 then get their own specs).
 - **M9 scope (port the JS sec. 5/13/14 + save blob):** the `screen` router (title/play/battle/gameover — `GameState` is currently always in "play"); title screen (synthwave sun + perspective grid, "new game"/difficulty pick) + gameover screen (archon silhouette, victory); the **difficulty-select UI** + the **player/isAI table** (M6 hardcoded AI to player 1 — generalize here: `GameState.difficulty` already exists; add per-player isAI so `_on_end_turn` reads the table instead of `current_player == 1`); **save/load** to `user://wraithspire_save.json` (versioned blob: units incl. cd/status/level/xp/evolved, weather, board/seed, turn, players, captured towers — design spec "Save / load"; optionally serialize `map_def` to fix the JS resumed-campaign-weather gap); **campaign** (CAMPAIGN data already ported in `data/campaign.gd`; scenario list + progression). Also the **battle-scene on/off setting** (JS `STATE.settings.battleScene`) deferred from M8 — a settings toggle that skips the cutaway.
