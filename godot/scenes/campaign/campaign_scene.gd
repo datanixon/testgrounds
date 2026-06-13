@@ -16,6 +16,7 @@ var session = null
 
 func _ready() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
+	size = Vector2(CW, CH)   # Node2D parent -> anchors give a 0-size rect; size the click area to the canvas
 
 func _row_rects() -> Array:
 	var w := 720.0; var h := 70.0; var gap := 16.0

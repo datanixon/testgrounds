@@ -17,6 +17,7 @@ var _shown_at := 0
 
 func _ready() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
+	size = Vector2(CW, CH)   # Node2D parent -> anchors give a 0-size rect; size the click area to the canvas
 
 func _process(_delta: float) -> void:
 	_frame += 1
