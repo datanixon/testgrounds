@@ -25,10 +25,11 @@ Two builds:
 | Phase 4.1 — Evolutions (**art**) | ⏳ pending 8 sprite PNGs | needs user-generated art |
 | Phase 4.3 — Bosses + maps (**data**) | ✅ done, on `main` | — |
 | Phase 4.3 — Bosses (**art**) | ⏳ pending 4 sprite PNGs | needs user-generated art |
-| Phase 5.1 — Campaign roster layer | ✅ done, on `godot-p5-1-roster` (awaiting merge) | `core/roster_store.gd` |
-| Phase 5.2–5.3, 6–8 | ⬜ not started | `ROADMAP2.md` |
+| Phase 5.1 — Campaign roster layer | ✅ done, on `main` | `core/roster_store.gd` |
+| Phase 5.2 — Deploy screen + survivors + AI scaling | ✅ done, on `godot-p5-2-deploy` (awaiting merge) | `core/deploy.gd`, `scenes/deploy/` |
+| Phase 5.3, 6–8 | ⬜ not started | `ROADMAP2.md` |
 
-Test suite: **1067 harness asserts green** on `godot-p5-1-roster` (998 on `main`).
+Test suite: **1112 harness asserts green** on `godot-p5-2-deploy` (1067 on `main`).
 
 ## Visual bug fixes merged to `main` (found via screenshots)
 
@@ -53,7 +54,7 @@ Four evolved forms — `Hexlord` (Hexwisp+), `Sigilwarden` (Runeward+), `Glaciam
 wiring. Evolution mechanic unchanged; evolved forms non-summonable (evolution-only).
 `UNIT_TYPES` 20→24. **Art still pending** (8 PNGs — see below).
 
-## Phase 5.1 — Campaign roster layer (on `godot-p5-1-roster`, awaiting merge)
+## Phase 5.1 — Campaign roster layer (merged to `main`)
 
 Pure `core/roster_store.gd` (`class_name RosterStore`) — the persistence layer for
 the Fire-Emblem-style persistent campaign. Data-only: no live game wiring yet
@@ -75,6 +76,29 @@ the Fire-Emblem-style persistent campaign. Data-only: no live game wiring yet
   re-coercion; rejects non-dict / wrong-version / missing required keys → falls back
   to `migrate`). 1067 tests; headless boot clean. Spec/plan:
   `docs/superpowers/{specs,plans}/2026-06-13-wraithspire-roster-layer*`.
+
+## Phase 5.2 — Deploy screen + survivors + AI scaling (on `godot-p5-2-deploy`, awaiting merge)
+
+Turns the 5.1 roster into a playable loop. Flow `story → deploy → play` (campaign-only;
+skirmish untouched).
+- **`core/deploy.gd`** (pure): `unit_from_entry` (roster entry → ready live unit, reusing
+  RosterStore's `_CARRY_*` contract), `roster_value` (Σ type cost), `ai_scale_mp`
+  (`value/10`, cap 12), `slots_for` (per-mission cap, default 3), `commit` (place chosen
+  veterans near the player master via `AI.find_summon_slot`, record `deployed_roster_ids`,
+  bump AI master MP by the scaled army value — uses `units.append`+`_new_id`, NOT
+  `spawn_unit`, so the `summoned` stat isn't bumped; veterans enter ready to act turn 1).
+- **`scenes/deploy/deploy_scene.gd`** — procedural picker (mirrors campaign_scene): roster
+  rows (name/L#/element + HP/PWR/DEF + relic), selection capped at the slot count, paged
+  list (`MAX_VISIBLE` 7 + wheel-scroll for big rosters), empty-roster note, BEGIN MISSION,
+  two-click reset. `--shot deploy` validated.
+- **Wiring:** `start_campaign` → `screen=deploy`; router `_on_deploy_begin` →
+  `Deploy.commit` → play; `_on_deploy_back` → campaign (nulls stale state).
+  `Session.on_match_won` reconciles surviving player-0 non-masters into the roster on a
+  **campaign win only** (permadeath on death; loss/skirmish leave the roster untouched).
+- **Persist:** `GameState.deployed_roster_ids` + per-unit `roster_id` round-trip through
+  save (int-coerced). Per-mission `deploy_slots` 3/3/4/4 on the campaign scenarios.
+- 1112 tests; headless boot clean. AI-scaling constants tunable in Phase 8. Spec/plan:
+  `docs/superpowers/{specs,plans}/2026-06-13-wraithspire-deploy-screen*`.
 
 ## Pending art (blocks 4.1 visuals + all of 4.3)
 

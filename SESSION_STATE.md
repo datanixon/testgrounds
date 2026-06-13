@@ -288,11 +288,50 @@ live game wiring (deploy, win-reconcile call sites, AI scaling all = 5.2). New p
   (was lost in entries → would kill the -1 cd on deployed evolved veterans → fixed via _CARRY_BOOL);
   strict reject of corrupt blobs missing identity keys; spec entry-schema gap (evolved) documented.
 
->>> PICK UP HERE: FF-merge `godot-p5-1-roster` → main + push on user OK. THEN options: Phase 5.2 (deploy
-screen + survivors-join-on-win wiring [calls RosterStore.reconcile] + AI opening-strength scaling — the
-first art-free slice that makes 5.1 player-visible), or the ART follow-ups (user generates 8 evo + 4 boss
-PNGs → import + remove pending_art), or Phase 6 (unlocks+records). 5.2 is the natural next step (it wires
-in the roster module just built). Use the `--shot` hook to validate UI. <<<
+(5.1 was FF-merged to main + pushed: eff563e..4d3ae83.)
+
+**UPDATE (2026-06-13): ROADMAP2 PHASE 5.2 (DEPLOY SCREEN + SURVIVORS + AI SCALING) DONE** on branch
+`godot-p5-2-deploy` (off main; NOT yet merged — awaiting user OK). Slice 2 of Phase 5; turns the 5.1
+roster store into a playable loop. Spec/plan: `docs/superpowers/{specs,plans}/2026-06-13-wraithspire-deploy-screen*`.
+Flow `story → deploy → play`, CAMPAIGN-ONLY (skirmish untouched).
+- New pure `core/deploy.gd` (class_name Deploy; takes `state` as a param like core/ai.gd, no GameState
+  preload; reuses RosterStore `_CARRY_*` + global AI.find_summon_slot): `unit_from_entry` (roster entry →
+  ready live unit, hp=max_hp, acted=false, roster_id stamped), `roster_value` (Σ UnitTypes cost),
+  `ai_scale_mp` (value/10, cap 12; consts AI_SCALE_DIVISOR/AI_SCALE_CAP), `slots_for` (scenario.deploy_slots,
+  DEFAULT_SLOTS 3), `commit(state, entries)` (place each veteran near player-0 master, record
+  state.deployed_roster_ids, bump AI master mp by ai_scale_mp(roster_value) clamped like new_campaign —
+  uses units.append+_new_id NOT spawn_unit so the `summoned` stat isn't bumped; scales on the CHOSEN army
+  not placed).
+- New `scenes/deploy/deploy_scene.gd` (class_name DeployScene extends Control; mirrors campaign_scene's
+  procedural row-list + size-0-Control fix): loads RosterStore.load_or_init(campaign_progress).roster,
+  rows (name/L#/element + HP/PWR/DEF + relic), selection capped at slots_for, PAGED list (MAX_VISIBLE 7 +
+  mouse-wheel scroll + ▲/▼ hints — handles unbounded roster growth), empty-roster note, BEGIN MISSION
+  emits picked ENTRY DICTS, two-click reset → RosterStore.reset, ESC → back.
+- Router (scenes/main.gd) + session: `Session.start_campaign` now sets screen="deploy" (was "play");
+  `_route` "deploy" case mounts DeployScene (scenario=Campaign.CAMPAIGN[story_index]); `_on_deploy_begin`
+  → Deploy.commit(state, picked) → play; `_on_deploy_back` → campaign (nulls stale session.state).
+  `--shot deploy` target added; `--shot mission2` fixed to commit([])+screen=play (since start_campaign
+  now lands on deploy). `_test_session` start_campaign assert updated play→deploy.
+- `Session.on_match_won(winner)` extended: on CAMPAIGN WIN (campaign_index≥0 && winner==0) gather surviving
+  player-0 NON-master units → RosterStore.reconcile(load_or_init(progress), survivors, deployed_roster_ids)
+  → save; THEN existing progress-advance+persist. Loss/skirmish leave roster untouched (failed mission =
+  replay, no permadeath on loss). SaveGame.delete()+has_save tail still unconditional.
+- State/save: `GameState.deployed_roster_ids: Array[int]` (SAVED, init [] in new_skirmish); deployed units
+  carry `roster_id`; save_game serializes deployed_roster_ids + adds roster_id to the per-unit int-coercion
+  list. `data/campaign.gd` += `deploy_slots` 3/3/4/4 on the 4 scenarios (additive).
+- **1112 tests** (4 new _test_deploy_*); both gates green (harness + headless boot); deploy.png shot
+  verified (4 starter veterans render cleanly). Subagent-driven (5 grinder/sonnet TDD tasks + per-task
+  spec+code review + opus whole-slice review). Review-found+fixed: roster_value defensive type_key;
+  large-roster overflow → paged scroll; stale session.state on deploy-back; reset-armed redraw.
+  Final opus review = ready to merge (1 deferred test-coverage gap: commit test uses new_skirmish not
+  new_campaign — formula is start-MP-agnostic, reconcile test covers new_campaign; balance = Phase 8).
+
+>>> PICK UP HERE: FF-merge `godot-p5-2-deploy` → main + push on user OK. THEN Phase 5.3 (missions 5–8:
+defs with objectives/bosses/fog/weather skews + lore interstitials + campaign screen extension + their
+own deploy_slots — completes Phase 5; this is where rosters grow large so the paged deploy list matters),
+or the ART follow-ups (8 evo + 4 boss PNGs → import + remove pending_art), or Phase 6 (unlocks+records).
+NOTE for 5.3/later: bosses (pyre_colossus/storm_tyrant) + evolved forms still need art (engine-disc
+fallback until then). Use the `--shot` hook to validate UI. <<<
 Previous handoff (M9, historical):
 - **Tracker:** `ROADMAP_GODOT.md` — M1–M8 ✅; next `- [ ] M9 — ...`. M9 needs its own spec (brainstorming) + plan (writing-plans). M9 is the PARITY-completing milestone (after it the port matches the JS reference; ROADMAP2 Phases 2–8 then get their own specs).
 - **M9 scope (port the JS sec. 5/13/14 + save blob):** the `screen` router (title/play/battle/gameover — `GameState` is currently always in "play"); title screen (synthwave sun + perspective grid, "new game"/difficulty pick) + gameover screen (archon silhouette, victory); the **difficulty-select UI** + the **player/isAI table** (M6 hardcoded AI to player 1 — generalize here: `GameState.difficulty` already exists; add per-player isAI so `_on_end_turn` reads the table instead of `current_player == 1`); **save/load** to `user://wraithspire_save.json` (versioned blob: units incl. cd/status/level/xp/evolved, weather, board/seed, turn, players, captured towers — design spec "Save / load"; optionally serialize `map_def` to fix the JS resumed-campaign-weather gap); **campaign** (CAMPAIGN data already ported in `data/campaign.gd`; scenario list + progression). Also the **battle-scene on/off setting** (JS `STATE.settings.battleScene`) deferred from M8 — a settings toggle that skips the cutaway.

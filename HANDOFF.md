@@ -8,15 +8,14 @@ with "stop caveman" / "normal mode").
 
 - **Canonical branch:** `main` — has the COMPLETE Godot port (M1–M10), ROADMAP2 Phase 2
   (Relics), Phase 3 (Fog), Phase 4.2 (Objectives), Phase 4.1 (Evolutions — DATA),
-  **Phase 4.3 (Bosses + maps — DATA, merged: commits 203b005→eff563e)**, and a family of
-  screenshot-found visual fixes (display/stretch; procedural-screen + top_bar + settings +
-  battle-cutaway size-0 Control bugs; camera board-bounds clamping) — all merged. 998 tests green.
-- **In flight:** **Phase 5.1 (Campaign roster layer) — DONE on branch `godot-p5-1-roster`**
-  (off main, NOT merged — awaiting user OK to FF-merge). Pure `core/roster_store.gd`: campaign.v2
-  slot file, full-snapshot veteran entries (level/xp/evolved/relic + grown stats), `reconcile`
-  (carry + permadeath), `migrate` (v1 progress → 1 starter veteran/cleared act), file I/O + JSON
-  re-coercion. DATA-ONLY — live wiring (deploy/win-reconcile/AI scaling) is Phase 5.2. 1067 tests;
-  both gates green; per-task + opus whole-slice reviews done. Details in `SESSION_STATE.md`.
+  Phase 4.3 (Bosses + maps — DATA), **Phase 5.1 (Campaign roster layer — `core/roster_store.gd`,
+  merged eff563e..4d3ae83)**, and a family of screenshot-found visual fixes — all merged. 1067 tests green.
+- **In flight:** **Phase 5.2 (Deploy screen + survivors + AI scaling) — DONE on branch `godot-p5-2-deploy`**
+  (off main, NOT merged — awaiting user OK to FF-merge). `core/deploy.gd` + `scenes/deploy/deploy_scene.gd`:
+  `story → deploy → play` veteran picker (campaign-only), survivors reconcile into the roster on a campaign
+  win (permadeath on death/loss=replay), AI opening MP scales with the deployed army value, per-mission
+  `deploy_slots`. 1112 tests; both gates green; per-task + opus whole-slice reviews done. Details in
+  `SESSION_STATE.md`. NEXT after merge = Phase 5.3 (missions 5–8) / art follow-ups / Phase 6.
 - **ART PENDING** (unchanged) — Phase 4.1: 8 PNGs; Phase 4.3: 4 PNGs. See below.
 - **ART PENDING** — Phase 4.1: 8 PNGs (Hexlord/Sigilwarden/Glaciamaw/Dunestalker); Phase 4.3:
   4 PNGs (Pyre Colossus/Storm Tyrant). Generation prompts in the respective spec appendices

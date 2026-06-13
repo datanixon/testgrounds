@@ -132,9 +132,13 @@ Tag legend: `[model | effort]` routing hints, same rubric as v1.
   int/bool re-coercion guard. Data-only; live wiring (deploy/win-reconcile/AI
   scaling) is 5.2; mission-unlock progress stays in settings. 1067 tests.
   [claude-opus-4-8 | high]
-- [ ] 5.2 Deploy screen + scaling: pre-mission veteran picker (slot caps),
-  survivors join roster on win, AI opening strength scales with roster value.
-  [claude-opus-4-8 | high]
+- [x] 5.2 Deploy screen + scaling: `core/deploy.gd` (unit_from_entry / roster_value
+  / ai_scale_mp ÷10 cap 12 / slots_for / commit — place veterans near player master,
+  record `deployed_roster_ids`, bump AI MP by scaled army value) + `scenes/deploy/
+  deploy_scene.gd` (paged picker, two-click reset); router `story→deploy→play`;
+  `on_match_won` reconciles survivors into roster on campaign win (permadeath on
+  death, untouched on loss); `deployed_roster_ids`+`roster_id` saved; per-mission
+  `deploy_slots` (3/3/4/4). Campaign-only. 1112 tests. [claude-opus-4-8 | high]
 - [ ] 5.3 Missions 5–8: defs with objectives/bosses/fog/weather skews + lore
   interstitials; campaign screen extended. [claude-opus-4-8 | high]
 
